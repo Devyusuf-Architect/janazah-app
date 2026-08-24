@@ -115,11 +115,13 @@ document. Both need Java for the emulator; the browser test also needs
 Chromium, which you can point at with `CHROMIUM_PATH` if Playwright cannot
 download its own.
 
-Deploy:
+## 10. Deploy
 
 ```bash
 firebase deploy --only hosting
 ```
+
+Your console is then live at `https://<project-id>.web.app`.
 
 ## What Phase 1 does not include, and why
 
