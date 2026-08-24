@@ -1,0 +1,345 @@
+rules_version = '2';
+
+// Janazah app - Phase 1 security rules.
+//
+// These rules are the only enforcement layer in this phase. There is no server
+// code, so anything not forbidden here is permitted to any browser on the
+// internet holding the (public, non-secret) Firebase web config.
+//
+// Two invariants matter most:
+//   1. A /notices document is world-readable once published. Its key set is
+//      therefore restricted to an explicit allowlist so that a private field
+//      cannot physically be written onto it, even by a bug in the admin UI.
+//      Anything private lives in /notices/{id}/private/*, which is staff-only.
+//   2. Only staff of a *verified* organization can publish. Verification
+//      status is writable by platform admins only, so an organization cannot
+//      verify itself.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- identity helpers ----------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(uid()));
+    }
+
+    function orgData(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)).data;
+    }
+
+    function orgExists(orgId) {
+      return exists(/databases/$(database)/documents/organizations/$(orgId));
+    }
+
+    function isOrgStaff(orgId) {
+      return isSignedIn() && orgExists(orgId) && uid() in orgData(orgId).staffUids;
+    }
+
+    function isOrgOwner(orgId) {
+      return isSignedIn() && orgExists(orgId) && orgData(orgId).ownerUid == uid();
+    }
+
+    function isOrgVerified(orgId) {
+      return orgExists(orgId) && orgData(orgId).verificationStatus == 'verified';
+    }
+
+    function changed(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+
+    // ---------- platform admins ----------
+    // A user may check whether they themselves are an admin (learning nothing
+    // about anyone else). Nobody may write this collection from a client; the
+    // first admin is created by hand in the Firebase console.
+
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && uid() == adminUid;
+      allow list: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    // ---------- organizations ----------
+
+    function orgKeys() {
+      return ['name', 'type', 'address', 'city', 'province', 'postalCode',
+              'lat', 'lng', 'cell', 'contactEmail', 'website',
+              'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
+              'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt'];
+    }
+
+    function orgRequiredKeys() {
+      return ['name', 'type', 'address', 'city', 'province', 'lat', 'lng',
+              'cell', 'verificationStatus', 'ownerUid', 'staffUids',
+              'createdAt', 'createdBy'];
+    }
+
+    function validOrgShape() {
+      return request.resource.data.keys().hasOnly(orgKeys())
+        && request.resource.data.keys().hasAll(orgRequiredKeys())
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 140
+        && request.resource.data.type in ['masjid', 'funeral_home', 'other']
+        && request.resource.data.verificationStatus
+             in ['pending', 'verified', 'rejected', 'suspended']
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+        && request.resource.data.staffUids is list
+        && request.resource.data.staffUids.size() <= 50;
+    }
+
+    match /organizations/{orgId} {
+      // Verified organizations are publicly readable: the community feed needs
+      // masjid names and prayer locations. Unverified ones are visible only to
+      // their own staff and to platform admins.
+      allow get: if resource.data.verificationStatus == 'verified'
+                 || isOrgStaff(orgId)
+                 || isPlatformAdmin();
+      // For list, Firestore matches the rule against the query's filters, so a
+      // caller must constrain the query to something a clause here permits:
+      // where('verificationStatus','==','verified') for the public directory,
+      // or where('staffUids','array-contains', <own uid>) for "my
+      // organizations", which must work while still pending verification.
+      allow list: if resource.data.verificationStatus == 'verified'
+                  || (isSignedIn() && uid() in resource.data.staffUids)
+                  || isPlatformAdmin();
+
+      // Anyone signed in may register an organization, but only as pending,
+      // owned by themselves, with themselves as the sole staff member.
+      allow create: if isSignedIn()
+        && validOrgShape()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.staffUids == [uid()]
+        && request.resource.data.verificationStatus == 'pending'
+        && !('verifiedAt' in request.resource.data)
+        && !('verifiedBy' in request.resource.data);
+
+      // Platform admin: may change verification status and nothing structural.
+      allow update: if isPlatformAdmin()
+        && validOrgShape()
+        && !changed(['ownerUid', 'createdAt', 'createdBy']);
+
+      // Owner: may edit the profile and manage staff, never the status.
+      allow update: if isOrgOwner(orgId)
+        && validOrgShape()
+        && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
+                     'statusReason', 'ownerUid', 'createdAt', 'createdBy']);
+
+      // Non-owner staff: profile edits only, no staff list changes.
+      allow update: if isOrgStaff(orgId)
+        && validOrgShape()
+        && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
+                     'statusReason', 'ownerUid', 'staffUids', 'createdAt',
+                     'createdBy']);
+
+      // Organizations are suspended, never deleted: the audit trail must keep
+      // pointing at something.
+      allow delete: if false;
+
+      // ---------- staff join requests ----------
+      match /staffRequests/{requestUid} {
+        allow create: if isSignedIn()
+          && requestUid == uid()
+          && request.resource.data.keys().hasOnly(
+               ['uid', 'email', 'displayName', 'status', 'requestedAt',
+                'decidedAt', 'decidedBy'])
+          && request.resource.data.uid == uid()
+          && request.resource.data.status == 'pending';
+        allow get: if isSignedIn()
+          && (uid() == requestUid || isOrgStaff(orgId) || isPlatformAdmin());
+        allow list: if isOrgStaff(orgId) || isPlatformAdmin();
+        allow update: if (isOrgOwner(orgId) || isPlatformAdmin())
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.status in ['approved', 'rejected'];
+        allow delete: if isOrgOwner(orgId) || uid() == requestUid;
+      }
+    }
+
+    // ---------- notices ----------
+    //
+    // The public document. Its key set is an allowlist. Family phone numbers,
+    // internal notes and anything else private have no permitted key here and
+    // are rejected at write time rather than merely hidden at read time.
+
+    function noticePublicKeys() {
+      return ['orgId', 'orgName', 'orgType', 'status', 'isPublic',
+              'deceasedName', 'showDeceasedName',
+              'janazahAt', 'timeZone', 'timeLabel',
+              'prayerLocation', 'burialLocation', 'instructions',
+              'version', 'createdBy', 'createdAt', 'updatedAt',
+              'lastEditedBy', 'publishedAt', 'cancelledAt', 'cancelReason',
+              'correctionNote'];
+    }
+
+    function noticeRequiredKeys() {
+      return ['orgId', 'status', 'isPublic', 'janazahAt', 'timeZone',
+              'prayerLocation', 'version', 'createdBy', 'createdAt'];
+    }
+
+    function validPrayerLocation() {
+      return request.resource.data.prayerLocation.keys()
+               .hasOnly(['name', 'address', 'lat', 'lng', 'cell'])
+        && request.resource.data.prayerLocation.keys()
+             .hasAll(['name', 'address', 'lat', 'lng', 'cell'])
+        && request.resource.data.prayerLocation.lat is number
+        && request.resource.data.prayerLocation.lng is number;
+    }
+
+    function validBurialLocation() {
+      return !('burialLocation' in request.resource.data)
+        || request.resource.data.burialLocation == null
+        || request.resource.data.burialLocation.keys()
+             .hasOnly(['name', 'address', 'lat', 'lng']);
+    }
+
+    function validNoticeShape() {
+      return request.resource.data.keys().hasOnly(noticePublicKeys())
+        && request.resource.data.keys().hasAll(noticeRequiredKeys())
+        && request.resource.data.status in ['draft', 'published', 'cancelled']
+        && request.resource.data.isPublic ==
+             (request.resource.data.status in ['published', 'cancelled'])
+        && request.resource.data.orgId is string
+        && request.resource.data.janazahAt is timestamp
+        && request.resource.data.timeZone is string
+        && request.resource.data.version is int
+        && validPrayerLocation()
+        && validBurialLocation()
+        && (!('instructions' in request.resource.data)
+            || (request.resource.data.instructions is string
+                && request.resource.data.instructions.size() <= 2000))
+        && (!('deceasedName' in request.resource.data)
+            || request.resource.data.deceasedName == null
+            || (request.resource.data.deceasedName is string
+                && request.resource.data.deceasedName.size() <= 140));
+    }
+
+    match /notices/{noticeId} {
+      // Published and cancelled notices are public. Cancelled stays readable
+      // so that someone holding a shared link sees the cancellation rather
+      // than a dead page. Drafts are staff-only.
+      //
+      // Note for the feed: for a list, Firestore evaluates the rule against
+      // the query's filters rather than the returned documents, so an
+      // unauthenticated caller MUST include where('isPublic','==',true).
+      // An unfiltered list is rejected. isPublic is a denormalised mirror of
+      // status, kept honest by validNoticeShape() below, because rule/query
+      // matching handles plain equality and not an `in` over a list.
+      allow get: if resource.data.isPublic == true
+                 || isOrgStaff(resource.data.orgId)
+                 || isPlatformAdmin();
+      allow list: if resource.data.isPublic == true
+                  || isOrgStaff(resource.data.orgId)
+                  || isPlatformAdmin();
+
+      allow create: if isSignedIn()
+        && validNoticeShape()
+        && isOrgStaff(request.resource.data.orgId)
+        && isOrgVerified(request.resource.data.orgId)
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.version == 1
+        && request.resource.data.status in ['draft', 'published'];
+
+      // Corrections and cancellations by the publishing organization.
+      // Cancellation is terminal. Ownership fields are immutable. The version
+      // counter must advance by exactly one, which makes a lost update
+      // visible rather than silent.
+      allow update: if validNoticeShape()
+        && isOrgStaff(resource.data.orgId)
+        && isOrgVerified(resource.data.orgId)
+        && resource.data.status != 'cancelled'
+        && request.resource.data.orgId == resource.data.orgId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.version == resource.data.version + 1
+        && request.resource.data.lastEditedBy == uid();
+
+      // Platform admin takedown of a fraudulent or incorrect notice.
+      allow update: if isPlatformAdmin()
+        && validNoticeShape()
+        && request.resource.data.orgId == resource.data.orgId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.version == resource.data.version + 1;
+
+      // Never hard-delete a published notice; cancel it. Deleting would break
+      // the audit trail and leave shared links dead instead of corrected.
+      allow delete: if isOrgStaff(resource.data.orgId)
+        && resource.data.status == 'draft';
+
+      // ---------- private side of a notice ----------
+      // Family contacts, internal coordination notes. Never public, and
+      // structurally unable to reach the public document above.
+      match /private/{docId} {
+        allow read, write: if isPlatformAdmin()
+          || (isSignedIn()
+              && exists(/databases/$(database)/documents/notices/$(noticeId))
+              && isOrgStaff(
+                   get(/databases/$(database)/documents/notices/$(noticeId))
+                     .data.orgId));
+      }
+    }
+
+    // ---------- audit log ----------
+    // Append-only. No update, no delete, by anyone, ever. actorUid is forced
+    // to the authenticated caller so an entry cannot be written under someone
+    // else's name, and `at` is forced to server time so it cannot be backdated.
+
+    match /auditLog/{entryId} {
+      allow get, list: if isPlatformAdmin()
+        || (isSignedIn() && resource.data.orgId != null
+            && isOrgStaff(resource.data.orgId));
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(
+             ['actorUid', 'actorEmail', 'action', 'targetType', 'targetId',
+              'orgId', 'at', 'details'])
+        && request.resource.data.keys().hasAll(
+             ['actorUid', 'action', 'targetType', 'targetId', 'at'])
+        && request.resource.data.actorUid == uid()
+        && request.resource.data.at == request.time
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 60;
+
+      allow update, delete: if false;
+    }
+
+    // ---------- reports ----------
+    // Community members flag an incorrect or fraudulent notice. A reporter can
+    // file but cannot read the queue; only platform admins triage.
+
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(
+             ['noticeId', 'reportedBy', 'reason', 'detail', 'status',
+              'createdAt', 'resolvedBy', 'resolvedAt', 'resolution'])
+        && request.resource.data.keys().hasAll(
+             ['noticeId', 'reportedBy', 'reason', 'status', 'createdAt'])
+        && request.resource.data.reportedBy == uid()
+        && request.resource.data.status == 'open'
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 60
+        && (!('detail' in request.resource.data)
+            || request.resource.data.detail.size() <= 1000);
+      allow get, list, update: if isPlatformAdmin();
+      allow delete: if false;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
