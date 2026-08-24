@@ -109,8 +109,8 @@ const run = async () => {
   });
   const failures = [];
 
-  const newPage = async () => {
-    const page = await (await browser.newContext()).newPage();
+  const newPage = async (contextOptions = {}) => {
+    const page = await (await browser.newContext(contextOptions)).newPage();
     page.on('pageerror', (err) => failures.push(`page error: ${err.message}`));
     page.on('console', (m) => {
       if (m.type() === 'error' && !/favicon/i.test(m.text())) {
@@ -308,6 +308,88 @@ const run = async () => {
       assert.ok(actions.includes(expected), `audit trail missing ${expected}; got ${actions}`);
     }
     log(`audit trail complete: ${actions.sort().join(', ')}`);
+
+    // ---- nearby matching, on the device ------------------------------------
+    // A second notice on the other side of the country, so radius filtering
+    // has something real to exclude.
+    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.locator('#janazahAt').fill('2026-12-03T13:30');
+    await coord.locator('#timeZone').selectOption('America/Vancouver');
+    await coord.locator('#prayerName').fill('Vancouver Prayer Hall');
+    await coord.locator('#prayerAddress').fill('1 Pacific Street, Vancouver');
+    await coord.locator('#prayerLat').fill('49.2827');
+    await coord.locator('#prayerLng').fill('-123.1207');
+    await coord.getByRole('button', { name: 'Publish', exact: true }).click();
+    await coord.locator('#confirm-check').check();
+    await coord.getByRole('button', { name: 'Publish now' }).click();
+    await coord.locator('.notice-card--published').first().waitFor({ timeout: 15000 });
+    log('second notice published, far away');
+
+    // A visitor physically in Toronto.
+    const local = await newPage({
+      permissions: ['geolocation'],
+      // Distinctive digits so the leak check below cannot collide with a
+      // coordinate that legitimately belongs to a notice.
+      geolocation: { latitude: 43.6591234, longitude: -79.3901234 },
+      locale: 'en-CA',
+    });
+    await local.goto(BASE);
+    await local.locator('.notice-card').first().waitFor({ timeout: 15000 });
+
+    await local.getByRole('button', { name: 'Near me' }).click();
+    await local.getByRole('button', { name: 'Use my location' }).waitFor({ timeout: 10000 });
+
+    const consent = await local.locator('.consent').innerText();
+    assert.match(consent, /never sent to us/i, 'consent copy must state where location goes');
+    assert.match(consent, /overwritten/i, 'consent copy must state that no history is kept');
+
+    await local.getByRole('button', { name: 'Use my location' }).click();
+    await local.locator('.nearby-settings').waitFor({ timeout: 15000 });
+
+    const nearbyText = await local.locator('#view').innerText();
+    assert.ok(nearbyText.includes('Main Prayer Hall'),
+      'the Toronto notice should be near a visitor in Toronto');
+    assert.ok(!nearbyText.includes('Vancouver Prayer Hall'),
+      'a notice 3000 km away must not appear within a 10 km radius');
+    assert.match(nearbyText, /\d+(\.\d+)?\s?km|under 1 km/,
+      'expected an approximate distance on the nearby card');
+    log('nearby filters by radius and shows an approximate distance');
+
+    // Widening the radius brings the far notice in, which proves the control
+    // is actually driving the filter.
+    await local.locator('#radius').selectOption('0');
+    await local.locator('#view').getByText('Vancouver Prayer Hall').waitFor({ timeout: 10000 });
+    log('widening the distance includes the far notice');
+
+    // Nothing about the visitor's position may reach the backend.
+    const positionStored = await local.evaluate(() =>
+      JSON.parse(localStorage.getItem('janazah.location') || '{}'));
+    assert.ok(positionStored.last?.lat, 'expected the position cached on the device');
+    const allDocs = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/notices`,
+      { headers: { Authorization: 'Bearer owner' } })).text();
+    assert.ok(!allDocs.includes('6591234'), 'a visitor position reached the notices collection');
+    const allOrgs = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/organizations`,
+      { headers: { Authorization: 'Bearer owner' } })).text();
+    assert.ok(!allOrgs.includes('6591234'), 'a visitor position reached the organizations collection');
+
+    for (const path of ['reports', 'auditLog']) {
+      const dump = await (await fetch(
+        `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`,
+        { headers: { Authorization: 'Bearer owner' } })).text();
+      assert.ok(!dump.includes('6591234'), `a visitor position reached ${path}`);
+    }
+    log('visitor position never reaches the backend');
+
+    // Opting out must erase, not merely stop reading.
+    await local.getByRole('button', { name: 'Turn off' }).click();
+    await local.getByRole('button', { name: 'Use my location' }).waitFor({ timeout: 10000 });
+    const afterOptOut = await local.evaluate(() =>
+      JSON.parse(localStorage.getItem('janazah.location') || '{}'));
+    assert.equal(afterOptOut.last, null, 'the stored position survived opting out');
+    assert.equal(afterOptOut.enabled, false);
+    log('opting out erases the stored position');
 
     if (failures.length) {
       throw new Error(`browser reported errors:\n  - ${failures.join('\n  - ')}`);

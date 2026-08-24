@@ -311,3 +311,27 @@ textarea.field { resize: vertical; }
 }
 
 .stack > .date-heading + .card { margin-top: 0; }
+
+/* ---------- nearby (Phase 3) ---------- */
+
+.consent { max-width: 560px; }
+.consent h3 { margin-top: 1.25rem; }
+.consent__list { margin: 0; }
+.consent__list li {
+  position: relative; padding: .3rem 0 .3rem 1.4rem; font-size: .93rem;
+}
+.consent__list li::before {
+  content: '✓'; position: absolute; left: 0; color: var(--accent); font-weight: 700;
+}
+
+.nearby-settings { margin-bottom: 1.25rem; }
+.nearby-settings__row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem; flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .nearby-settings__row { flex-direction: column; align-items: stretch; }
+  .nearby-settings__row .row-actions { justify-content: stretch; }
+  .nearby-settings__row .row-actions .btn { flex: 1; }
+}

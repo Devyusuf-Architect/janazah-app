@@ -3,9 +3,10 @@
 One trusted place where verified masajid and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.
 
-**Status: Phase 2 complete.** The public community feed and the coordinator
-and administrator console are built and tested. Nearby matching (Phase 3) and
-push notifications (Phase 4) are not built yet.
+**Status: Phase 3 complete.** The public feed, on-device nearby matching, and
+the coordinator and administrator console are built and tested. Push
+notifications that reach a locked phone (Phase 4) are not built, and are still
+gated on a compute decision.
 
 | Path            | What it is                                     |
 | --------------- | ---------------------------------------------- |
@@ -31,9 +32,10 @@ emulator-only `demo-` project, so nothing can reach a real backend.
 ## Tests
 
 ```bash
+npm run test:unit    # 22 tests of the distance and nearby-matching maths
 npm run test:rules   # 54 security rule tests
-npm run test:e2e     # browser smoke test of the full coordinator path
-npm test             # both
+npm run test:e2e     # browser run through the whole product path
+npm test             # all three
 ```
 
 The end-to-end test needs a Chromium binary. If Playwright's own download is
@@ -44,6 +46,20 @@ CHROMIUM_PATH=/path/to/chrome npm run test:e2e
 ```
 
 ## What is built
+
+### Phase 3, nearby Janazahs
+
+- Opt-in location, with a consent panel that explains where the position goes
+  before the browser prompt appears
+- Distance choice of 5, 10, 20, 50 km or any distance, with an approximate
+  distance shown on every notice
+- Matching done entirely in the browser against notices the feed already has,
+  so no position is ever sent to the backend
+- Only the most recent position is kept, on the device, overwritten in place;
+  turning the feature off erases it
+- Optional alerts for newly published nearby notices while the page is open
+
+See [`docs/phase-3-notes.md`](docs/phase-3-notes.md).
 
 ### Phase 2, the public feed
 
@@ -94,10 +110,12 @@ publish. The audit collection forbids update and delete for every caller
 including administrators, forces the actor to the authenticated session, and
 forces the timestamp to server time.
 
-No user location is stored anywhere. That stays true through Phase 3: nearby
-matching is done on the device against the public notice list, so the backend
-never learns where anyone is. See `docs/janazah-app-build-spec.md` and the
-architecture notes below.
+No user location is stored anywhere. Nearby matching runs on the device
+against the public notice list, so the backend never learns where anyone is.
+There is no collection for user positions, and the rules deny any collection
+not explicitly matched, so one cannot appear by accident. The end-to-end test
+sets a distinctive browser position and then greps every Firestore collection
+for it, so a regression that started sending positions would fail the build.
 
 ## Architecture notes and deliberate departures from the original spec
 

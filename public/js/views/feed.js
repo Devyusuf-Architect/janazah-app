@@ -7,8 +7,12 @@
 
 import { el, toast, friendlyError, showModal } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
+import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
+import { renderNearby } from './nearby.js';
 import * as follows from '../follows.js';
+import * as loc from '../location.js';
+import * as alerts from '../alerts.js';
 import * as store from '../store.js';
 
 const REPORT_REASONS = [
@@ -108,6 +112,10 @@ export function renderFeed(mount) {
         onclick: () => { filter = 'all'; paint(); },
       }, 'All notices'),
       el('button', {
+        class: `tab${filter === 'nearby' ? ' tab--active' : ''}`,
+        onclick: () => { filter = 'nearby'; paint(); },
+      }, 'Near me'),
+      el('button', {
         class: `tab${filter === 'following' ? ' tab--active' : ''}`,
         onclick: () => { filter = 'following'; paint(); },
       }, `Masajid I follow${followed ? ` (${followed})` : ''}`),
@@ -120,12 +128,22 @@ export function renderFeed(mount) {
 
   const paint = () => {
     paintTabs();
+    list.replaceChildren();
+
+    if (filter === 'nearby') {
+      renderNearby(list, {
+        getNotices: () => notices,
+        onChange: paint,
+        renderCard: (notice, distanceLabel) =>
+          feedCard(notice, onFollowChange, distanceLabel),
+      });
+      return;
+    }
+
     const followedIds = follows.followedOrgIds();
     const visible = filter === 'following'
       ? notices.filter((n) => followedIds.includes(n.orgId))
       : notices;
-
-    list.replaceChildren();
 
     if (!visible.length) {
       list.append(el('div', { class: 'empty' }, [
@@ -143,9 +161,18 @@ export function renderFeed(mount) {
       return;
     }
 
+    // When location is on, every tab shows how far away each notice is. The
+    // distance is computed here in the browser and never sent anywhere.
+    const settings = loc.settings();
+    const from = settings.enabled ? settings.last : null;
+
     for (const group of groupByDate(visible)) {
       list.append(el('h2', { class: 'date-heading', text: group.heading }));
-      for (const notice of group.items) list.append(feedCard(notice, onFollowChange));
+      for (const notice of group.items) {
+        const km = loc.noticeDistanceKm(notice, from);
+        list.append(feedCard(notice, onFollowChange,
+          km === null ? null : formatDistance(km)));
+      }
     }
   };
 
@@ -157,7 +184,23 @@ export function renderFeed(mount) {
   };
 
   unwatch = store.watchPublicNotices((incoming) => {
+    const first = notices.length === 0;
     notices = incoming;
+    // Exposed for the alert toggle, so switching alerts on can mark what is
+    // already on screen as seen instead of firing for all of it at once.
+    window.__janazahNotices = incoming;
+
+    const settings = loc.settings();
+    if (settings.enabled && settings.last) {
+      if (first && !settings.alertsEnabled) {
+        alerts.primeSeen(incoming);
+      } else if (settings.alertsEnabled) {
+        const raised = alerts.alertOnNew(incoming, settings.last, settings.radiusKm);
+        if (raised.length) {
+          toast(`${raised.length} new Janazah${raised.length > 1 ? 's' : ''} near you.`);
+        }
+      }
+    }
     paint();
   });
 
@@ -171,7 +214,7 @@ export function renderFeed(mount) {
     .catch((err) => console.error('verifiedOrganizations', err));
 }
 
-function feedCard(notice, onFollowChange = () => {}) {
+function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
   const started = (() => {
     const at = notice.janazahAt?.toDate ? notice.janazahAt.toDate() : notice.janazahAt;
     return at && at.getTime() < Date.now();
@@ -183,7 +226,7 @@ function feedCard(notice, onFollowChange = () => {}) {
     started && notice.status !== 'cancelled'
       ? el('p', { class: 'notice-strip notice-strip--muted', text: 'This prayer time has passed.' })
       : null,
-    publicNoticeView(notice, { compact: true }),
+    publicNoticeView(notice, { compact: true, distanceLabel }),
     el('div', { class: 'card-actions' }, [
       el('button', {
         class: `btn btn--small${following ? ' btn--active' : ''}`,
