@@ -28,6 +28,11 @@ is already in the repo.
 **Build > Authentication > Get started > Email/Password > Enable.** Leave
 passwordless sign-in off.
 
+Also enable **Anonymous** in the same sign-in method list. Phase 2's community
+reporting form uses an anonymous session so that a report can be attributed
+well enough to rate limit, without collecting anything about the reporter. See
+`docs/phase-2-notes.md`.
+
 Multi-factor authentication is not available on Spark. It needs the Identity
 Platform upgrade, which is a Blaze-tier switch. Phase 1 works without it; see
 "What Phase 1 does not include" below.
@@ -70,7 +75,8 @@ Platform admins are rows in an `/admins/{uid}` collection. There is no server
 code in Phase 1 to write them, and the rules deliberately forbid clients from
 creating them, so the first one is created by hand in the console.
 
-1. Run the app (step 8) and sign up. This creates your auth user.
+1. Run the app (step 8), go to `/console`, and sign up. This creates your
+   auth user.
 2. **Authentication > Users**, copy your **User UID**.
 3. **Firestore Database > Start collection**, collection ID `admins`.
 4. Document ID: paste your UID. Add one field: `email` (string), your email.
@@ -81,8 +87,11 @@ creating them, so the first one is created by hand in the console.
 Locally, against the live project:
 
 ```bash
-firebase serve --only hosting     # http://localhost:5000
+firebase serve --only hosting
 ```
+
+The public feed is at `http://localhost:5000` and the coordinator console at
+`http://localhost:5000/console`.
 
 Or fully offline against the emulators, which is the better way to test rule
 changes:
@@ -121,7 +130,8 @@ download its own.
 firebase deploy --only hosting
 ```
 
-Your console is then live at `https://<project-id>.web.app`.
+The public feed is then live at `https://<project-id>.web.app` and the console
+at `https://<project-id>.web.app/console`.
 
 ## What Phase 1 does not include, and why
 

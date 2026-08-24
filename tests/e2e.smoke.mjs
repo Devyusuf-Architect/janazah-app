@@ -29,21 +29,25 @@ const MIME = {
   '.json': 'application/json', '.ico': 'image/x-icon',
 };
 
-/** Static server for the test build. Firebase Hosting is not needed here. */
+/**
+ * Static server for the test build, mirroring the rewrites in firebase.json:
+ * /console and below serve the console page, everything else the feed.
+ */
 function serve(root, port) {
   const server = createServer(async (req, res) => {
     const path = normalize(decodeURIComponent(req.url.split('?')[0]));
-    let file = join(root, path === '/' ? 'index.html' : path);
-    try {
+    const page = /^\/console(\/|$)/.test(path) ? 'console.html' : 'index.html';
+    const send = async (file, type) => {
       const body = await readFile(file);
-      res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
+      res.writeHead(200, { 'Content-Type': type });
       res.end(body);
+    };
+    try {
+      if (path === '/' || !extname(path)) throw new Error('route to page');
+      await send(join(root, path), MIME[extname(path)] || 'application/octet-stream');
     } catch {
-      // Single-page fallback, matching the hosting rewrite.
       try {
-        const body = await readFile(join(root, 'index.html'));
-        res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(body);
+        await send(join(root, page), 'text/html');
       } catch {
         res.writeHead(404).end('not found');
       }
@@ -79,7 +83,7 @@ async function grantPlatformAdmin(uid, email) {
 }
 
 async function signUp(page, { email, password }, name) {
-  await page.goto(BASE);
+  await page.goto(`${BASE}/console`);
   await page.getByRole('button', { name: 'Create an account' }).click();
   await page.locator('#displayName').fill(name);
   await page.locator('#email').fill(email);
@@ -89,7 +93,7 @@ async function signUp(page, { email, password }, name) {
 }
 
 async function signIn(page, { email, password }) {
-  await page.goto(BASE);
+  await page.goto(`${BASE}/console`);
   await page.locator('#email').waitFor({ timeout: 15000 });
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
@@ -196,12 +200,93 @@ const run = async () => {
     assert.ok(stored.includes('Example Cemetery'), 'burial location missing from the notice');
     log('stored public document contains no private fields');
 
+    // ---- the public feed, as a visitor with no account ---------------------
+    const visitor = await newPage();
+    await visitor.goto(BASE);
+    await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
+
+    const feedText = await visitor.locator('#view').innerText();
+    assert.ok(feedText.includes('Test Name'), 'approved name missing from the feed');
+    assert.ok(feedText.includes('Main Prayer Hall'), 'prayer location missing from the feed');
+    assert.ok(feedText.includes('Example Cemetery'), 'burial location missing from the feed');
+    assert.ok(!feedText.includes('555-0100'), 'phone number leaked into the feed');
+    assert.ok(!feedText.includes('no visitors'), 'internal notes leaked into the feed');
+    log('feed shows the notice to a visitor with no account');
+
+    // Directions links must point somewhere usable for both locations.
+    const directions = await visitor.locator('.public-notice a.link').all();
+    assert.equal(directions.length, 2, 'expected directions for prayer and burial');
+    for (const link of directions) {
+      assert.match(await link.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir/);
+    }
+    log('directions links present for prayer and burial');
+
+    // Following is device-local: no write leaves the browser.
+    await visitor.getByRole('button', { name: /^Follow Test Masjid$/ }).click();
+    await visitor.getByRole('button', { name: /^Following Test Masjid$/ }).waitFor({ timeout: 5000 });
+    const followState = await visitor.evaluate(() => localStorage.getItem('janazah.followedOrgs'));
+    assert.ok(followState && JSON.parse(followState).length === 1,
+      'follow was not stored on the device');
+
+    await visitor.getByRole('button', { name: 'Masajid I follow (1)' }).click();
+    await visitor.locator('.notice-card').first().waitFor({ timeout: 5000 });
+    log('follow persisted on the device and filters the feed');
+
+    // The shareable per-notice link.
+    await visitor.getByRole('button', { name: 'All notices' }).click();
+    await visitor.getByRole('link', { name: 'Open' }).first().click();
+    await visitor.locator('.public-notice').first().waitFor({ timeout: 10000 });
+    assert.match(visitor.url(), /\/n\/[A-Za-z0-9_-]+$/, 'expected a /n/{id} share URL');
+    const singleText = await visitor.locator('#view').innerText();
+    assert.ok(!singleText.includes('555-0100'), 'phone number leaked into the shared notice page');
+    log('shared notice page loads at its own URL');
+
+    // Reporting, over an anonymous session.
+    await visitor.getByRole('button', { name: 'Report a problem' }).click();
+    await visitor.locator('#report-reason').selectOption('incorrect_details');
+    await visitor.locator('#report-detail').fill('The prayer time looks wrong.');
+    await visitor.getByRole('button', { name: 'Send report' }).click();
+    await visitor.locator('.modal-backdrop').waitFor({ state: 'detached', timeout: 15000 });
+
+    const reports = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/reports`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    assert.equal((reports.documents || []).length, 1, 'report was not stored');
+    assert.equal(reports.documents[0].fields.status.stringValue, 'open');
+    log('report filed over an anonymous session');
+
+    // A notice not yet published must never appear on the feed.
+    await coord.getByRole('button', { name: 'Notices' }).click();
+    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.locator('#janazahAt').fill('2026-12-02T13:30');
+    await coord.locator('#prayerName').fill('Draft Hall');
+    await coord.locator('#prayerAddress').fill('9 Draft Street, Toronto');
+    await coord.locator('#prayerLat').fill('43.66');
+    await coord.locator('#prayerLng').fill('-79.39');
+    await coord.getByRole('button', { name: 'Save as draft' }).click();
+    await coord.locator('.notice-card--draft').waitFor({ timeout: 15000 });
+
+    await visitor.goto(BASE);
+    await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
+    assert.ok(!(await visitor.locator('#view').innerText()).includes('Draft Hall'),
+      'an unpublished draft appeared on the public feed');
+    log('drafts stay off the public feed');
+
     // ---- cancellation ------------------------------------------------------
-    await coord.getByRole('button', { name: 'Cancel notice' }).click();
+    await coord.getByRole('button', { name: 'Cancel notice' }).first().click();
     await coord.locator('#reason-input').fill('Prayer moved to another masjid.');
     await coord.getByRole('button', { name: 'Cancel notice', exact: true }).last().click();
     await coord.locator('.notice-card--cancelled').waitFor({ timeout: 15000 });
     log('notice cancelled');
+
+    // A cancelled notice stays visible and says so, rather than vanishing and
+    // leaving anyone holding a shared link with a dead page.
+    await visitor.reload();
+    await visitor.locator('.public-notice--cancelled').first().waitFor({ timeout: 15000 });
+    const cancelledText = await visitor.locator('#view').innerText();
+    assert.ok(/Cancelled: Prayer moved to another masjid/.test(cancelledText),
+      `expected the cancellation reason on the feed; got: ${cancelledText.slice(0, 300)}`);
+    log('feed shows the cancellation with its reason');
 
     // ---- the audit trail recorded every step -------------------------------
     // The UI updates optimistically from its own snapshot listener, so the

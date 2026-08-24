@@ -6,6 +6,7 @@ import {
   query, where, orderBy, limit, serverTimestamp, onSnapshot, increment,
 } from 'firebase/firestore';
 
+import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from './firebase.js';
 import { geohash } from './geo.js';
 import { APP } from './config.js';
@@ -315,6 +316,34 @@ export function watchOrgNotices(orgId, cb) {
     (snap) => cb(snap.docs.map(withId)),
     (err) => console.error('watchOrgNotices', err),
   );
+}
+
+/**
+ * Sign in anonymously if there is no session yet.
+ *
+ * Reading the feed needs no account. Filing a report does, because the rules
+ * pin `reportedBy` to the authenticated caller, which is what makes rate
+ * limiting and abuse handling possible later. An anonymous session gives a
+ * stable identifier and collects nothing about the person.
+ */
+export async function ensureSignedIn() {
+  if (auth.currentUser) return auth.currentUser;
+  const { user } = await signInAnonymously(auth);
+  return user;
+}
+
+/** Community report of an incorrect or fraudulent notice. */
+export async function submitReport(noticeId, reason, detail) {
+  const user = await ensureSignedIn();
+  const payload = {
+    noticeId,
+    reportedBy: user.uid,
+    reason,
+    status: 'open',
+    createdAt: serverTimestamp(),
+  };
+  if (detail?.trim()) payload.detail = detail.trim().slice(0, 1000);
+  await addDoc(collection(db, 'reports'), payload);
 }
 
 /**

@@ -37,10 +37,8 @@ export async function buildTestApp() {
   });
   rmSync(entryDir, { recursive: true, force: true });
 
-  const indexPath = join(OUT, 'index.html');
-  const html = readFileSync(indexPath, 'utf8').replace(
-    /<script type="importmap">[\s\S]*?<\/script>/,
-    `<script type="importmap">
+  // Every entry page carries its own import map; rewrite all of them.
+  const localMap = `<script type="importmap">
   {
     "imports": {
       "firebase/app": "/vendor/firebase-app.js",
@@ -48,8 +46,16 @@ export async function buildTestApp() {
       "firebase/firestore": "/vendor/firebase-firestore.js"
     }
   }
-  </script>`);
-  writeFileSync(indexPath, html);
+  </script>`;
+  for (const page of ['index.html', 'console.html']) {
+    const path = join(OUT, page);
+    const html = readFileSync(path, 'utf8')
+      .replace(/<script type="importmap">[\s\S]*?<\/script>/, localMap);
+    if (!html.includes('/vendor/firebase-app.js')) {
+      throw new Error(`${page}: import map not found, so the local SDK was not wired in`);
+    }
+    writeFileSync(path, html);
+  }
   return OUT;
 }
 

@@ -427,6 +427,18 @@ describe('reports', () => {
       report({ status: 'resolved' })));
   });
 
+  test('an unauthenticated visitor cannot file a report', async () => {
+    // Reading the feed needs no account, but filing does: the rules pin
+    // reportedBy to the caller, which is what makes abuse handling possible.
+    await assertFails(addDoc(collection(anon(), 'reports'),
+      report({ reportedBy: null })));
+  });
+
+  test('a report cannot carry an oversized detail field', async () => {
+    await assertFails(addDoc(collection(as(OUTSIDER), 'reports'),
+      report({ detail: 'x'.repeat(1001) })));
+  });
+
   test('only a platform admin can read the report queue', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'reports', 'r1'),
@@ -435,6 +447,39 @@ describe('reports', () => {
     await assertFails(getDoc(doc(as(OUTSIDER), 'reports', 'r1')));
     await assertFails(getDoc(doc(as(STAFF), 'reports', 'r1')));
     await assertSucceeds(getDoc(doc(as(ADMIN), 'reports', 'r1')));
+  });
+});
+
+describe('the public feed needs no account', () => {
+  test('a visitor with no account can read the feed', async () => {
+    await seedNotice('n1');
+    await assertSucceeds(getDocs(query(
+      collection(anon(), 'notices'), where('isPublic', '==', true))));
+  });
+
+  test('a visitor with no account can read the verified masjid directory', async () => {
+    await assertSucceeds(getDocs(query(
+      collection(anon(), 'organizations'),
+      where('verificationStatus', '==', 'verified'))));
+  });
+
+  test('a visitor cannot read the audit log', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'auditLog', 'a1'), {
+        actorUid: STAFF, action: 'notice.published', targetType: 'notice',
+        targetId: 'n1', orgId: VERIFIED_ORG, at: Timestamp.now(),
+      });
+    });
+    await assertFails(getDoc(doc(anon(), 'auditLog', 'a1')));
+  });
+
+  test('a visitor cannot read a notice’s private details', async () => {
+    await seedNotice('n1');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'notices', 'n1', 'private', 'details'),
+        { familyContactPhone: '555-0100' });
+    });
+    await assertFails(getDoc(doc(anon(), 'notices', 'n1', 'private', 'details')));
   });
 });
 

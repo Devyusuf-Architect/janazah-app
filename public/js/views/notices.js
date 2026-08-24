@@ -3,9 +3,9 @@
 import { el, toast, readForm, fillForm, friendlyError, askReason, showModal } from '../ui.js';
 import {
   validateNoticeForm, buildPublicNotice, buildPrivateDetails, noticeToForm,
-  formatJanazahTime, FORBIDDEN_PUBLIC_FIELDS,
+  formatJanazahTime,
 } from '../model.js';
-import { directionsUrl } from '../geo.js';
+import { publicNoticeView } from '../notice-view.js';
 import { APP } from '../config.js';
 import * as store from '../store.js';
 
@@ -404,49 +404,4 @@ function showPreview(notice, extra = {}) {
     );
   }
   showModal('Public preview', body, { wide: true });
-}
-
-/** Exactly the fields a community member would see. */
-export function publicNoticeView(notice) {
-  const view = el('article', { class: 'public-notice' }, [
-    el('p', { class: 'public-notice__org', text: notice.orgName || '' }),
-    el('h3', {
-      text: notice.showDeceasedName && notice.deceasedName
-        ? `Janazah for ${notice.deceasedName}`
-        : 'Janazah notice',
-    }),
-    el('p', { class: 'public-notice__time', text: formatJanazahTime(notice) }),
-    el('dl', { class: 'kv' }, [
-      el('dt', { text: 'Prayer' }),
-      el('dd', {}, [
-        el('div', { text: notice.prayerLocation?.name }),
-        el('div', { class: 'muted', text: notice.prayerLocation?.address }),
-        el('a', {
-          class: 'link', target: '_blank', rel: 'noopener noreferrer',
-          href: directionsUrl(notice.prayerLocation),
-        }, 'Directions to prayer'),
-      ]),
-      ...(notice.burialLocation ? [
-        el('dt', { text: 'Burial' }),
-        el('dd', {}, [
-          el('div', { text: notice.burialLocation.name }),
-          el('div', { class: 'muted', text: notice.burialLocation.address }),
-          el('a', {
-            class: 'link', target: '_blank', rel: 'noopener noreferrer',
-            href: directionsUrl(notice.burialLocation),
-          }, 'Directions to burial'),
-        ]),
-      ] : []),
-    ]),
-    notice.instructions ? el('p', { class: 'instructions', text: notice.instructions }) : null,
-  ]);
-
-  // Guard rather than trust: if a private-looking key ever reaches a document
-  // headed for the public view, say so loudly instead of rendering it.
-  const leaked = Object.keys(notice).filter((k) => FORBIDDEN_PUBLIC_FIELDS.includes(k));
-  if (leaked.length) {
-    view.prepend(el('p', { class: 'notice-strip notice-strip--error' },
-      `Private fields present on a public document: ${leaked.join(', ')}. Do not publish.`));
-  }
-  return view;
 }

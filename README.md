@@ -3,9 +3,15 @@
 One trusted place where verified masajid and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.
 
-**Status: Phase 1 complete.** The coordinator and platform administrator
-console is built and tested. The public community feed (Phase 2), nearby
-matching (Phase 3) and push notifications (Phase 4) are not built yet.
+**Status: Phase 2 complete.** The public community feed and the coordinator
+and administrator console are built and tested. Nearby matching (Phase 3) and
+push notifications (Phase 4) are not built yet.
+
+| Path            | What it is                                     |
+| --------------- | ---------------------------------------------- |
+| `/`             | Public feed of current and upcoming Janazahs   |
+| `/n/{id}`       | A single notice, the shareable link            |
+| `/console`      | Coordinator and platform administrator console |
 
 ## Getting started
 
@@ -25,7 +31,7 @@ emulator-only `demo-` project, so nothing can reach a real backend.
 ## Tests
 
 ```bash
-npm run test:rules   # 48 security rule tests
+npm run test:rules   # 54 security rule tests
 npm run test:e2e     # browser smoke test of the full coordinator path
 npm test             # both
 ```
@@ -37,7 +43,24 @@ unavailable, point it at an existing one:
 CHROMIUM_PATH=/path/to/chrome npm run test:e2e
 ```
 
-## What Phase 1 does
+## What is built
+
+### Phase 2, the public feed
+
+- Current and upcoming Janazahs, grouped by date in each notice's own time
+  zone, with no account and no location
+- Follow specific masajid, stored on the device rather than in an account, so
+  the platform never learns which masajid anyone cares about
+- Directions to the prayer and burial locations
+- Share a notice, through the native share sheet where available and the
+  clipboard otherwise
+- A shareable per-notice URL that shows a cancellation rather than going dead
+- Report an incorrect or fraudulent notice, over an anonymous session
+
+See [`docs/phase-2-notes.md`](docs/phase-2-notes.md), which includes the one
+Firebase console step reporting needs.
+
+### Phase 1, the console
 
 - Email/password sign-in for coordinators and platform administrators
 - Organization registration, held as `pending` until a platform administrator

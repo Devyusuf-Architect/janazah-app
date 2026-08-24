@@ -6,7 +6,7 @@ import {
 import { db } from '../firebase.js';
 import { el, toast, friendlyError, askReason, showModal } from '../ui.js';
 import { statusBadge, renderAuditTable } from './org.js';
-import { publicNoticeView } from './notices.js';
+import { publicNoticeView } from '../notice-view.js';
 import { ORG_TYPES } from '../model.js';
 import * as store from '../store.js';
 

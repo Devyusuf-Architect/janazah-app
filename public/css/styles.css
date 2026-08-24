@@ -281,3 +281,33 @@ textarea.field { resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- public feed (Phase 2) ---------- */
+
+.brand__sub {
+  font-weight: 400; color: var(--ink-muted); font-size: .85em;
+}
+
+.feed-intro { margin-bottom: 1.25rem; }
+
+.date-heading {
+  font-size: .82rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-muted); font-weight: 600;
+  margin: 1.75rem 0 .6rem; padding-bottom: .35rem;
+  border-bottom: 1px solid var(--line);
+}
+.date-heading:first-child { margin-top: 0; }
+
+.public-notice__head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: .75rem;
+}
+.public-notice__title { margin: .1rem 0 .2rem; font-size: 1.1rem; }
+.public-notice--compact { background: transparent; border: 0; padding: 0; margin: 0; }
+.public-notice--cancelled .public-notice__title { text-decoration: line-through; }
+
+.btn--active {
+  background: var(--ok-bg); border-color: var(--accent); color: var(--accent);
+  font-weight: 600;
+}
+
+.stack > .date-heading + .card { margin-top: 0; }

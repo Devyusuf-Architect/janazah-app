@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Janazah Notices</title>
-  <meta name="description"
-        content="Current and upcoming Janazah notices published by verified masajid and funeral coordinators.">
+  <title>Janazah Notices — coordinator console</title>
+  <meta name="description" content="Publish, correct and cancel verified Janazah notices.">
+  <meta name="robots" content="noindex">
   <link rel="stylesheet" href="/css/styles.css">
 
   <!-- Single place the Firebase SDK version is pinned. Bump all three
@@ -27,34 +27,30 @@
   </p>
 
   <header class="masthead">
-    <a class="brand" href="/">
+    <a class="brand" href="/console">
       <span class="brand__mark" aria-hidden="true">◆</span>
-      <span>Janazah Notices</span>
+      <span>Janazah Notices <span class="brand__sub">console</span></span>
     </a>
-    <nav class="nav">
-      <div class="nav-spacer"></div>
-      <a class="nav-item" href="/console">Masjid sign in</a>
-    </nav>
+    <nav id="nav" class="nav" hidden></nav>
   </header>
 
   <main id="view" class="view">
-    <p class="muted">Loading notices…</p>
+    <p class="muted">Loading…</p>
   </main>
 
   <footer class="footer">
     <p>
-      Notices are published by masajid and funeral coordinators verified by a
-      platform administrator. If something looks wrong, use “Report a problem”
-      on the notice.
+      Coordinator and administrator console.
+      <a class="link" href="/">View the public feed</a>.
     </p>
     <p class="muted">
-      This page needs no account and reads no location. Masajid you follow are
-      remembered on your own device and are never sent to us or to them.
+      A user's location is never stored by this application. See
+      <code>docs/phase-1-setup.md</code>.
     </p>
   </footer>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="/js/feed.js"></script>
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>

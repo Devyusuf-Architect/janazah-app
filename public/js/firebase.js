@@ -48,5 +48,6 @@ export const usingEmulator =
 if (usingEmulator) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  window.__janazahEmulator = true;
   console.info('Connected to Firebase emulators. Append ?live=1 to use production.');
 }
