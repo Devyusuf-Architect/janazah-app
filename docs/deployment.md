@@ -240,6 +240,26 @@ emulate FCM sending. Do it before launch, not after.
       installed this way; the app detects this and shows the instruction, but
       expect a meaningful share of iPhone users never to complete it
 
+## 14b. Hosting the static files on Vercel instead of Firebase Hosting
+
+Firebase Hosting is what the repo is configured for and what the rest of this
+guide assumes, but the `public/` directory is plain static files, so hosting
+them on Vercel instead works too. This does **not** replace Firebase: Firestore,
+Authentication, security rules and the Cloud Functions all still have to exist
+in a Firebase project exactly as described above. Vercel only serves the HTML,
+CSS and JS.
+
+To do it: connect the repo in Vercel and deploy. `vercel.json` in the repo root
+mirrors the routing `firebase.json` does, so `/console`, `/n/{id}`, `/privacy`
+and `/terms` resolve correctly on a direct visit or a refresh, not only via
+in-app navigation.
+
+Before the first deploy, `public/js/config.js` still needs the real Firebase
+config written into it (`npm run setup`, then commit and push) — Vercel serves
+whatever is committed, so a deploy before that step shows the app's own
+"Firebase is not configured yet" screen, which is correct behaviour for an
+unconfigured build rather than a bug.
+
 ## 15. Optional: a custom domain
 
 **Hosting → Add custom domain**, follow the DNS instructions. Then update
