@@ -32,7 +32,10 @@ await page.locator('.notice-card').first().waitFor({ timeout: 15000 });
 const feed = await page.locator('#view').innerText();
 const assert = (cond, msg) => { if (!cond) problems.push(msg); else console.log('  ok:', msg); };
 
-assert(feed.includes('Ahmad Ibrahim Al-Sayyid'), 'feed lists notices');
+assert(feed.includes('Fulan ibn Fulan'), 'feed lists notices');
+assert(!/Danforth|Meadowvale|Al-Noor|Ar-Rahma/.test(feed),
+  'no real street, cemetery or masjid name appears');
+assert(feed.includes('Sample Masjid'), 'organizations read as samples');
 assert(feed.includes('Janazah notice'), 'withheld name renders without a name');
 assert(!feed.includes('555-'), 'no private data anywhere on the feed');
 assert((await page.locator('.notice-card').count()) >= 4, 'several notices present');
@@ -64,7 +67,7 @@ assert(wide > tight, `radius filters (5 km: ${tight}, any: ${wide})`);
 // Follow
 await page.getByRole('button', { name: 'All notices' }).click();
 await page.locator('.notice-card').first().waitFor({ timeout: 10000 });
-await page.getByRole('button', { name: /^Follow Masjid Al-Noor$/ }).first().click();
+await page.getByRole('button', { name: /^Follow Sample Masjid, Riverbend$/ }).first().click();
 await page.getByRole('button', { name: 'Masajid I follow (1)' }).waitFor({ timeout: 8000 });
 assert(true, 'follow persists and updates the tab count');
 
