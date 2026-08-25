@@ -31,9 +31,12 @@ initializeApp();
 // country on its way out.
 setGlobalOptions({ region: 'northamerica-northeast1', maxInstances: 10 });
 
+// Deliberately has no default. Every notification links back to this origin,
+// so a placeholder that deployed silently would send the whole community to
+// the wrong address. With no default the CLI asks on first deploy and stores
+// the answer in functions/.env.
 const SITE_ORIGIN = defineString('SITE_ORIGIN', {
   description: 'Public origin of the feed, e.g. https://janazah-app.web.app',
-  default: 'https://example.web.app',
 });
 
 /** Topic subscription changes a single device may request in one call. */

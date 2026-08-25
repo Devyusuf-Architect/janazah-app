@@ -26,8 +26,8 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 
 ## Getting started
 
-See [`docs/phase-1-setup.md`](docs/phase-1-setup.md) for linking a Firebase
-project and creating the first platform administrator.
+**Deploying for the first time: [`docs/deployment.md`](docs/deployment.md)** is
+the full sequence from an empty machine to a live site.
 
 To run against the local emulators without any Firebase project at all:
 
