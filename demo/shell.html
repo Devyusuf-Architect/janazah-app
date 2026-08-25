@@ -1,0 +1,133 @@
+<title>Janazah Notices</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+/* STYLES */
+
+/* ---------- preview-only chrome ---------- */
+
+.preview-note {
+  margin: 0;
+  padding: .6rem 1rem;
+  text-align: center;
+  background: var(--gold-soft);
+  color: var(--gold);
+  border-bottom: 1px solid var(--gold-line);
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.preview-note strong { font-weight: 600; }
+.preview-note button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+
+.preview-details {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 2rem);
+}
+.preview-details[hidden] { display: none; }
+.preview-details ul { margin: 1rem 0 0; padding-left: 1.15rem; }
+.preview-details li { margin-bottom: .45rem; color: var(--ink-2); }
+.preview-details .card { margin-top: 1.25rem; }
+</style>
+
+<p class="preview-note">
+  <strong>Preview.</strong> The real interface, with sample notices and no
+  connection to any live system.
+  <button type="button" id="preview-toggle" aria-expanded="false"
+          aria-controls="preview-details">What is and isn’t real</button>
+</p>
+
+<div class="preview-details" id="preview-details" hidden>
+  <div class="card">
+    <h2>What you are looking at</h2>
+    <p class="muted">
+      Every screen, style and piece of formatting here is the application
+      itself. Only the database is replaced, by a handful of sample notices
+      held in this page, so nothing you do can reach a real masjid or a real
+      family.
+    </p>
+    <ul>
+      <li><strong>Try “Near me”.</strong> It asks permission first and explains
+        where your location goes. A browser inside a preview frame is not
+        allowed to read a real position, so it uses a fixed point in downtown
+        Toronto. Everything after that, the distances, the radius, the erase on
+        opting out, is the real code.</li>
+      <li><strong>Follow a masjid.</strong> Stored in your own browser, exactly
+        as in the product. Nothing is sent anywhere.</li>
+      <li><strong>Alerts show as unavailable.</strong> That is the honest state
+        before a project is configured, not a broken preview. Notifications to
+        a closed page need a server credential.</li>
+      <li><strong>Reports are accepted and discarded.</strong> There is no
+        administrator queue behind this page.</li>
+      <li><strong>The second notice has no name</strong>, because that family
+        did not approve sharing it. The name is never written rather than
+        written and hidden.</li>
+    </ul>
+    <p class="hint hint--boxed">
+      Not shown here: the coordinator console, where a masjid publishes and
+      corrects notices, and the administrator screens for verification and
+      reports. Those need sign-in, so they only run against a real project.
+    </p>
+  </div>
+</div>
+
+<header class="masthead">
+  <a class="brand" href="/">
+    <span class="brand__mark" aria-hidden="true">◆</span>
+    <span>Janazah Notices</span>
+  </a>
+  <nav class="nav">
+    <div class="nav-spacer"></div>
+  </nav>
+</header>
+
+<main id="view" class="view">
+  <p class="muted">Loading notices…</p>
+</main>
+
+<footer class="footer">
+  <p>
+    Notices are published by masajid and funeral coordinators verified by a
+    platform administrator. If something looks wrong, use “Report a problem”
+    on the notice.
+  </p>
+  <p class="muted">
+    This page needs no account. Location is off unless you turn it on, and even
+    then it is used only in your browser and never sent to us or to any masjid.
+    Masajid you follow are remembered on your own device.
+    <a class="link" href="/privacy">How your information is handled</a>.
+  </p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+// SCRIPT
+</script>
+
+<script>
+  (() => {
+    const button = document.getElementById('preview-toggle');
+    const panel = document.getElementById('preview-details');
+    button.addEventListener('click', () => {
+      const open = panel.hasAttribute('hidden');
+      panel.toggleAttribute('hidden', !open);
+      button.setAttribute('aria-expanded', String(open));
+      button.textContent = open ? 'Hide this' : 'What is and isn’t real';
+    });
+  })();
+</script>

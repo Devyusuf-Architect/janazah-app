@@ -24,6 +24,21 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 | `/n/{id}`       | A single notice, the shareable link            |
 | `/console`      | Coordinator and platform administrator console |
 
+## Seeing it without installing anything
+
+`npm run preview` builds `build/preview.html`: one self-contained file with the
+whole community side of the app in it, no backend and no network. Open it in a
+browser, or host it anywhere, to show someone the product without a Firebase
+project.
+
+It is the real thing rather than a mockup. Every view, style and piece of
+formatting logic is the application's own code; `demo/` swaps out only the data
+layer and the three browser capabilities a sandboxed frame cannot provide.
+`npm run preview:verify` drives it in a browser and checks that it does.
+
+The coordinator console and the administrator screens are not in it, because
+they need sign-in.
+
 ## Getting started
 
 **Deploying for the first time: [`docs/deployment.md`](docs/deployment.md)** is

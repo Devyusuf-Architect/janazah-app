@@ -18,7 +18,9 @@
     "seed:demo": "node scripts/seed-demo.mjs",
     "preflight": "node scripts/preflight.mjs",
     "predemo": "npm run preflight",
-    "pretest": "npm run preflight"
+    "pretest": "npm run preflight",
+    "preview": "node demo/build.mjs",
+    "preview:verify": "node demo/build.mjs && node demo/verify.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
