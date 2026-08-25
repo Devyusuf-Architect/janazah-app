@@ -240,6 +240,11 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .card--narrow { max-width: 30rem; margin-inline: auto; }
 .card--flat { box-shadow: none; background: var(--surface-2); }
+.card--urgent {
+  position: relative;
+  padding-left: calc(clamp(1rem, 3vw, 1.4rem) - 3px);
+  border-left: 3px solid var(--danger);
+}
 .card-head {
   display: flex;
   justify-content: space-between;

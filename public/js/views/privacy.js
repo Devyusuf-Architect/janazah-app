@@ -7,6 +7,7 @@
 
 import { el } from '../ui.js';
 import { RETENTION_DAYS } from '../retention-policy.js';
+import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
 
 const LAST_UPDATED = '25 August 2026';
 
@@ -96,6 +97,28 @@ export function renderPrivacy(mount) {
       el('p', { text: 'On Google Firebase, in a Canadian region. This service ' +
                       'is intended to meet Canadian privacy expectations under ' +
                       'PIPEDA.' }),
+    ]),
+
+section('Asking for a notice to come down', [
+      el('p', { text: 'The standard retention period is described above, but ' +
+                      'a family should not have to wait weeks for a notice ' +
+                      'about their own relative to be removed if they want it ' +
+                      'removed sooner.' }),
+      el('ol', {}, [
+        el('li', { text: 'Open the notice.' }),
+        el('li', { text: '“Report a problem”, then choose “I am family, ' +
+                          'and I am asking for this to come down”.' }),
+        el('li', { text: 'Say, if you can, how you are connected to the ' +
+                          'family. This is not required, but it helps the ' +
+                          'request move faster.' }),
+      ]),
+      el('p', { text: `A platform administrator aims to review these within ` +
+                      `${FAMILY_TAKEDOWN_TARGET}. Reviewing means confirming ` +
+                      `the request and taking the notice down or redacting ` +
+                      `the name from it; it does not mean asking the family ` +
+                      `to prove who they are before acting.` }),
+      el('p', { class: 'muted', text: 'This request needs no account, the ' +
+                      'same as reporting an incorrect notice.' }),
     ]),
 
     section('Your choices', [

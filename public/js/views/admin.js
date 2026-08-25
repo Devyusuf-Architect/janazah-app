@@ -197,6 +197,7 @@ async function reviewNotices(org) {
 }
 
 const REPORT_REASON_LABELS = {
+  family_takedown: 'Family takedown request',
   incorrect_details: 'Details are wrong',
   already_cancelled: 'Already cancelled',
   duplicate: 'Duplicate notice',
@@ -223,7 +224,12 @@ async function reportsView(panel) {
 
   const render = () => {
     panel.replaceChildren();
-    const open = reports.filter((r) => r.status === 'open');
+    // A family asking for their own relative's notice to come down should
+    // never be sitting below a queue of general reports; put it first among
+    // the open ones rather than relying on an administrator to scroll to it.
+    const open = reports
+      .filter((r) => r.status === 'open')
+      .sort((a, b) => (b.reason === 'family_takedown') - (a.reason === 'family_takedown'));
     const closed = reports.filter((r) => r.status !== 'open');
 
     panel.append(el('p', { class: 'hint hint--boxed' },
@@ -269,7 +275,11 @@ function reportCard(report, refresh) {
   const created = report.createdAt?.toDate
     ? report.createdAt.toDate().toLocaleString('en-CA') : '—';
 
-  return el('div', { class: 'card' }, [
+  const isFamilyRequest = report.reason === 'family_takedown';
+
+  return el('div', {
+    class: `card${isFamilyRequest && report.status === 'open' ? ' card--urgent' : ''}`,
+  }, [
     el('div', { class: 'card-head' }, [
       el('div', {}, [
         el('h3', { text: REPORT_REASON_LABELS[report.reason] || report.reason }),

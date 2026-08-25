@@ -9,6 +9,7 @@ import { el, icon, skeleton, toast, friendlyError, showModal } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
 import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
+import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
 import { renderNearby } from './nearby.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
@@ -17,6 +18,11 @@ import * as push from '../push.js';
 import * as store from '../store.js';
 
 const REPORT_REASONS = [
+  // Listed first: a family asking for their own relative's notice to come
+  // down is the most time-sensitive reason on this list, and should be the
+  // first thing a distressed person sees rather than something they have to
+  // find at the bottom of a dropdown.
+  { value: 'family_takedown', label: 'I am family, and I am asking for this to come down' },
   { value: 'incorrect_details', label: 'The details are wrong' },
   { value: 'already_cancelled', label: 'This Janazah was cancelled' },
   { value: 'duplicate', label: 'Duplicate of another notice' },
@@ -387,6 +393,25 @@ function openReport(notice) {
     placeholder: 'What is wrong? Anything specific helps the administrator check quickly.',
   });
 
+  // A family takedown request is the one reason on this list where the
+  // person submitting is often not in a state to fill out a careful form, and
+  // where a generic "we'll look at it" is not reassuring. Swap the copy
+  // around it, rather than a separate flow, so this stays one small form
+  // rather than two.
+  const familyNote = el('p', {
+    class: 'notice-strip notice-strip--warn',
+    hidden: true,
+  }, `A platform administrator aims to review family takedown requests within ` +
+     `${FAMILY_TAKEDOWN_TARGET}. If you can, say which notice this is about and ` +
+     `how you are connected to the family in the details below; it helps the ` +
+     `request move faster, but is not required.`);
+
+  const syncFamilyNote = () => {
+    familyNote.hidden = select.value !== 'family_takedown';
+  };
+  select.addEventListener('change', syncFamilyNote);
+  syncFamilyNote();
+
   const backdrop = el('div', { class: 'modal-backdrop' });
   const close = () => backdrop.remove();
   const submit = el('button', { class: 'btn btn--primary' }, 'Send report');
@@ -397,7 +422,9 @@ function openReport(notice) {
     try {
       await store.submitReport(notice.id, select.value, detail.value);
       close();
-      toast('Report sent. A platform administrator will look at it.');
+      toast(select.value === 'family_takedown'
+        ? `Request sent. A platform administrator aims to review it within ${FAMILY_TAKEDOWN_TARGET}.`
+        : 'Report sent. A platform administrator will look at it.');
     } catch (err) {
       error.hidden = false;
       error.textContent =
@@ -417,6 +444,7 @@ function openReport(notice) {
       'the form being abused.'),
     el('label', { class: 'label', for: 'report-reason', text: 'What is the problem?' }),
     select,
+    familyNote,
     el('label', { class: 'label', for: 'report-detail', text: 'Details (optional)' }),
     detail,
     error,

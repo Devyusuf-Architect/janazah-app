@@ -116,7 +116,7 @@ const run = async () => {
     // stacks and must render correctly without them, so a blocked font host
     // is not a failure. Everything else in the console is.
     const ignorable = (text) => /favicon/i.test(text)
-      || /ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED/.test(text);
+      || /ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED|ERR_CERT_AUTHORITY_INVALID/.test(text);
     page.on('console', (m) => {
       if (m.type() === 'error' && !ignorable(m.text())) {
         failures.push(`console error: ${m.text()}`);
@@ -376,6 +376,50 @@ const run = async () => {
     assert.equal(resolved.status.stringValue, 'resolved');
     assert.ok(resolved.resolvedBy?.stringValue, 'the outcome must name who decided it');
     log('administrator resolved a report, with the outcome recorded');
+
+    // ---- family takedown request --------------------------------------------
+    // File a generic report and a family takedown request back to back, then
+    // confirm the family request surfaces ahead of it, is labelled plainly
+    // rather than as a raw value, and states a response-time target rather
+    // than a bare "we'll look at it".
+    await visitor.goto(BASE);
+    await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
+    await visitor.getByRole('link', { name: 'Open' }).first().click();
+    await visitor.locator('.public-notice').first().waitFor({ timeout: 10000 });
+
+    await visitor.getByRole('button', { name: 'Report a problem' }).click();
+    await visitor.locator('#report-reason').selectOption('other');
+    await visitor.getByRole('button', { name: 'Send report' }).click();
+    await visitor.locator('.modal-backdrop').waitFor({ state: 'detached', timeout: 15000 });
+
+    await visitor.getByRole('button', { name: 'Report a problem' }).click();
+    await visitor.locator('#report-reason').selectOption('family_takedown');
+    const familyNoteText = await visitor.locator('.notice-strip--warn').innerText();
+    assert.match(familyNoteText, /one business day/,
+      `expected the response-time target in the family note; got: ${familyNoteText}`);
+    await visitor.locator('#report-detail').fill('I am the deceased’s son.');
+    await visitor.getByRole('button', { name: 'Send report' }).click();
+    await visitor.locator('.modal-backdrop').waitFor({ state: 'detached', timeout: 15000 });
+    log('family takedown request filed, with the target response time shown before sending');
+
+    await admin.reload();
+    await admin.getByRole('button', { name: 'Admin' }).click();
+    await admin.getByRole('button', { name: 'Reports' }).click();
+    await admin.getByText('Family takedown request').first().waitFor({ timeout: 15000 });
+
+    const openReportCards = await admin.locator('.card:has(.badge:text("open"))').all();
+    assert.ok(openReportCards.length >= 2, 'expected both new reports to be open');
+    const firstCardText = await openReportCards[0].innerText();
+    assert.match(firstCardText, /Family takedown request/,
+      'the family takedown request should sort ahead of a general report');
+    log('family takedown request sorts ahead of a general report in triage');
+
+    await admin.getByRole('button', { name: 'Resolve' }).first().click();
+    await admin.locator('#reason-input').fill('Confirmed with the family and took the notice down.');
+    await admin.getByRole('button', { name: 'Resolve', exact: true }).last().click();
+    await admin.getByText('Confirmed with the family', { exact: false }).first()
+      .waitFor({ timeout: 15000 });
+    log('family takedown request resolved, with the outcome recorded');
 
     // ---- account security --------------------------------------------------
     await coord.getByRole('button', { name: 'Account' }).click();
