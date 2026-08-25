@@ -18,7 +18,7 @@ export const firebaseConfig = {
 };
 
 export const APP = {
-  name: 'Janazah Notices',
+  name: "Ta'ziyah",
   // Web Push certificate key pair, from
   // Firebase console > Project settings > Cloud Messaging > Web configuration.
   // Like the config above this is a public identifier, not a secret: it lets a

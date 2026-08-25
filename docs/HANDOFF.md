@@ -1,4 +1,4 @@
-# Janazah Notices — project brief
+# Ta'ziyah — project brief
 
 Paste this whole file into a new Claude conversation to bring it up to speed on
 the project. It covers what the app does, how it is built, which decisions were

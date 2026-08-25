@@ -14,7 +14,7 @@ import {
 import { auth } from '../firebase.js';
 import { el, toast, friendlyError } from '../ui.js';
 
-const ISSUER = 'Janazah Notices';
+const ISSUER = "Ta'ziyah";
 
 /** Identity Platform is a paid-tier switch; say so rather than failing oddly. */
 function unavailableMessage(err) {

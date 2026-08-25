@@ -1,4 +1,4 @@
-# Janazah Notification App
+# Ta'ziyah
 
 One trusted place where verified masajid and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.

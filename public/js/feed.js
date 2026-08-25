@@ -21,16 +21,16 @@ function route() {
     return;
   }
   if (/^\/privacy\/?$/.test(location.pathname)) {
-    document.title = 'Privacy — Janazah Notices';
+    document.title = "Privacy — Ta'ziyah";
     renderPrivacy(mount());
     return;
   }
   if (/^\/terms\/?$/.test(location.pathname)) {
-    document.title = 'Terms of service — Janazah Notices';
+    document.title = "Terms of service — Ta'ziyah";
     renderTerms(mount());
     return;
   }
-  document.title = 'Janazah Notices';
+  document.title = "Ta'ziyah";
   renderFeed(mount());
 }
 
