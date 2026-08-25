@@ -183,12 +183,40 @@ export function showModal(title, contentNode, { wide = false } = {}) {
   return close;
 }
 
-/** Turn a Firebase error into something a coordinator can act on. */
-export function friendlyError(err) {
+// What "permission denied" means depends entirely on what was being
+// attempted, and the wrong one of these is worse than no message at all.
+// Telling someone filling in a registration form that their organization
+// "may not be verified yet" is both meaningless (they are creating it; there
+// is nothing to verify yet) and discouraging at exactly the moment they are
+// deciding whether to trust the platform.
+const PERMISSION_DENIED = {
+  register:
+    'Your registration could not be saved. Nothing you entered is wrong, and ' +
+    'this is not something you can fix by changing it. Please try again in a ' +
+    'moment. If it keeps happening, the platform administrators need to know.',
+  load:
+    'Some of this page could not be loaded. Your account is fine; this is a ' +
+    'problem on our side.',
+  publish:
+    'This organization cannot publish yet. It needs to be approved by a ' +
+    'platform administrator first, and you need to be authorized to publish ' +
+    'for it.',
+  default:
+    'Permission denied. Your organization may not be verified yet, or you ' +
+    'may not be authorized to publish for it.',
+};
+
+/**
+ * Turn a Firebase error into something a coordinator can act on.
+ *
+ * @param {*} err
+ * @param {'register'|'load'|'publish'} [context]  Which PERMISSION_DENIED
+ *   message fits what was being attempted. Only affects that one code.
+ */
+export function friendlyError(err, context) {
   const code = err?.code || '';
   if (code === 'permission-denied') {
-    return 'Permission denied. Your organization may not be verified yet, ' +
-      'or you may not be authorized to publish for it.';
+    return PERMISSION_DENIED[context] || PERMISSION_DENIED.default;
   }
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
     return 'Email or password is incorrect.';

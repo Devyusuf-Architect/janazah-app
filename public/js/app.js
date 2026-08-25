@@ -73,11 +73,17 @@ function renderNav() {
 }
 
 async function loadContext() {
+  ctx.orgsError = null;
   const [isAdmin, orgs] = await Promise.all([
     store.isPlatformAdmin(ctx.user.uid),
     store.myOrganizations(ctx.user.uid).catch((err) => {
+      // Deliberately not a toast. This runs on every sign-in and every
+      // refresh, before the person has done anything, and a red banner
+      // accusing them of a permissions problem on arrival reads as "you are
+      // not welcome here". The view that needs this data says so in place
+      // instead, where it is attached to what is actually missing.
       console.error('myOrganizations', err);
-      toast(friendlyError(err), 'error');
+      ctx.orgsError = err;
       return [];
     }),
   ]);

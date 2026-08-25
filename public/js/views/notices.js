@@ -377,7 +377,7 @@ async function openComposer(mount, ctx, org, existing) {
       renderNotices(mount, ctx);
     } catch (err) {
       error.hidden = false;
-      error.textContent = friendlyError(err);
+      error.textContent = friendlyError(err, 'publish');
       for (const btn of form.querySelectorAll('.form-actions button')) btn.disabled = false;
     }
   };

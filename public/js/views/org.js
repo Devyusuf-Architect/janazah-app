@@ -128,6 +128,13 @@ export function renderOrgs(mount, ctx) {
   mount.replaceChildren();
   const { orgs } = ctx;
 
+  // Attached to the list it belongs to, rather than thrown as a toast the
+  // moment someone signs in. See loadContext in app.js.
+  if (ctx.orgsError) {
+    mount.append(el('p', { class: 'notice-strip notice-strip--warn' },
+      friendlyError(ctx.orgsError, 'load')));
+  }
+
   // Someone whose single organization is not verified has nothing to do on a
   // list screen: give them the state itself, in full, rather than a card in a
   // list of one. With more than one organization the list is the right view,
@@ -277,8 +284,12 @@ function renderRegisterForm(mount, ctx) {
       toast('Submitted. A platform administrator will review it.');
       await ctx.refresh();
     } catch (err) {
+      // Registering is the first thing a masjid ever does here. A denial at
+      // this point is a fault on our side, never something the applicant got
+      // wrong, so it must not read as a warning about them.
+      console.error('registerOrganization', err);
       error.hidden = false;
-      error.textContent = friendlyError(err);
+      error.textContent = friendlyError(err, 'register');
     } finally {
       submit.disabled = false;
     }
@@ -293,7 +304,7 @@ async function renderJoinForm(mount, ctx) {
   try {
     orgs = await store.verifiedOrganizations();
   } catch (err) {
-    mount.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err) }));
+    mount.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err, 'load') }));
     return;
   }
 
