@@ -327,7 +327,7 @@ const run = async () => {
 
     // A visitor physically in Toronto.
     const local = await newPage({
-      permissions: ['geolocation'],
+      permissions: ['geolocation', 'notifications'],
       // Distinctive digits so the leak check below cannot collide with a
       // coordinate that legitimately belongs to a notice.
       geolocation: { latitude: 43.6591234, longitude: -79.3901234 },
@@ -381,6 +381,21 @@ const run = async () => {
       assert.ok(!dump.includes('6591234'), `a visitor position reached ${path}`);
     }
     log('visitor position never reaches the backend');
+
+    // The alerts control must describe what it actually does. In this build
+    // no Web Push certificate is configured, so it has to offer the
+    // page-open-only fallback and say so rather than implying more.
+    const alertsText = await local.locator('.alerts-panel').innerText();
+    assert.match(alertsText, /not set up for this site yet|cannot receive notifications/i,
+      `expected the panel to explain why push is unavailable; got: ${alertsText}`);
+    assert.match(alertsText, /only works while a tab is open|will not reach a locked phone/i,
+      `the fallback must state its limitation; got: ${alertsText}`);
+
+    await local.locator('#alerts-toggle').check();
+    await local.waitForFunction(() =>
+      JSON.parse(localStorage.getItem('janazah.location') || '{}').alertsEnabled === true,
+      null, { timeout: 10000 });
+    log('alerts panel is honest about what it can deliver, and the fallback works');
 
     // Opting out must erase, not merely stop reading.
     await local.getByRole('button', { name: 'Turn off' }).click();

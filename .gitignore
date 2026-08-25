@@ -7,3 +7,6 @@ firestore-debug.log
 ui-debug.log
 .DS_Store
 .test-serve/
+functions/node_modules/
+functions/.env
+functions/.env.*

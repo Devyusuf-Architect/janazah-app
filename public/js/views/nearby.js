@@ -6,8 +6,10 @@
 
 import { el, toast } from '../ui.js';
 import { formatDistance } from '../geo.js';
+import { alertsPanel } from './alerts-panel.js';
 import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
+import * as push from '../push.js';
 
 /**
  * @param {object} deps
@@ -83,6 +85,7 @@ function consentPanel(onChange) {
     try {
       loc.update({ enabled: true });
       await loc.requestPosition();
+      push.syncTopics().catch((err) => console.error('syncTopics', err));
       toast('Showing Janazahs near you.');
       onChange();
     } catch (err) {
@@ -126,6 +129,8 @@ function settingsPanel(settings, onChange) {
     })));
   radius.addEventListener('change', () => {
     loc.update({ radiusKm: Number(radius.value) });
+    // A different radius means a different set of area topics.
+    push.syncTopics().catch((err) => console.error('syncTopics', err));
     onChange();
   });
 
@@ -150,6 +155,8 @@ function settingsPanel(settings, onChange) {
           onclick: () => {
             loc.disable();
             alerts.clearSeen();
+            // Drop the area subscriptions too; follows are unaffected.
+            push.syncTopics().catch((err) => console.error('syncTopics', err));
             toast('Location turned off and the stored position erased.');
             onChange();
           },
@@ -159,54 +166,7 @@ function settingsPanel(settings, onChange) {
     lastSeen
       ? el('p', { class: 'hint', text: `Based on where you were at ${lastSeen}. Nothing is stored anywhere but this device.` })
       : null,
-    alertToggle(settings, onChange),
-  ]);
-}
-
-function alertToggle(settings, onChange) {
-  if (!alerts.notificationsSupported()) {
-    return el('p', { class: 'hint', text: 'This browser does not support alerts.' });
-  }
-
-  const permission = alerts.notificationPermission();
-
-  if (permission === 'denied') {
-    return el('p', { class: 'hint' },
-      'Alerts are blocked for this site in your browser settings. The list ' +
-      'below still updates on its own.');
-  }
-
-  const checkbox = el('input', {
-    type: 'checkbox', id: 'alerts-toggle',
-    checked: settings.alertsEnabled && permission === 'granted',
-  });
-
-  checkbox.addEventListener('change', async () => {
-    if (!checkbox.checked) {
-      loc.update({ alertsEnabled: false });
-      onChange();
-      return;
-    }
-    const granted = await alerts.requestNotificationPermission();
-    if (granted !== 'granted') {
-      checkbox.checked = false;
-      toast('Your browser declined alerts for this site.', 'warn');
-      return;
-    }
-    alerts.primeSeen(window.__janazahNotices || []);
-    loc.update({ alertsEnabled: true });
-    toast('Alerts on for new Janazahs within your distance.');
-    onChange();
-  });
-
-  return el('div', {}, [
-    el('label', { class: 'check', for: 'alerts-toggle' }, [
-      checkbox,
-      el('span', { text: 'Alert me when a new Janazah is published near me' }),
-    ]),
-    el('p', { class: 'hint' },
-      'This works while this page is open. Alerts that reach a locked phone ' +
-      'need the app version, which is not built yet.'),
+    alertsPanel(onChange),
   ]);
 }
 
@@ -216,6 +176,8 @@ async function refresh(button, onChange) {
   button.textContent = 'Finding your location…';
   try {
     await loc.requestPosition();
+    // Moving changes which area covers this device.
+    push.syncTopics().catch((err) => console.error('syncTopics', err));
     onChange();
   } catch (err) {
     toast(err.message, 'error');

@@ -15,7 +15,8 @@ globalThis.localStorage = {
   removeItem: (k) => store.delete(k),
 };
 
-const { geohash, distanceKm, formatDistance } = await import('../public/js/geo.js');
+const { geohash, distanceKm, formatDistance, cellsCovering, cellSizeDegrees, subscriptionCells } =
+  await import('../public/js/geo.js');
 const locationModule = await import('../public/js/location.js');
 const { nearbyNotices, noticeDistanceKm, isStale, settings, update, disable, STALE_AFTER_MS } =
   locationModule;
@@ -128,6 +129,75 @@ describe('nearbyNotices', () => {
     const km = noticeDistanceKm(mid, here);
     assert.equal(nearbyNotices([mid], here, km).length, 1);
     assert.equal(nearbyNotices([mid], here, km - 0.001).length, 0);
+  });
+});
+
+describe('subscription cells', () => {
+  const TORONTO = { lat: 43.6532, lng: -79.3832 };
+
+  test('cell size halves in alternating axes as precision grows', () => {
+    const p4 = cellSizeDegrees(4);
+    const p5 = cellSizeDegrees(5);
+    assert.ok(p5.lat < p4.lat && p5.lng < p4.lng);
+    // Five bits per character, split between the two axes.
+    assert.ok(Math.abs((p4.lat * p4.lng) / (p5.lat * p5.lng) - 32) < 1e-6);
+  });
+
+  test('always covers the cell the point itself is in', () => {
+    const cells = cellsCovering(TORONTO.lat, TORONTO.lng, 5, 5);
+    assert.ok(cells.includes(geohash(TORONTO.lat, TORONTO.lng, 5)));
+  });
+
+  test('a wider radius covers more ground', () => {
+    const near = cellsCovering(TORONTO.lat, TORONTO.lng, 5, 5).length;
+    const far = cellsCovering(TORONTO.lat, TORONTO.lng, 40, 5).length;
+    assert.ok(far > near, `${far} should exceed ${near}`);
+  });
+
+  test('every returned cell is a well-formed geohash of the right length', () => {
+    for (const cell of cellsCovering(TORONTO.lat, TORONTO.lng, 20, 4)) {
+      assert.equal(cell.length, 4);
+      assert.match(cell, /^[0-9bcdefghjkmnpqrstuvwxyz]+$/);
+    }
+  });
+
+  test('a point inside the radius falls in one of the cells', () => {
+    // ~8 km north, comfortably inside a 20 km radius.
+    const cells = new Set(cellsCovering(TORONTO.lat, TORONTO.lng, 20, 5));
+    const north = geohash(TORONTO.lat + 0.072, TORONTO.lng, 5);
+    assert.ok(cells.has(north), `expected ${north} among ${cells.size} cells`);
+  });
+
+  test('precision drops rather than returning an unusable number of topics', () => {
+    for (const radius of [5, 10, 20, 50, 0]) {
+      const { precision, cells } = subscriptionCells(TORONTO.lat, TORONTO.lng, radius);
+      assert.ok(cells.length <= 40, `radius ${radius} gave ${cells.length} cells`);
+      assert.ok(precision >= 2 && precision <= 5);
+      assert.equal(new Set(cells).size, cells.length, 'cells must be unique');
+      for (const cell of cells) assert.equal(cell.length, precision);
+    }
+  });
+
+  test('a tight radius keeps fine cells', () => {
+    assert.equal(subscriptionCells(TORONTO.lat, TORONTO.lng, 5).precision, 5);
+  });
+
+  test('works near the antimeridian without producing junk', () => {
+    const cells = cellsCovering(-16.5, 179.9, 30, 4);
+    assert.ok(cells.length > 0);
+    for (const cell of cells) assert.match(cell, /^[0-9bcdefghjkmnpqrstuvwxyz]{4}$/);
+  });
+
+  test('works at a pole without dividing by zero or looping forever', () => {
+    // Near a pole a 50 km radius genuinely spans most longitudes, so the raw
+    // cover is large; what matters is that it terminates and is well formed.
+    const cells = cellsCovering(89.9, 0, 50, 4);
+    assert.ok(cells.length > 0);
+    for (const cell of cells) assert.match(cell, /^[0-9bcdefghjkmnpqrstuvwxyz]{4}$/);
+
+    // The contract that the app actually relies on: a usable topic count.
+    const { cells: subscribed } = subscriptionCells(89.9, 0, 50);
+    assert.ok(subscribed.length <= 40, `got ${subscribed.length}`);
   });
 });
 

@@ -33,9 +33,9 @@ reporting form uses an anonymous session so that a report can be attributed
 well enough to rate limit, without collecting anything about the reporter. See
 `docs/phase-2-notes.md`.
 
-Multi-factor authentication is not available on Spark. It needs the Identity
-Platform upgrade, which is a Blaze-tier switch. Phase 1 works without it; see
-"What Phase 1 does not include" below.
+Multi-factor authentication needs the Identity Platform upgrade, which is a
+Blaze-tier switch. If you are upgrading to Blaze for push notifications
+anyway (see `docs/phase-4-notes.md`), enable it at the same time.
 
 ## 4. Register a web app and copy the config
 
@@ -133,17 +133,19 @@ firebase deploy --only hosting
 The public feed is then live at `https://<project-id>.web.app` and the console
 at `https://<project-id>.web.app/console`.
 
-## What Phase 1 does not include, and why
+## If you are staying on Spark for now
 
-Deferred to Phase 4, when the compute decision is made:
+Everything in Phases 1 to 3 works on the free plan: the console, the public
+feed, and on-device nearby matching. Two things do not, and both need Blaze:
 
-- **Push notifications.** Sending to FCM needs a service account credential,
-  which cannot live in browser JavaScript. This needs Cloud Functions (Blaze)
-  or a small external endpoint. Nothing in Phase 1 depends on it.
-- **Multi-factor auth for coordinators.** Needs the Identity Platform upgrade.
-- **Scheduled retention purges.** No scheduler without Cloud Functions. Expired
-  notices are filtered out of queries by time; actual deletion is manual until
-  Phase 5.
+- **Push notifications** (Phase 4), because sending to FCM needs a service
+  account credential. With `APP.vapidKey` left unset the app says alerts are
+  not set up rather than failing oddly, and offers the page-open fallback.
+- **Multi-factor auth for coordinators**, which needs Identity Platform.
+
+Also still absent on either plan: scheduled retention purges. Expired notices
+are filtered out of queries by time, but actually deleting a deceased person's
+name remains a manual step until someone builds it.
 
 Known limitation of a client-only audit trail: rules make `/auditLog` strictly
 append-only and force `actorUid` to match the authenticated caller, so an entry

@@ -1,0 +1,15 @@
+{
+  "name": "janazah-functions",
+  "description": "Notification fan-out for the Janazah app",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

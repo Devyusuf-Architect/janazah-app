@@ -484,6 +484,26 @@ describe('the public feed needs no account', () => {
 });
 
 describe('everything else is closed', () => {
+  test('notification bookkeeping is closed to every client', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'notificationRuns', 'n1_published_v1'),
+        { noticeId: 'n1', kind: 'published' });
+    });
+    for (const db of [anon(), as(STAFF), as(ADMIN)]) {
+      await assertFails(getDoc(doc(db, 'notificationRuns', 'n1_published_v1')));
+      await assertFails(setDoc(doc(db, 'notificationRuns', 'forged'), { noticeId: 'n1' }));
+    }
+  });
+
+  test('there is nowhere for a user position to be stored', async () => {
+    // The nearby feature must stay device-side. If a future change adds a
+    // location collection, this fails and forces the decision to be explicit.
+    for (const name of ['userLocations', 'locations', 'devices', 'presence']) {
+      await assertFails(setDoc(doc(as(STAFF), name, STAFF), { lat: 43.6, lng: -79.3 }));
+      await assertFails(setDoc(doc(anon(), name, 'x'), { lat: 43.6, lng: -79.3 }));
+    }
+  });
+
   test('an unmatched collection is not writable', async () => {
     await assertFails(setDoc(doc(as(STAFF), 'userLocations', STAFF), { lat: 43.6, lng: -79.3 }));
     await assertFails(getDoc(doc(as(STAFF), 'userLocations', STAFF)));

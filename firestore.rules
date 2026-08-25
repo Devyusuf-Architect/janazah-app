@@ -337,6 +337,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- notification bookkeeping ----------
+    // Written only by the notification function through the Admin SDK, which
+    // bypasses rules. Closed to every client: it is internal delivery state,
+    // and it is kept in its own collection so it cannot disturb the field
+    // allowlist that guards the public notice document.
+
+    match /notificationRuns/{runId} {
+      allow read, write: if false;
+    }
+
     // Anything not matched above is denied.
     match /{document=**} {
       allow read, write: if false;

@@ -335,3 +335,11 @@ textarea.field { resize: vertical; }
   .nearby-settings__row .row-actions { justify-content: stretch; }
   .nearby-settings__row .row-actions .btn { flex: 1; }
 }
+
+/* ---------- alerts (Phase 4) ---------- */
+
+.alerts-panel {
+  margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--line);
+}
+.alerts-panel .notice-strip strong { display: block; margin-bottom: .25rem; }
+.alerts-panel .notice-strip p { margin: 0; }

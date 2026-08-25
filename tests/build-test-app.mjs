@@ -7,7 +7,13 @@ import { join } from 'node:path';
 import { build } from 'esbuild';
 
 const OUT = '.test-serve';
-const SERVICES = { app: 'firebase/app', auth: 'firebase/auth', firestore: 'firebase/firestore' };
+const SERVICES = {
+  app: 'firebase/app',
+  auth: 'firebase/auth',
+  firestore: 'firebase/firestore',
+  messaging: 'firebase/messaging',
+  functions: 'firebase/functions',
+};
 
 export async function buildTestApp() {
   rmSync(OUT, { recursive: true, force: true });
@@ -43,7 +49,9 @@ export async function buildTestApp() {
     "imports": {
       "firebase/app": "/vendor/firebase-app.js",
       "firebase/auth": "/vendor/firebase-auth.js",
-      "firebase/firestore": "/vendor/firebase-firestore.js"
+      "firebase/firestore": "/vendor/firebase-firestore.js",
+      "firebase/messaging": "/vendor/firebase-messaging.js",
+      "firebase/functions": "/vendor/firebase-functions.js"
     }
   }
   </script>`;

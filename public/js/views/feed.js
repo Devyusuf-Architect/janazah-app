@@ -13,6 +13,7 @@ import { renderNearby } from './nearby.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
+import * as push from '../push.js';
 import * as store from '../store.js';
 
 const REPORT_REASONS = [
@@ -179,6 +180,8 @@ export function renderFeed(mount) {
   // Following changes the tab count, and while the "following" filter is
   // active it changes which cards belong on screen, so both have to refresh.
   const onFollowChange = () => {
+    // Following also decides which masjid topics this device receives.
+    push.syncTopics().catch((err) => console.error('syncTopics', err));
     if (filter === 'following') paint();
     else paintTabs();
   };
@@ -438,7 +441,11 @@ async function openFollowManager() {
           ]),
           el('button', {
             class: `btn btn--small${following ? ' btn--active' : ''}`,
-            onclick: () => { follows.toggleFollow(org.id); render(); },
+            onclick: () => {
+              follows.toggleFollow(org.id);
+              push.syncTopics().catch((err) => console.error('syncTopics', err));
+              render();
+            },
           }, following ? 'Following' : 'Follow'),
         ]);
       })),

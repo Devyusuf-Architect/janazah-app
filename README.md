@@ -3,10 +3,15 @@
 One trusted place where verified masajid and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.
 
-**Status: Phase 3 complete.** The public feed, on-device nearby matching, and
-the coordinator and administrator console are built and tested. Push
-notifications that reach a locked phone (Phase 4) are not built, and are still
-gated on a compute decision.
+**Status: Phase 4 complete.** The public feed, on-device nearby matching, push
+notifications, and the coordinator and administrator console are all built and
+tested.
+
+Push requires the Blaze plan, because sending to Firebase Cloud Messaging needs
+a service account credential that cannot live in a browser. Usage sits inside
+the free allowance; a card still has to be attached. Everything else in the app
+runs without it, and with push unconfigured the UI says so plainly rather than
+failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 
 | Path            | What it is                                     |
 | --------------- | ---------------------------------------------- |
@@ -32,11 +37,15 @@ emulator-only `demo-` project, so nothing can reach a real backend.
 ## Tests
 
 ```bash
-npm run test:unit    # 22 tests of the distance and nearby-matching maths
-npm run test:rules   # 54 security rule tests
+npm run test:unit    # 57 tests of the distance, cell and notification logic
+npm run test:rules   # 56 security rule tests
 npm run test:e2e     # browser run through the whole product path
 npm test             # all three
 ```
+
+Delivery of an actual push cannot be tested against the emulator, which does
+not emulate FCM sending. `docs/phase-4-notes.md` lists what to check by hand on
+a real device before launch.
 
 The end-to-end test needs a Chromium binary. If Playwright's own download is
 unavailable, point it at an existing one:
@@ -46,6 +55,20 @@ CHROMIUM_PATH=/path/to/chrome npm run test:e2e
 ```
 
 ## What is built
+
+### Phase 4, push notifications
+
+- Alerts that arrive when the page is closed, for Janazahs in your area and
+  from masajid you follow
+- The device subscribes itself to coarse area topics; a notice is published to
+  the topics covering its own location, so the backend receives no position and
+  has no way to ask which devices are in a given area
+- One notification per notice even when both a follow and an area match, and a
+  correction replaces the original rather than stacking
+- Cancellations reach exactly the people the original reached, without keeping
+  any record of who that was
+- iPhone install instructions, since Apple allows web push only for pages added
+  to the Home Screen
 
 ### Phase 3, nearby Janazahs
 

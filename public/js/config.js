@@ -19,6 +19,12 @@ export const firebaseConfig = {
 
 export const APP = {
   name: 'Janazah Notices',
+  // Web Push certificate key pair, from
+  // Firebase console > Project settings > Cloud Messaging > Web configuration.
+  // Like the config above this is a public identifier, not a secret: it lets a
+  // browser register for push and grants nothing else. Leave it as-is and push
+  // stays switched off with a clear message rather than failing oddly.
+  vapidKey: 'REPLACE_ME_WEB_PUSH_CERTIFICATE_KEY',
   // Geohash precision used for the alert cell grid. 5 characters is roughly
   // 5 km x 5 km. Phase 1 only stamps the cell onto records; Phase 4 routes
   // notifications with it.

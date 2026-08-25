@@ -29,6 +29,19 @@
             "value": "no-cache"
           }
         ]
+      },
+      {
+        "source": "/firebase-messaging-sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          },
+          {
+            "key": "Service-Worker-Allowed",
+            "value": "/"
+          }
+        ]
       }
     ]
   },
@@ -44,6 +57,20 @@
     },
     "ui": {
       "enabled": true
+    },
+    "functions": {
+      "port": 5001
     }
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "*.local"
+      ]
+    }
+  ]
 }
