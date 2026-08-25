@@ -39,7 +39,11 @@ export function orgRow(org, onChange = () => {}) {
 
   return el('li', { class: 'list-row' }, [
     el('div', {}, [
-      el('strong', { text: org.name }),
+      // A followed masjid has to lead somewhere, or following is only a
+      // filter on the main feed. /o/{id} is that somewhere.
+      el('a', { class: 'list-row__link', href: `/o/${org.id}` }, [
+        el('strong', { text: org.name }),
+      ]),
       el('p', { class: 'muted', text: `${org.city}, ${org.province}` }),
     ]),
     button,
@@ -52,7 +56,7 @@ export function renderMasjids(mount) {
   store.verifiedOrganizations()
     .then((orgs) => paint(mount, orgs))
     .catch((err) => {
-      mount.append(el('p', { class: 'form-error', text: friendlyError(err) }));
+      mount.append(el('p', { class: 'form-error', text: friendlyError(err, 'orgList') }));
     });
 }
 

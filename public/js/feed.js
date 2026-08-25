@@ -12,6 +12,7 @@ import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { renderHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
+import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
 import { renderAbout } from './views/about.js';
 import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
@@ -28,6 +29,7 @@ let authReady = false;
 function teardownAll() {
   teardownFeed();
   teardownDashboard();
+  teardownOrgPage();
 }
 
 /** Redraws the nav for the current path and sign-in state. */
@@ -52,6 +54,12 @@ function route() {
   if (/^\/masajid\/?$/.test(path)) {
     history.replaceState(null, '', '/masjids');
     route();
+    return;
+  }
+
+  const orgPage = path.match(/^\/o\/([A-Za-z0-9_-]+)\/?$/);
+  if (orgPage) {
+    renderOrgPage(mount(), orgPage[1]);
     return;
   }
 

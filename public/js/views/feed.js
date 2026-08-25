@@ -471,7 +471,7 @@ async function openFollowManager() {
       orgs = await store.verifiedOrganizations();
       orgsById = new Map(orgs.map((o) => [o.id, o]));
     } catch (err) {
-      body.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err) }));
+      body.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err, 'orgList') }));
       return;
     }
   }

@@ -660,6 +660,27 @@ const run = async () => {
     await guest.getByRole('button', { name: /^Follow Test Masjid$/ }).waitFor({ timeout: 15000 });
     log('masjids directory lists a verified organization with a follow control');
 
+    // ---- an organization's own page, which is where a follow leads ---------
+    await guest.getByRole('link', { name: 'Test Masjid' }).first().click();
+    await guest.locator('.org-header').waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/o\/[A-Za-z0-9_-]+$/, `expected /o/{id}, got ${guest.url()}`);
+    // The notice list arrives on its own snapshot after the header renders.
+    await guest.locator('.notice-card').first().waitFor({ timeout: 15000 });
+    const orgPageText = await guest.locator('#view').innerText();
+    assert.match(orgPageText, /Test Masjid/, 'the organization page must name the masjid');
+    assert.match(orgPageText, /Verified/i, 'a verified masjid should say so');
+    assert.match(orgPageText, /Test Name/,
+      'the organization page must list that masjid’s own notices');
+    log('organization page shows the masjid and its notices');
+
+    // Following from the organization page, with no account of any kind.
+    await guest.getByRole('button', { name: /^Follow Test Masjid$/ }).click();
+    await guest.getByRole('button', { name: /^Following Test Masjid$/ }).waitFor({ timeout: 5000 });
+    const guestFollows = await guest.evaluate(() => localStorage.getItem('janazah.followedOrgs'));
+    assert.ok(guestFollows && JSON.parse(guestFollows).length === 1,
+      'following from the organization page did not persist on the device');
+    log('a visitor with no account can follow from the organization page');
+
     // ---- the dashboard is not reachable while signed out ---------------------
     await guest.goto(`${BASE}/dashboard`);
     await guest.locator('form.card--narrow').waitFor({ timeout: 15000 });
@@ -678,7 +699,7 @@ const run = async () => {
 
     const dashboardText = await member.locator('#view').innerText();
     for (const claim of [
-      /Upcoming Janazahs/, /Janazahs near me/i, /Followed masjids/i,
+      /Upcoming Janazahs/, /Janazahs near me/i, /Following/i,
       /Notification settings/i, /Account security/i,
     ]) {
       assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);

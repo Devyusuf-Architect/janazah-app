@@ -273,6 +273,56 @@ describe('corrections and cancellation', () => {
   });
 });
 
+describe('following is a community action, not a coordinator one', () => {
+  // Following is stored on the device (public/js/follows.js) and writes
+  // nothing, so the only thing it needs from the backend is the ability to
+  // read the list of verified organizations. These pin that this stays true
+  // for someone with no account and no relationship to any organization,
+  // because the moment it needs more, following starts failing with a
+  // message about publishing rights.
+
+  test('a visitor with no account can list verified organizations', async () => {
+    await assertSucceeds(getDocs(query(collection(anon(), 'organizations'),
+      where('verificationStatus', '==', 'verified'))));
+  });
+
+  test('a signed-in community member can list verified organizations', async () => {
+    // OUTSIDER is staff of nothing verified and is not an admin.
+    await assertSucceeds(getDocs(query(collection(as(OUTSIDER), 'organizations'),
+      where('verificationStatus', '==', 'verified'))));
+  });
+
+  test('a visitor can open one verified organization directly', async () => {
+    // The /o/{id} page, reached by following a masjid.
+    await assertSucceeds(getDoc(doc(anon(), 'organizations', VERIFIED_ORG)));
+  });
+
+  test('unverified organizations stay invisible to a community member', async () => {
+    await assertFails(getDoc(doc(anon(), 'organizations', PENDING_ORG)));
+    await assertFails(getDoc(doc(as(STAFF), 'organizations', PENDING_ORG)));
+  });
+
+  test('reading an organization grants nothing over it', async () => {
+    // The separation that matters: a community member may read every verified
+    // organization, and must still not be able to edit one, publish for one,
+    // or add themselves to its staff.
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', VERIFIED_ORG), {
+      name: 'Renamed By A Follower',
+    }));
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', VERIFIED_ORG), {
+      staffUids: [OWNER, STAFF, OUTSIDER],
+    }));
+    await assertFails(addDoc(collection(as(OUTSIDER), 'notices'), {
+      orgId: VERIFIED_ORG, orgName: 'Test Masjid', status: 'published',
+      isPublic: true, showDeceasedName: false,
+      janazahAt: Timestamp.fromDate(new Date(Date.now() + 86400000)),
+      timeZone: 'America/Toronto',
+      prayerLocation: { name: 'Hall', address: '1 A St', lat: 43.6, lng: -79.3, cell: 'dpz83' },
+      version: 1, createdBy: OUTSIDER, createdAt: serverTimestamp(),
+    }));
+  });
+});
+
 describe('verification cannot be self-granted', () => {
   test('an owner cannot verify their own organization', async () => {
     await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {

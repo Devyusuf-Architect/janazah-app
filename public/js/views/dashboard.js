@@ -45,8 +45,8 @@ export function renderDashboard(mount, ctx) {
   const nearMe = el('div', { class: 'card dash-card' }, [
     el('h2', { text: 'Janazahs near me' }),
   ]);
-  const followedCard = el('div', { class: 'card dash-card' }, [
-    el('h2', { text: 'Followed masjids' }),
+  const followedCard = el('div', { class: 'card dash-card dash-card--wide' }, [
+    el('h2', { text: 'Following' }),
     el('p', { class: 'muted', text: 'Loading…' }),
   ]);
   const alertsCard = el('div', { class: 'card dash-card dash-card--wide' }, [
@@ -93,26 +93,30 @@ export function renderDashboard(mount, ctx) {
     .then((orgs) => {
       const followedIds = new Set(follows.followedOrgIds());
       const followed = orgs.filter((o) => followedIds.has(o.id));
-      followedCard.replaceChildren(el('h2', { text: 'Followed masjids' }));
+      followedCard.replaceChildren(el('h2', { text: 'Following' }));
       if (!followed.length) {
         followedCard.append(
-          el('p', { class: 'muted', text: 'You are not following any masjids yet.' }),
+          el('p', { class: 'muted' },
+            'You are not following any masjids yet. Follow one and its ' +
+            'notices gather here and on your feed, so you do not have to go ' +
+            'looking each time.'),
           el('a', { class: 'btn btn--small', href: '/masjids', text: 'Browse masjids' }),
         );
         return;
       }
       followedCard.append(
-        el('ul', { class: 'list' }, followed.slice(0, 5).map((org) => orgRow(org, () => renderDashboard(mount, ctx)))),
-        followed.length > 5
-          ? el('p', { class: 'muted small', text: `and ${followed.length - 5} more` })
-          : null,
-        el('a', { class: 'btn btn--small', href: '/masjids', text: 'Manage in directory' }),
+        el('p', { class: 'muted' },
+          `${followed.length} masjid${followed.length === 1 ? '' : 's'}. ` +
+          'Kept on this device.'),
+        el('ul', { class: 'list' },
+          followed.map((org) => orgRow(org, () => renderDashboard(mount, ctx)))),
+        el('a', { class: 'btn btn--small', href: '/masjids', text: 'Browse all masjids' }),
       );
     })
     .catch((err) => {
       followedCard.replaceChildren(
         el('h2', { text: 'Followed masjids' }),
-        el('p', { class: 'form-error', text: friendlyError(err) }),
+        el('p', { class: 'form-error', text: friendlyError(err, 'orgList') }),
       );
     });
 

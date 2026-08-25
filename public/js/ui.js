@@ -201,6 +201,16 @@ const PERMISSION_DENIED = {
     'This organization cannot publish yet. It needs to be approved by a ' +
     'platform administrator first, and you need to be authorized to publish ' +
     'for it.',
+  // Following is a community action. It needs no account, no membership of
+  // the organization and no coordinator rights, so a failure here must never
+  // borrow the publishing message: it would tell someone who just wants to
+  // keep up with a masjid that they are not authorized to publish for it,
+  // which is both untrue and alarming.
+  follow:
+    'We could not follow this masjid right now. Please try again in a moment.',
+  orgList:
+    'The list of masjids could not be loaded right now. Please try again in a ' +
+    'moment.',
   default:
     'Permission denied. Your organization may not be verified yet, or you ' +
     'may not be authorized to publish for it.',
