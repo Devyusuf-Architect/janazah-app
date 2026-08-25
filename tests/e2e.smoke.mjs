@@ -481,6 +481,30 @@ const run = async () => {
     }
     log('privacy page states what the code actually does');
 
+    // ---- the terms of service page ------------------------------------------
+    // Navigated via the in-app link, not goto(), so the routing itself is
+    // exercised too, not just that the page renders when hit directly.
+    await local.getByRole('link', { name: 'Terms of service' }).first().click();
+    await local.locator('.policy').waitFor({ timeout: 15000 });
+    assert.match(local.url(), /\/terms$/, `expected /terms, got ${local.url()}`);
+    const terms = await local.locator('.policy').innerText();
+    for (const claim of [
+      /notification layer/i,
+      /not.*a religious authority/i,
+      /reviewed by a platform administrator/i,
+      /never a shared login/i,
+      /takes.*down|take down|taken down/i,
+    ]) {
+      assert.match(terms, claim, `terms page is missing: ${claim}`);
+    }
+    log('terms page covers who may publish, fraud handling, and platform scope');
+
+    // Direct navigation must also resolve, since a shared /terms link should
+    // work without first visiting the feed.
+    await local.goto(`${BASE}/terms`);
+    await local.locator('.policy').waitFor({ timeout: 15000 });
+    log('terms page resolves on a direct visit, not only via in-app navigation');
+
     if (failures.length) {
       throw new Error(`browser reported errors:\n  - ${failures.join('\n  - ')}`);
     }

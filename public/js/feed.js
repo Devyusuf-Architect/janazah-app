@@ -8,6 +8,7 @@ import { usingEmulator } from './firebase.js';
 import { $ } from './ui.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderPrivacy } from './views/privacy.js';
+import { renderTerms } from './views/terms.js';
 
 const mount = () => $('#view');
 
@@ -22,6 +23,11 @@ function route() {
   if (/^\/privacy\/?$/.test(location.pathname)) {
     document.title = 'Privacy — Janazah Notices';
     renderPrivacy(mount());
+    return;
+  }
+  if (/^\/terms\/?$/.test(location.pathname)) {
+    document.title = 'Terms of service — Janazah Notices';
+    renderTerms(mount());
     return;
   }
   document.title = 'Janazah Notices';

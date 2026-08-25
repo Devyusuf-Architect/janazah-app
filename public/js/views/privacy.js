@@ -21,6 +21,10 @@ export function renderPrivacy(mount) {
   mount.append(el('article', { class: 'policy' }, [
     el('a', { class: 'btn btn--link', href: '/' }, '← Back to notices'),
     el('h1', { text: 'Privacy' }),
+    el('p', { class: 'muted' }, [
+      el('a', { class: 'link', href: '/terms' }, 'Terms of service'),
+      el('span', { text: ' covers who may publish and what happens when a notice is wrong.' }),
+    ]),
     el('p', { class: 'policy__updated', text: `Last updated ${LAST_UPDATED}` }),
 
     el('p',
