@@ -112,8 +112,13 @@ const run = async () => {
   const newPage = async (contextOptions = {}) => {
     const page = await (await browser.newContext(contextOptions)).newPage();
     page.on('pageerror', (err) => failures.push(`page error: ${err.message}`));
+    // Webfonts are a progressive enhancement: the page has real fallback
+    // stacks and must render correctly without them, so a blocked font host
+    // is not a failure. Everything else in the console is.
+    const ignorable = (text) => /favicon/i.test(text)
+      || /ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED/.test(text);
     page.on('console', (m) => {
-      if (m.type() === 'error' && !/favicon/i.test(m.text())) {
+      if (m.type() === 'error' && !ignorable(m.text())) {
         failures.push(`console error: ${m.text()}`);
       }
     });
@@ -205,6 +210,12 @@ const run = async () => {
     await visitor.goto(BASE);
     await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
 
+    // The page must be legible with the webfont unavailable, which is also
+    // what a first paint on a slow connection looks like.
+    const bodyFont = await visitor.evaluate(() => getComputedStyle(document.body).fontFamily);
+    assert.match(bodyFont, /Inter|system-ui|-apple-system|sans-serif/,
+      `body font stack must fall back gracefully; got ${bodyFont}`);
+
     const feedText = await visitor.locator('#view').innerText();
     assert.ok(feedText.includes('Test Name'), 'approved name missing from the feed');
     assert.ok(feedText.includes('Main Prayer Hall'), 'prayer location missing from the feed');
@@ -214,7 +225,7 @@ const run = async () => {
     log('feed shows the notice to a visitor with no account');
 
     // Directions links must point somewhere usable for both locations.
-    const directions = await visitor.locator('.public-notice a.link').all();
+    const directions = await visitor.locator('.public-notice a.link-inline').all();
     assert.equal(directions.length, 2, 'expected directions for prayer and burial');
     for (const link of directions) {
       assert.match(await link.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir/);

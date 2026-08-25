@@ -1,6 +1,8 @@
 // Notice composition, preview, publishing, correction and cancellation.
 
-import { el, toast, readForm, fillForm, friendlyError, askReason, showModal } from '../ui.js';
+import {
+  el, append, icon, toast, readForm, fillForm, friendlyError, askReason, showModal,
+} from '../ui.js';
 import {
   validateNoticeForm, buildPublicNotice, buildPrivateDetails, noticeToForm,
   formatJanazahTime,
@@ -214,7 +216,7 @@ async function openComposer(mount, ctx, org, existing) {
   const error = el('p', { class: 'form-error', hidden: true });
   const form = el('form', { class: 'card' });
 
-  form.append(
+  append(form,
     el('h1', { text: editing ? 'Correct notice' : 'New Janazah notice' }),
     el('p', { class: 'muted', text: `Publishing as ${org.name}` }),
 

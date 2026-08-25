@@ -5,7 +5,7 @@
 // matching is Phase 3 and notifications are Phase 4; nothing here depends on
 // either, and no user location is read or stored.
 
-import { el, toast, friendlyError, showModal } from '../ui.js';
+import { el, icon, skeleton, toast, friendlyError, showModal } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
 import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
@@ -105,25 +105,25 @@ export function renderFeed(mount) {
   const list = el('div', { class: 'stack' });
   mount.append(tabs, list);
 
+  /**
+   * One set of tab buttons, restyled by CSS into a segmented control on a
+   * desktop and a bottom bar on a phone. Deliberately not two sets: duplicate
+   * controls confuse assistive technology and would match twice by name.
+   */
   const paintTabs = () => {
     const followed = follows.followedOrgIds().length;
+    const tab = (key, iconName, label, onclick) => el('button', {
+      class: `tab${filter === key ? ' tab--active' : ''}`,
+      onclick,
+    }, [icon(iconName, { size: 18 }), el('span', { class: 'tab__label', text: label })]);
+
     tabs.replaceChildren(
-      el('button', {
-        class: `tab${filter === 'all' ? ' tab--active' : ''}`,
-        onclick: () => { filter = 'all'; paint(); },
-      }, 'All notices'),
-      el('button', {
-        class: `tab${filter === 'nearby' ? ' tab--active' : ''}`,
-        onclick: () => { filter = 'nearby'; paint(); },
-      }, 'Near me'),
-      el('button', {
-        class: `tab${filter === 'following' ? ' tab--active' : ''}`,
-        onclick: () => { filter = 'following'; paint(); },
-      }, `Masajid I follow${followed ? ` (${followed})` : ''}`),
-      el('button', {
-        class: 'tab',
-        onclick: () => openFollowManager(),
-      }, 'Manage'),
+      tab('all', 'grid', 'All notices', () => { filter = 'all'; paint(); }),
+      tab('nearby', 'pin', 'Near me', () => { filter = 'nearby'; paint(); }),
+      tab('following', 'bookmark',
+        `Masajid I follow${followed ? ` (${followed})` : ''}`,
+        () => { filter = 'following'; paint(); }),
+      tab('manage', 'users', 'Manage', () => openFollowManager()),
     );
   };
 
@@ -147,17 +147,25 @@ export function renderFeed(mount) {
       : notices;
 
     if (!visible.length) {
+      const noFollows = filter === 'following' && !followedIds.length;
       list.append(el('div', { class: 'empty' }, [
-        el('p', {
-          text: filter === 'following' && !followedIds.length
-            ? 'You are not following any masajid yet.'
+        icon(noFollows ? 'bookmark' : 'clock', { size: 30 }),
+        el('h2', {
+          text: noFollows
+            ? 'No masajid followed yet'
             : filter === 'following'
-              ? 'No current Janazahs from the masajid you follow.'
-              : 'No current or upcoming Janazahs.',
+              ? 'Nothing from the masajid you follow'
+              : 'No current or upcoming Janazahs',
+        }),
+        el('p', {
+          text: noFollows
+            ? 'Follow a masjid and its notices will gather here.'
+            : 'This page updates on its own as notices are published.',
         }),
         filter === 'following'
-          ? el('button', { class: 'btn', onclick: () => openFollowManager() }, 'Choose masajid to follow')
-          : el('p', { class: 'muted', text: 'This page updates on its own as notices are published.' }),
+          ? el('button', { class: 'btn', onclick: () => openFollowManager() },
+              'Choose masajid to follow')
+          : null,
       ]));
       return;
     }
@@ -207,7 +215,7 @@ export function renderFeed(mount) {
     paint();
   });
 
-  list.append(el('p', { class: 'muted', text: 'Loading notices…' }));
+  list.append(skeleton(3));
   paintTabs();
 
   // The organization list is only needed for the follow manager, so a failure
@@ -217,13 +225,43 @@ export function renderFeed(mount) {
     .catch((err) => console.error('verifiedOrganizations', err));
 }
 
+/**
+ * The follow control. Its visible label stays short so a phone card is not a
+ * wall of text, while the accessible name keeps the masjid in it so screen
+ * reader users know which one they are following.
+ */
+function followButton(notice, onFollowChange) {
+  const paint = (button, following) => {
+    button.replaceChildren(
+      icon('bookmark', { size: 15 }),
+      el('span', { text: following ? 'Following' : 'Follow' }));
+    button.setAttribute('aria-label',
+      following ? `Following ${notice.orgName}` : `Follow ${notice.orgName}`);
+    button.classList.toggle('btn--active', following);
+  };
+
+  const button = el('button', {
+    class: 'btn btn--small',
+    onclick: () => {
+      if (!follows.storageAvailable()) {
+        toast('Your browser is blocking local storage, so follows cannot be saved.', 'warn');
+        return;
+      }
+      const following = follows.toggleFollow(notice.orgId);
+      paint(button, following);
+      toast(following ? `Following ${notice.orgName}.` : `Unfollowed ${notice.orgName}.`);
+      onFollowChange();
+    },
+  });
+  paint(button, follows.isFollowing(notice.orgId));
+  return button;
+}
+
 function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
   const started = (() => {
     const at = notice.janazahAt?.toDate ? notice.janazahAt.toDate() : notice.janazahAt;
     return at && at.getTime() < Date.now();
   })();
-
-  const following = follows.isFollowing(notice.orgId);
 
   const card = el('div', { class: `card notice-card notice-card--${notice.status}` }, [
     started && notice.status !== 'cancelled'
@@ -231,28 +269,15 @@ function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
       : null,
     publicNoticeView(notice, { compact: true, distanceLabel }),
     el('div', { class: 'card-actions' }, [
-      el('button', {
-        class: `btn btn--small${following ? ' btn--active' : ''}`,
-        onclick: (event) => {
-          const now = follows.toggleFollow(notice.orgId);
-          if (!follows.storageAvailable()) {
-            toast('Your browser is blocking local storage, so follows cannot be saved.', 'warn');
-            return;
-          }
-          event.target.textContent = now
-            ? `Following ${notice.orgName}`
-            : `Follow ${notice.orgName}`;
-          event.target.classList.toggle('btn--active', now);
-          toast(now ? `Following ${notice.orgName}.` : `Unfollowed ${notice.orgName}.`);
-          onFollowChange();
-        },
-      }, following ? `Following ${notice.orgName}` : `Follow ${notice.orgName}`),
-      el('button', { class: 'btn btn--small', onclick: () => shareNotice(notice) }, 'Share'),
-      el('a', { class: 'btn btn--small', href: `/n/${notice.id}` }, 'Open'),
+      followButton(notice, onFollowChange),
+      el('button', { class: 'btn btn--small', onclick: () => shareNotice(notice) },
+        [icon('share', { size: 15 }), el('span', { text: 'Share' })]),
+      el('a', { class: 'btn btn--small', href: `/n/${notice.id}` },
+        [icon('eye', { size: 15 }), el('span', { text: 'Open' })]),
       el('button', {
         class: 'btn btn--small btn--quiet',
         onclick: () => openReport(notice),
-      }, 'Report a problem'),
+      }, [icon('flag', { size: 15 }), el('span', { text: 'Report a problem' })]),
     ]),
   ]);
   return card;
@@ -262,7 +287,7 @@ function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
 
 export async function renderSingleNotice(mount, noticeId) {
   teardownFeed();
-  mount.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
+  mount.replaceChildren(skeleton(1));
 
   let notice;
   try {
@@ -291,7 +316,8 @@ export async function renderSingleNotice(mount, noticeId) {
 
   const following = follows.isFollowing(notice.orgId);
   mount.replaceChildren(
-    el('a', { class: 'btn btn--link', href: '/' }, '← All notices'),
+    el('a', { class: 'btn btn--link', href: '/' },
+      [icon('arrowLeft', { size: 15 }), el('span', { text: 'All notices' })]),
     el('div', { class: 'card' }, [
       publicNoticeView(notice),
       el('div', { class: 'card-actions' }, [

@@ -2,7 +2,7 @@
 // coordinator's preview, the administrator's review screen, and the community
 // feed. One implementation, so a preview cannot drift from what is published.
 
-import { el } from './ui.js';
+import { el, icon } from './ui.js';
 import { formatJanazahTime, FORBIDDEN_PUBLIC_FIELDS } from './model.js';
 import { directionsUrl } from './geo.js';
 
@@ -38,29 +38,16 @@ export function publicNoticeView(notice, { distanceLabel = null, compact = false
         ? `Janazah for ${notice.deceasedName}`
         : 'Janazah notice',
     }),
-    el('p', { class: 'public-notice__time', text: formatJanazahTime(notice) }),
+    el('p', { class: 'public-notice__time' }, [
+      icon('clock'),
+      el('span', { text: formatJanazahTime(notice) }),
+    ]),
 
-    el('dl', { class: 'kv' }, [
-      el('dt', { text: 'Prayer' }),
-      el('dd', {}, [
-        el('div', { text: notice.prayerLocation?.name }),
-        el('div', { class: 'muted', text: notice.prayerLocation?.address }),
-        el('a', {
-          class: 'link', target: '_blank', rel: 'noopener noreferrer',
-          href: directionsUrl(notice.prayerLocation),
-        }, 'Directions to prayer'),
-      ]),
-      ...(notice.burialLocation ? [
-        el('dt', { text: 'Burial' }),
-        el('dd', {}, [
-          el('div', { text: notice.burialLocation.name }),
-          el('div', { class: 'muted', text: notice.burialLocation.address }),
-          el('a', {
-            class: 'link', target: '_blank', rel: 'noopener noreferrer',
-            href: directionsUrl(notice.burialLocation),
-          }, 'Directions to burial'),
-        ]),
-      ] : []),
+    el('div', { class: 'kv' }, [
+      locationRow('Prayer', notice.prayerLocation, 'Directions to prayer'),
+      notice.burialLocation
+        ? locationRow('Burial', notice.burialLocation, 'Directions to burial')
+        : null,
     ]),
 
     notice.instructions
@@ -77,4 +64,21 @@ export function publicNoticeView(notice, { distanceLabel = null, compact = false
       `Private fields present on a public document: ${leaked.join(', ')}. Do not publish.`));
   }
   return view;
+}
+
+/** One location, with its own directions link. */
+function locationRow(label, place, linkText) {
+  if (!place) return null;
+  return el('div', { class: 'kv-row' }, [
+    icon('pin'),
+    el('div', {}, [
+      el('p', { class: 'kv-label', text: label }),
+      el('p', { class: 'kv-value', text: place.name }),
+      el('p', { class: 'kv-sub', text: place.address }),
+      el('a', {
+        class: 'link-inline', target: '_blank', rel: 'noopener noreferrer',
+        href: directionsUrl(place),
+      }, [icon('route', { size: 15 }), el('span', { text: linkText })]),
+    ]),
+  ]);
 }

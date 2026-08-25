@@ -152,7 +152,16 @@ const run = async () => {
   await mkdir(OUT, { recursive: true });
   const root = await buildTestApp();
   const server = await serve(root, 5000);
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
+  // Honour an outbound proxy when one is configured, so webfonts load; local
+  // traffic always bypasses it.
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH,
+    ...(proxyUrl
+      ? { proxy: { server: proxyUrl, bypass: '127.0.0.1,localhost' },
+          args: ['--ignore-certificate-errors'] }
+      : {}),
+  });
 
   const context = (opts = {}) => browser.newContext({
     viewport: { width: 1280, height: 900 },
@@ -239,8 +248,15 @@ const run = async () => {
       geolocation: { latitude: 43.6602, longitude: -79.3820 },
     })).newPage();
 
+    visitor.on('pageerror', (e) => console.error('  page error:', e.message));
     await visitor.goto(BASE);
-    await visitor.locator('.notice-card').first().waitFor({ timeout: 20000 });
+    try {
+      await visitor.locator('.notice-card').first().waitFor({ timeout: 20000 });
+    } catch (err) {
+      console.error('  feed never rendered a card. #view was:\n',
+        (await visitor.locator('#view').innerText()).slice(0, 600));
+      throw err;
+    }
     await shot(visitor, '01-feed', { full: true });
 
     await visitor.getByRole('button', { name: 'Near me' }).click();
@@ -272,7 +288,12 @@ const run = async () => {
     })).newPage();
     await phone.goto(BASE);
     await phone.locator('.notice-card').first().waitFor({ timeout: 20000 });
-    await shot(phone, '12-feed-phone', { full: true });
+    // Viewport only: a full-page capture renders the fixed tab bar wherever it
+    // happens to fall rather than pinned to the bottom.
+    await shot(phone, '12-feed-phone');
+    await phone.getByRole('button', { name: 'Near me' }).click();
+    await phone.locator('.consent').waitFor({ timeout: 20000 });
+    await shot(phone, '13-nearby-phone');
 
     console.log(`\n${shots.length} screenshots in ${OUT}/`);
   } finally {

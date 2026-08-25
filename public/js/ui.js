@@ -30,6 +30,61 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+// Inline SVG icons. No dependency, no icon font, no network request, and they
+// inherit colour and size from their surroundings. Marked aria-hidden so the
+// button's text remains its accessible name.
+const ICON_PATHS = {
+  clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+  pin: 'M12 21s7-5.686 7-11a7 7 0 1 0-14 0c0 5.314 7 11 7 11Z|M12 10.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z',
+  route: 'M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 13V4',
+  share: 'M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13',
+  bell: 'M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 0 1-3.4 0',
+  bookmark: 'M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Zm0 0v7',
+  warning: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01',
+  check: 'M20 6 9 17l-5-5',
+  plus: 'M12 5v14M5 12h14',
+  arrowLeft: 'M19 12H5M12 19l-7-7 7-7',
+  grid: 'M3 6h18M3 12h18M3 18h18',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm14 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  building: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M9 10h.01M15 10h.01M12 13h.01',
+  eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+  x: 'M18 6 6 18M6 6l12 12',
+};
+
+/** @param {keyof ICON_PATHS} name */
+export function icon(name, { size = 18 } = {}) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.7');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('icon');
+  for (const d of (ICON_PATHS[name] || '').split('|')) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+/** Placeholder cards, so a slow network shows shape rather than the word "Loading". */
+export function skeleton(count = 3) {
+  return el('div', { class: 'skeletons', 'aria-hidden': 'true' },
+    Array.from({ length: count }, () => el('div', { class: 'skeleton-card' }, [
+      el('span', { class: 'skeleton skeleton--sm' }),
+      el('span', { class: 'skeleton skeleton--lg' }),
+      el('span', { class: 'skeleton skeleton--md' }),
+      el('span', { class: 'skeleton skeleton--md' }),
+    ])));
+}
+
 let toastTimer;
 export function toast(message, kind = 'info') {
   const bar = $('#toast');
@@ -37,6 +92,20 @@ export function toast(message, kind = 'info') {
   bar.className = `toast toast--${kind} is-visible`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => bar.classList.remove('is-visible'), 5200);
+}
+
+/**
+ * Append children, skipping absent ones.
+ *
+ * Native append() renders null as the text "null", which is how a stray
+ * "null" ends up on a page built from conditional fragments.
+ */
+export function append(parent, ...children) {
+  for (const child of children.flat()) {
+    if (child == null) continue;
+    parent.append(child instanceof Node ? child : document.createTextNode(child));
+  }
+  return parent;
 }
 
 /** Read a form into a plain object, with checkboxes as booleans. */
