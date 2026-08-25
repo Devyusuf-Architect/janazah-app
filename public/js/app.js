@@ -22,8 +22,28 @@ const ctx = {
   isAdmin: false,
   orgs: [],
   route: 'notices',
+  // Set from ?start= on the way in from the public site's Masjid /
+  // Coordinator cards, and consumed once by renderOrgs.
+  startIntent: null,
   refresh: async () => { await loadContext(); route(); },
 };
+
+/**
+ * What the person said they came to do, from ?start=register|join.
+ *
+ * Stripped from the URL immediately: it is a one-time instruction, and
+ * leaving it there would re-open the same form on every reload, including
+ * after the registration it just completed.
+ */
+function takeStartIntent() {
+  const params = new URLSearchParams(location.search);
+  const start = params.get('start');
+  if (start !== 'register' && start !== 'join') return null;
+  params.delete('start');
+  const query = params.toString();
+  history.replaceState(null, '', location.pathname + (query ? `?${query}` : ''));
+  return start;
+}
 
 const ROUTES = {
   notices: { label: 'Notices', render: renderNotices },
@@ -94,6 +114,11 @@ async function loadContext() {
   ctx.orgs = orgs.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Captured at load, before anything can navigate. Someone arriving from the
+// public site may still have to sign in or create an account first, and the
+// intent has to survive that round trip to be worth anything.
+ctx.startIntent = takeStartIntent();
+
 // See feed.js: the return leg of a Google redirect sign-in has to be claimed
 // or it silently drops the person back on the sign-in form.
 completeRedirectSignIn((message) => toast(message, 'error'));
@@ -112,6 +137,10 @@ onAuthStateChanged(auth, async (user) => {
 
   mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
   await loadContext();
+
+  // Straight to whichever form they chose on the public site, rather than a
+  // list of nothing with a button that repeats the choice they already made.
+  if (ctx.startIntent) { ctx.route = 'organizations'; route(); return; }
 
   // A coordinator with nothing publishable has nothing to do on the notices
   // screen, so start them where the work is: registering, or reading why

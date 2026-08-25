@@ -108,8 +108,8 @@ async function stubGeocoder(page) {
   }));
 }
 
-async function signUp(page, { email, password }, name) {
-  await page.goto(`${BASE}/console`);
+async function signUp(page, { email, password }, name, { start } = {}) {
+  await page.goto(`${BASE}/console${start ? `?start=${start}` : ''}`);
   await page.getByRole('button', { name: 'Create an account' }).click();
   await page.locator('#displayName').fill(name);
   await page.locator('#email').fill(email);
@@ -154,10 +154,21 @@ const run = async () => {
   try {
     // ---- coordinator registers an organization -----------------------------
     const coord = await newPage();
-    await signUp(coord, COORD, 'Test Coordinator');
+    // Entering the way a masjid actually does: from the public site's
+    // "Register a new masjid", which carries ?start=register through
+    // account creation so the form opens directly.
+    await signUp(coord, COORD, 'Test Coordinator', { start: 'register' });
     log('coordinator account created');
 
-    await coord.getByRole('button', { name: 'Register an organization' }).first().click();
+    await coord.locator('#name').waitFor({ timeout: 15000 });
+    assert.ok(!(await coord.locator('#view').innerText()).includes('You are not yet staff'),
+      'the registration CTA must open the form, not an empty organizations list');
+    // The one-time instruction must not survive in the URL, or every reload
+    // would reopen this form, including after it has been submitted.
+    assert.ok(!coord.url().includes('start='),
+      `?start= should be consumed and stripped; got ${coord.url()}`);
+    log('the registration CTA opens the form directly, with no second click');
+
     await coord.locator('#name').fill('Test Masjid');
 
     // The coordinates come from an address the coordinator picks, not from
@@ -742,7 +753,13 @@ const run = async () => {
     await member.locator('#email').fill('member@example.com');
     await member.locator('#password').fill('test-password-3');
     await member.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await member.getByRole('button', { name: 'Register an organization' }).first().waitFor({ timeout: 15000 });
+    // A brand-new coordinator sees two clearly separated choices rather than
+    // one button and a link, and an empty organization list is a normal
+    // starting state, never an application error.
+    await member.getByRole('button', { name: 'Register a new masjid' }).first().waitFor({ timeout: 15000 });
+    await member.getByRole('button', { name: 'Request access' }).first().waitFor({ timeout: 5000 });
+    log('a new coordinator is offered "register new" and "join existing" separately');
+
     const consoleNav = await member.locator('#nav').innerText();
     assert.ok(!/Admin/.test(consoleNav),
       'a community member with no admin record must not see an Admin tab');

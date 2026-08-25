@@ -125,15 +125,78 @@ function verificationStateScreen(org, ctx) {
   ]);
 }
 
+/**
+ * The first thing someone entering the coordinator area sees when they are
+ * not yet staff of anything. Two genuinely different jobs, presented as two
+ * choices rather than one primary button and a link:
+ *
+ *   Register a new masjid   nobody has put this masjid on Ta'ziyah yet
+ *   Join an existing masjid  it is already here and you need access to it
+ *
+ * Someone who already said which of these they wanted, by choosing it on the
+ * public /register-masjid page, never sees this screen. See ctx.startIntent.
+ */
+function renderStartChoice(mount, ctx) {
+  mount.append(
+    el('div', { class: 'page-head' }, [
+      el('h1', { text: 'Masjid / Coordinator access' }),
+    ]),
+    el('p', { class: 'muted', style: 'margin-bottom:1.5rem' },
+      'Two different things, depending on whether your masjid is already on ' +
+      'Ta’ziyah.'),
+    el('div', { class: 'cta-row' }, [
+      el('div', { class: 'cta-card' }, [
+        el('h2', { text: 'Register a new masjid' }),
+        el('p', { class: 'muted' },
+          'For someone responsible for a masjid or funeral home that is not on ' +
+          'Ta’ziyah yet. A platform administrator reviews it before it can ' +
+          'publish anything.'),
+        el('div', { class: 'cta-card__actions' }, [
+          el('button', {
+            class: 'btn btn--primary',
+            onclick: () => renderRegisterForm(mount, ctx),
+          }, 'Register a new masjid'),
+        ]),
+      ]),
+      el('div', { class: 'cta-card' }, [
+        el('h2', { text: 'Join an existing masjid' }),
+        el('p', { class: 'muted' },
+          'For someone working with a masjid already registered here. Its ' +
+          'owner approves your request, so a masjid never needs a shared ' +
+          'login.'),
+        el('div', { class: 'cta-card__actions' }, [
+          el('button', {
+            class: 'btn',
+            onclick: () => renderJoinForm(mount, ctx),
+          }, 'Request access'),
+        ]),
+      ]),
+    ]),
+  );
+}
+
 export function renderOrgs(mount, ctx) {
   mount.replaceChildren();
   const { orgs } = ctx;
 
-  // Attached to the list it belongs to, rather than thrown as a toast the
-  // moment someone signs in. See loadContext in app.js.
+  // An intent chosen on the public site, honoured exactly once. Someone who
+  // already clicked "Register a new masjid" has said what they want; making
+  // them find and click it again on a list of nothing is the friction this
+  // removes.
+  const intent = ctx.startIntent;
+  if (intent) {
+    ctx.startIntent = null;
+    if (intent === 'register') { renderRegisterForm(mount, ctx); return; }
+    if (intent === 'join') { renderJoinForm(mount, ctx); return; }
+  }
+
+  // Only a genuine failure. An empty list is the normal state for a new
+  // coordinator and is handled by renderStartChoice below, not treated as an
+  // error. Deliberately non-blocking: whatever failed to load, registering is
+  // still the thing they came to do.
   if (ctx.orgsError) {
     mount.append(el('p', { class: 'notice-strip notice-strip--warn' },
-      friendlyError(ctx.orgsError, 'load')));
+      friendlyError(ctx.orgsError, 'orgLoad')));
   }
 
   // Someone whose single organization is not verified has nothing to do on a
@@ -161,17 +224,7 @@ export function renderOrgs(mount, ctx) {
   ]));
 
   if (!orgs.length) {
-    mount.append(el('div', { class: 'empty' }, [
-      el('p', { text: 'You are not yet staff of any organization.' }),
-      el('p', {
-        class: 'muted',
-        text: 'Register one, or ask an existing organization’s owner to add you.',
-      }),
-      el('button', {
-        class: 'btn',
-        onclick: () => renderJoinForm(mount, ctx),
-      }, 'Request access to an existing organization'),
-    ]));
+    renderStartChoice(mount, ctx);
     return;
   }
 

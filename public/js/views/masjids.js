@@ -87,6 +87,6 @@ function paint(mount, orgs) {
     el('p', { class: 'muted' },
       'Register it, then a platform administrator verifies it before it can ' +
       'publish. This keeps every notice traceable to a real, checked organization.'),
-    el('a', { class: 'btn btn--primary', href: '/register-masjid', text: 'Register your masjid' }),
+    el('a', { class: 'btn btn--primary', href: '/console?start=register', text: 'Register your masjid' }),
   ]));
 }

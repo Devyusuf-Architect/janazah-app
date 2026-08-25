@@ -211,6 +211,13 @@ const PERMISSION_DENIED = {
   orgList:
     'The list of masjids could not be loaded right now. Please try again in a ' +
     'moment.',
+  // Specifically the "which organizations am I staff of" lookup. An empty
+  // result is normal for a new coordinator and is never an error; this is
+  // only for the query genuinely failing, which they cannot fix and which
+  // must not stop them registering.
+  orgLoad:
+    'We could not check which masjids you belong to. That is a problem on our ' +
+    'side, not with your account, and it does not stop you registering below.',
   default:
     'Permission denied. Your organization may not be verified yet, or you ' +
     'may not be authorized to publish for it.',

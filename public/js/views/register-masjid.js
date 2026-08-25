@@ -27,11 +27,22 @@ export function renderRegisterMasjid(mount) {
         'community trusting what it reads here, so there is no way to skip it ' +
         'and no way to approve yourself.'),
       el('div', { class: 'hero__actions' }, [
-        el('a', { class: 'btn btn--primary btn--lg', href: '/console', text: 'Start registration' }),
+        // ?start= carries the choice through sign-in, so the form opens
+        // directly instead of dropping someone on a list of nothing and
+        // asking them to say again what they just said.
+        el('a', {
+          class: 'btn btn--primary btn--lg', href: '/console?start=register',
+          text: 'Register a new masjid',
+        }),
+        el('a', {
+          class: 'btn btn--lg', href: '/console?start=join',
+          text: 'Join an existing masjid',
+        }),
       ]),
       el('p', { class: 'hero__note' },
-        'Already registered? Sign in at the same place to check your ' +
-        'verification status.'),
+        'Register if your masjid is not on Ta’ziyah yet. Join if it already ' +
+        'is and you need access to publish for it. Already registered? Sign ' +
+        'in at the same place to check your verification status.'),
     ]),
 
     el('section', { class: 'steps' }, [
