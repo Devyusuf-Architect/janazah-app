@@ -24,6 +24,13 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 | `/n/{id}`       | A single notice, the shareable link            |
 | `/console`      | Coordinator and platform administrator console |
 
+## Handing this to someone else, or to Claude
+
+[`docs/HANDOFF.md`](docs/HANDOFF.md) is a single brief covering what the app
+does, how it is built, which decisions were deliberate and why, and what is
+still open. Paste it into a new conversation, or give it to a developer joining
+the project.
+
 ## Seeing it without installing anything
 
 `npm run preview` builds `build/preview.html`: one self-contained file with the
