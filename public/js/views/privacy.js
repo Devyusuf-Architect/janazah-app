@@ -20,7 +20,7 @@ export function renderPrivacy(mount) {
   const list = (items) => el('ul', {}, items.map((t) => el('li', { text: t })));
 
   mount.append(el('article', { class: 'policy' }, [
-    el('a', { class: 'btn btn--link', href: '/' }, '← Back to notices'),
+    el('a', { class: 'btn btn--link', href: '/janazahs' }, '← Back to notices'),
     el('h1', { text: 'Privacy' }),
     el('p', { class: 'muted' }, [
       el('a', { class: 'link', href: '/terms' }, 'Terms of service'),

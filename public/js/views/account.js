@@ -1,9 +1,9 @@
-// Account security for coordinators and administrators.
-//
-// A compromised coordinator account can publish a fraudulent Janazah in a
-// masjid's name, which is the worst thing this system can be made to do. A
-// second factor is the cheapest defence against it, so this screen exists
-// even though it is not the most interesting part of the app.
+// Account security. Shared by the console (coordinators, platform
+// administrators) and the community dashboard: any signed-in account benefits
+// from a second factor, and a compromised coordinator account can publish a
+// fraudulent Janazah in a masjid's name, which is the worst thing this system
+// can be made to do. This screen exists even though it is not the most
+// interesting part of the app.
 //
 // Time-based codes rather than SMS: no phone number is collected, and SMS is
 // the weakest of the common second factors.
@@ -60,8 +60,9 @@ export function renderAccount(mount, ctx) {
     el('h2', { text: 'Two-step sign-in' }),
     el('p', { class: 'muted' },
       'An authenticator app generates a six-digit code that is needed alongside ' +
-      'your password. This account can publish notices in your masjid’s name, ' +
-      'so it is worth the extra step.'),
+      'your password. It protects this account even if your password is ' +
+      'exposed elsewhere, which is worth the extra step, especially if this ' +
+      'account can publish notices in a masjid’s name.'),
   ]);
 
   if (enrolled.length) {

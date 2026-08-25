@@ -19,7 +19,7 @@ export function renderTerms(mount) {
   const list = (items) => el('ul', {}, items.map((t) => el('li', { text: t })));
 
   mount.append(el('article', { class: 'policy' }, [
-    el('a', { class: 'btn btn--link', href: '/' }, '← Back to notices'),
+    el('a', { class: 'btn btn--link', href: '/janazahs' }, '← Back to notices'),
     el('h1', { text: 'Terms of service' }),
     el('p', { class: 'policy__updated', text: `Last updated ${LAST_UPDATED}` }),
 

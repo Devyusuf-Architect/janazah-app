@@ -74,7 +74,8 @@ export function renderNearby(mount, { getNotices, onChange, renderCard }) {
   }
 }
 
-function consentPanel(onChange) {
+/** Exported for the community dashboard, which shows this without a notice list. */
+export function consentPanel(onChange) {
   const error = el('p', { class: 'form-error', hidden: true });
 
   const enable = el('button', { class: 'btn btn--primary' }, 'Use my location');
@@ -122,7 +123,8 @@ function consentPanel(onChange) {
   ]);
 }
 
-function settingsPanel(settings, onChange) {
+/** Exported for the community dashboard; see consentPanel above. */
+export function settingsPanel(settings, onChange) {
   const radius = el('select', { class: 'field field--inline', id: 'radius' },
     loc.RADIUS_OPTIONS.map((opt) => el('option', {
       value: String(opt.km), text: opt.label, selected: opt.km === settings.radiusKm,

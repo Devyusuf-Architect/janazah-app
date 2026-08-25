@@ -75,7 +75,10 @@ each HTML page, which is the single place its version is pinned.
 
 ```
 public/
-  index.html          Public community feed          →  /
+  index.html          Public site: home, feed, near me, masajid, about,
+                      sign-in, dashboard   →  /, /janazahs, /near-me,
+                      /masajid, /about, /n/{id}, /privacy, /terms,
+                      /signin, /dashboard
   console.html        Coordinator + admin console    →  /console
   css/styles.css      The whole design system
   firebase-messaging-sw.js   Service worker for push
@@ -90,11 +93,18 @@ public/
     push.js           FCM token and topic subscription
     alerts.js         In-page alerts (the fallback when push is unavailable)
     follows.js        Followed masajid, in localStorage
-    audit.js          Audit trail writes
+    audit.js          Audit trail reads (writes are server-side, see below)
+    nav.js            The public site's nav bar and mobile menu toggle
     ui.js             DOM helpers, icons, toasts, modals
     feed.js / app.js  Entry points for the two pages
-    views/            feed, nearby, alerts-panel, privacy, notices, org,
-                      admin, account, auth
+    views/            home, feed, nearby, alerts-panel, masajid, about,
+                      privacy, terms, auth, dashboard, notices, org,
+                      admin, account
+      auth.js         Sign-in/up, shared by the console and the public site's
+                      /signin via a `variant` (copy differs; same accounts,
+                      same rules-enforced roles)
+      dashboard.js    Community dashboard: composes follows.js, location.js,
+                      nearby.js's panels and account.js, writes nothing new
 functions/            Cloud Functions (the only server code)
   index.js            subscribeDevice, onNoticeWritten, enforceRetention
   lib/notify.js       What to send and to whom

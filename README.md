@@ -20,8 +20,14 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 
 | Path            | What it is                                     |
 | --------------- | ---------------------------------------------- |
-| `/`             | Public feed of current and upcoming Janazahs   |
+| `/`             | Home: what Ta'ziyah is, and where to go        |
+| `/janazahs`     | Public feed of current and upcoming Janazahs   |
+| `/near-me`      | The feed, opened to the nearby-matching tab    |
+| `/masajid`      | Directory of verified masajid, with follow     |
+| `/about`        | What Ta'ziyah is, in plain terms               |
 | `/n/{id}`       | A single notice, the shareable link            |
+| `/signin`       | Community sign-in, for a personal dashboard    |
+| `/dashboard`    | A signed-in member's followed masajid, alerts and account |
 | `/console`      | Coordinator and platform administrator console |
 
 ## Handing this to someone else, or to Claude

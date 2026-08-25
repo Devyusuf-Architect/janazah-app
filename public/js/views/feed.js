@@ -11,6 +11,7 @@ import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
 import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
 import { renderNearby } from './nearby.js';
+import { orgRow } from './masajid.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
@@ -96,9 +97,10 @@ function groupByDate(list) {
 
 // ---------------------------------------------------------------------- render
 
-export function renderFeed(mount) {
+export function renderFeed(mount, { initialFilter } = {}) {
   teardownFeed();
   mount.replaceChildren();
+  if (initialFilter) filter = initialFilter;
 
   mount.append(el('div', { class: 'feed-intro' }, [
     el('h1', { text: 'Current and upcoming Janazahs' }),
@@ -301,7 +303,7 @@ export async function renderSingleNotice(mount, noticeId) {
   } catch (err) {
     mount.replaceChildren(el('div', { class: 'empty' }, [
       el('p', { class: 'form-error', text: friendlyError(err) }),
-      el('a', { class: 'btn', href: '/' }, 'Back to all notices'),
+      el('a', { class: 'btn', href: '/janazahs' }, 'Back to all notices'),
     ]));
     return;
   }
@@ -311,7 +313,7 @@ export async function renderSingleNotice(mount, noticeId) {
       el('h1', { text: 'Notice not found' }),
       el('p', { class: 'muted' },
         'This notice may have been removed, or the link may be incomplete.'),
-      el('a', { class: 'btn', href: '/' }, 'See current Janazahs'),
+      el('a', { class: 'btn', href: '/janazahs' }, 'See current Janazahs'),
     ]));
     return;
   }
@@ -322,7 +324,7 @@ export async function renderSingleNotice(mount, noticeId) {
 
   const following = follows.isFollowing(notice.orgId);
   mount.replaceChildren(
-    el('a', { class: 'btn btn--link', href: '/' },
+    el('a', { class: 'btn btn--link', href: '/janazahs' },
       [icon('arrowLeft', { size: 15 }), el('span', { text: 'All notices' })]),
     el('div', { class: 'card' }, [
       publicNoticeView(notice),
@@ -483,26 +485,13 @@ async function openFollowManager() {
 
   const render = () => {
     body.replaceChildren(
-      el('p', { class: 'muted' },
+      el('p', { class: 'muted' }, [
         'Follows are kept on this device only. Nothing is sent to the masjid ' +
-        'or to us, and there is no account to create.'),
-      el('ul', { class: 'list' }, orgs.map((org) => {
-        const following = follows.isFollowing(org.id);
-        return el('li', { class: 'list-row' }, [
-          el('div', {}, [
-            el('strong', { text: org.name }),
-            el('p', { class: 'muted', text: `${org.city}, ${org.province}` }),
-          ]),
-          el('button', {
-            class: `btn btn--small${following ? ' btn--active' : ''}`,
-            onclick: () => {
-              follows.toggleFollow(org.id);
-              push.syncTopics().catch((err) => console.error('syncTopics', err));
-              render();
-            },
-          }, following ? 'Following' : 'Follow'),
-        ]);
-      })),
+        'or to us, and there is no account to create. Browse the full ',
+        el('a', { class: 'link', href: '/masajid', text: 'directory of masajid' }),
+        '.',
+      ]),
+      el('ul', { class: 'list' }, orgs.map((org) => orgRow(org, render))),
     );
   };
   render();

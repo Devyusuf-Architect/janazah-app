@@ -207,7 +207,7 @@ const run = async () => {
 
     // ---- the public feed, as a visitor with no account ---------------------
     const visitor = await newPage();
-    await visitor.goto(BASE);
+    await visitor.goto(`${BASE}/janazahs`);
     await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
 
     // The page must be legible with the webfont unavailable, which is also
@@ -277,7 +277,7 @@ const run = async () => {
     await coord.getByRole('button', { name: 'Save as draft' }).click();
     await coord.locator('.notice-card--draft').waitFor({ timeout: 15000 });
 
-    await visitor.goto(BASE);
+    await visitor.goto(`${BASE}/janazahs`);
     await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
     assert.ok(!(await visitor.locator('#view').innerText()).includes('Draft Hall'),
       'an unpublished draft appeared on the public feed');
@@ -398,7 +398,7 @@ const run = async () => {
     // confirm the family request surfaces ahead of it, is labelled plainly
     // rather than as a raw value, and states a response-time target rather
     // than a bare "we'll look at it".
-    await visitor.goto(BASE);
+    await visitor.goto(`${BASE}/janazahs`);
     await visitor.locator('.notice-card').first().waitFor({ timeout: 15000 });
     await visitor.getByRole('link', { name: 'Open' }).first().click();
     await visitor.locator('.public-notice').first().waitFor({ timeout: 10000 });
@@ -441,7 +441,7 @@ const run = async () => {
     await coord.getByRole('button', { name: 'Account' }).click();
     const accountText = await coord.locator('#view').innerText();
     assert.match(accountText, /two-step sign-in/i, 'expected the second-factor section');
-    assert.match(accountText, /publish notices in your masjid/i,
+    assert.match(accountText, /publish notices in a masjid/i,
       'expected the reason two-step matters to be stated');
     log('account security screen offers a second factor');
 
@@ -453,7 +453,7 @@ const run = async () => {
       geolocation: { latitude: 43.6591234, longitude: -79.3901234 },
       locale: 'en-CA',
     });
-    await local.goto(BASE);
+    await local.goto(`${BASE}/janazahs`);
     await local.locator('.notice-card').first().waitFor({ timeout: 15000 });
 
     await local.getByRole('button', { name: 'Near me' }).click();
@@ -564,6 +564,73 @@ const run = async () => {
     await local.goto(`${BASE}/terms`);
     await local.locator('.policy').waitFor({ timeout: 15000 });
     log('terms page resolves on a direct visit, not only via in-app navigation');
+
+    // ---- the home page, and the nav that ties the site together -------------
+    const guest = await newPage();
+    await guest.goto(BASE);
+    await guest.locator('.hero').waitFor({ timeout: 15000 });
+    const homeText = await guest.locator('#view').innerText();
+    assert.match(homeText, /verified masajid/i, 'home page must state who publishes');
+    assert.match(homeText, /optional/i, 'home page must state location alerts are optional');
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masajid', 'About', 'Sign in']) {
+      await guest.getByRole('link', { name: label, exact: true }).first().waitFor({ timeout: 5000 });
+    }
+    log('home page explains the product and links to every major section');
+
+    await guest.getByRole('link', { name: 'View Janazahs' }).click();
+    await guest.locator('.notice-card').first().waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/janazahs$/, 'expected /janazahs after "View Janazahs"');
+    log('home page routes into the feed with no account');
+
+    // ---- the masajid directory -----------------------------------------------
+    await guest.goto(`${BASE}/masajid`);
+    await guest.getByRole('button', { name: /^Follow Test Masjid$/ }).waitFor({ timeout: 15000 });
+    log('masajid directory lists a verified organization with a follow control');
+
+    // ---- the dashboard is not reachable while signed out ---------------------
+    await guest.goto(`${BASE}/dashboard`);
+    await guest.locator('form.card--narrow').waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/signin$/, 'a signed-out visitor to /dashboard must land on /signin');
+    log('dashboard redirects a signed-out visitor to sign in, rather than rendering');
+
+    // ---- community sign-up, and the dashboard it lands on --------------------
+    const member = await newPage();
+    await member.goto(`${BASE}/signin`);
+    await member.getByRole('button', { name: 'Create an account' }).click();
+    await member.locator('#email').fill('member@example.com');
+    await member.locator('#password').fill('test-password-3');
+    await member.getByRole('button', { name: 'Create account' }).click();
+    await member.locator('#view').getByRole('heading', { name: /^Welcome/ }).waitFor({ timeout: 15000 });
+    assert.match(member.url(), /\/dashboard$/, 'expected /dashboard after community sign-up');
+
+    const dashboardText = await member.locator('#view').innerText();
+    for (const claim of [
+      /Upcoming Janazahs/, /Janazahs near me/i, /Followed masajid/i,
+      /Notification settings/i, /Account security/i,
+    ]) {
+      assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);
+    }
+    log('community sign-up lands on a dashboard reusing the existing sections');
+
+    await member.getByRole('button', { name: 'Sign out' }).click();
+    await member.locator('form.card--narrow').waitFor({ timeout: 15000 });
+    assert.match(member.url(), /\/signin$/, 'signing out of the dashboard must return to sign-in');
+    log('signing out of the community dashboard returns to sign-in');
+
+    // ---- a community account cannot reach coordinator/admin functionality ---
+    // The console's own sign-in accepts the same account (one Firebase
+    // project, one set of accounts); what it cannot do is anything requiring
+    // organization staff or platform-admin status, which rules enforce
+    // server-side regardless of which UI is used to sign in.
+    await member.goto(`${BASE}/console`);
+    await member.locator('#email').fill('member@example.com');
+    await member.locator('#password').fill('test-password-3');
+    await member.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await member.getByRole('button', { name: 'Register an organization' }).first().waitFor({ timeout: 15000 });
+    const consoleNav = await member.locator('#nav').innerText();
+    assert.ok(!/Admin/.test(consoleNav),
+      'a community member with no admin record must not see an Admin tab');
+    log('a community account reaches the console with no coordinator or admin access');
 
     if (failures.length) {
       throw new Error(`browser reported errors:\n  - ${failures.join('\n  - ')}`);

@@ -39,14 +39,17 @@
       <span class="brand__mark" aria-hidden="true">◆</span>
       <span>Ta'ziyah</span>
     </a>
-    <nav class="nav">
-      <div class="nav-spacer"></div>
-      <a class="nav-item" href="/console">Masjid sign in</a>
-    </nav>
+    <button id="nav-toggle" class="nav-toggle" type="button"
+            aria-label="Menu" aria-expanded="false" aria-controls="nav">
+      <span class="nav-toggle__bar"></span>
+      <span class="nav-toggle__bar"></span>
+      <span class="nav-toggle__bar"></span>
+    </button>
+    <nav id="nav" class="nav"></nav>
   </header>
 
   <main id="view" class="view">
-    <p class="muted">Loading notices…</p>
+    <p class="muted">Loading…</p>
   </main>
 
   <footer class="footer">
@@ -56,9 +59,10 @@
       on the notice.
     </p>
     <p class="muted">
-      This page needs no account. Location is off unless you turn it on, and
+      Reading notices needs no account. Location is off unless you turn it on, and
       even then it is used only in your browser and never sent to us or to any
       masjid. Masajid you follow are remembered on your own device.
+      <a class="link" href="/about">About</a> ·
       <a class="link" href="/privacy">How your information is handled</a> ·
       <a class="link" href="/terms">Terms of service</a>.
     </p>
