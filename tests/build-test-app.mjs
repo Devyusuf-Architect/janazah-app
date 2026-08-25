@@ -20,6 +20,16 @@ export async function buildTestApp() {
   mkdirSync(join(OUT, 'vendor'), { recursive: true });
   cpSync('public', OUT, { recursive: true });
 
+  // The end-to-end suite exercises the real product against the emulator, so
+  // the sample data shown to testers (APP.sampleData in config.js) is forced
+  // off here. Leaving it on would mix fictional notices into every feed
+  // assertion and quietly change counts. Sample mode has its own coverage in
+  // tests/sample-mode.test.js, and is deliberately not what these tests are
+  // about.
+  const cfgPath = join(OUT, 'js/config.js');
+  writeFileSync(cfgPath, readFileSync(cfgPath, 'utf8')
+    .replace(/sampleData:\s*true,/, 'sampleData: false,'));
+
   // One esbuild run with splitting, so all three entry points share a single
   // copy of the Firebase app registry. Bundling them separately gives each its
   // own registry and auth then fails with "Component auth has not been

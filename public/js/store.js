@@ -11,6 +11,10 @@ import { db, auth } from './firebase.js';
 import { geohash } from './geo.js';
 import { APP } from './config.js';
 import {
+  isSampleMode, sampleNotices, sampleOrgs, sampleNoticeById, sampleOrgById,
+  withSamples,
+} from './sample-mode.js';
+import {
   assertPublicNoticeShape, buildPublicNotice, buildPrivateDetails,
   looksLikeDuplicate, DUPLICATE_WINDOW_HOURS,
 } from './model.js';
@@ -64,6 +68,8 @@ export async function registerOrganization(form) {
 }
 
 export async function getOrganization(orgId) {
+  const sample = sampleOrgById(orgId);
+  if (sample) return sample;
   const snap = await getDoc(doc(db, 'organizations', orgId));
   return snap.exists() ? withId(snap) : null;
 }
@@ -79,11 +85,22 @@ export async function myOrganizations(uid) {
 
 /** Verified organizations, for the public feed and the follow list. */
 export async function verifiedOrganizations() {
-  const snap = await getDocs(query(
-    collection(db, 'organizations'),
-    where('verificationStatus', '==', 'verified'),
-  ));
-  return snap.docs.map(withId).sort((a, b) => a.name.localeCompare(b.name));
+  let live = [];
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'organizations'),
+      where('verificationStatus', '==', 'verified'),
+    ));
+    live = snap.docs.map(withId);
+  } catch (err) {
+    // Same reasoning as watchPublicNotices: with samples on, a failed read
+    // must not empty the directory. With them off the error is real and is
+    // rethrown for the view to report.
+    if (!isSampleMode()) throw err;
+    console.error('verifiedOrganizations', err);
+  }
+  return withSamples(live, sampleOrgs())
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Platform admin view of the verification queue. */
@@ -254,6 +271,8 @@ export async function deleteDraft(noticeId) {
 }
 
 export async function getNotice(noticeId) {
+  const sample = sampleNoticeById(noticeId);
+  if (sample) return sample;
   const snap = await getDoc(doc(db, 'notices', noticeId));
   return snap.exists() ? withId(snap) : null;
 }
@@ -361,7 +380,25 @@ export function watchPublicNotices(cb, max = 200) {
       orderBy('janazahAt', 'asc'),
       limit(max),
     ),
-    (snap) => cb(snap.docs.map(withId)),
-    (err) => console.error('watchPublicNotices', err),
+    // Sample notices are folded in here rather than in each view, so every
+    // surface that reads the feed (the feed itself, the dashboard preview and
+    // an organization's page) shows the same thing without knowing about it.
+    (snap) => cb(sortByTime(withSamples(snap.docs.map(withId), sampleNotices()))),
+    (err) => {
+      console.error('watchPublicNotices', err);
+      // While the samples are on, a failed read still shows something rather
+      // than an empty site. This is what makes the flag useful before the
+      // security rules have been deployed.
+      if (isSampleMode()) cb(sortByTime(sampleNotices()));
+    },
   );
+}
+
+/** Soonest first, matching the server-side orderBy the query asks for. */
+function sortByTime(notices) {
+  const ms = (n) => {
+    const at = n.janazahAt?.toDate ? n.janazahAt.toDate() : n.janazahAt;
+    return at instanceof Date ? at.getTime() : 0;
+  };
+  return [...notices].sort((a, b) => ms(a) - ms(b));
 }

@@ -19,6 +19,24 @@ export const firebaseConfig = {
 
 export const APP = {
   name: "Ta'ziyah",
+
+  // ---------------------------------------------------------------------
+  // SAMPLE DATA. Set to false before this site is public.
+  // ---------------------------------------------------------------------
+  //
+  // While true, the app shows the fictional notices in
+  // public/js/sample-data.js alongside anything real, so testers see a
+  // populated site. Every one of them is named "Sample ..." or "Fulan ...",
+  // and a banner sits at the top of every page saying they are examples,
+  // because a fake Janazah notice that reads as real is the single most
+  // harmful thing this app could show.
+  //
+  // Turning this off is the whole removal process: one word here. Nothing is
+  // written to the database, so there is nothing to clean up afterwards.
+  // (scripts/sample-data-live.mjs is the other option, which writes real
+  // documents to a real project and needs credentials. This flag needs
+  // neither, and works before the security rules are deployed.)
+  sampleData: true,
   // Web Push certificate key pair, from
   // Firebase console > Project settings > Cloud Messaging > Web configuration.
   // Like the config above this is a public identifier, not a secret: it lets a

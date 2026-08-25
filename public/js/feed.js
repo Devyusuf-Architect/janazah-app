@@ -8,6 +8,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast } from './ui.js';
+import { isSampleMode } from './sample-mode.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { revealIn, autoReveal } from './motion.js';
 import { renderHome } from './views/home.js';
@@ -168,6 +169,10 @@ window.addEventListener('popstate', route);
 
 const navToggle = $('#nav-toggle');
 if (navToggle) wireNavToggle(navToggle, nav());
+
+// Fictional notices are on screen, so say so, on every page, without a
+// dismiss control. See APP.sampleData in config.js.
+if (isSampleMode()) $('#sample-banner')?.removeAttribute('hidden');
 
 if (usingEmulator) $('#env-banner')?.removeAttribute('hidden');
 

@@ -80,24 +80,39 @@ tells you what to do; it runs automatically before `npm run demo` and
 
 ## Sample data for testers
 
-To show testers a populated app on a real project, and take it out again
-before launch:
+**Currently ON.** `APP.sampleData` in `public/js/config.js` is `true`, so the
+deployed site shows fictional notices and masjids alongside anything real,
+and a banner on every page says they are examples.
+
+**To remove it before going public, set that one flag to `false`.** That is
+the entire process: nothing is written to the database, so there is nothing
+to clean up. `tests/sample-mode.test.js` pins that turning it off leaves no
+path by which a sample record can reach a reader.
+
+The data is `public/js/sample-data.js`, which `tests/sample-data.test.js`
+pins as unmistakably fake: every organization is named "Sample ...", every
+published name contains "Fulan" (the Arabic equivalent of John Doe), and
+every address is an example street. A demo of a funeral app must never look
+like a real funeral. It is the same data the local demo and the standalone
+preview use, so there is one copy and it is the checked one.
+
+It works with no Firebase credentials and before the security rules are
+deployed, which is what makes it useful right now: if the database is
+unreachable, the samples still render rather than leaving an empty site.
+
+There is also a seeding script, for writing the same data as real documents
+to a real project:
 
 ```bash
-npm run sample:add      # write visibly fictional notices and masjids
+npm run sample:add      # write them
 npm run sample:remove   # take every one of them back out
 ```
 
-It reuses `demo/sample-data.js` verbatim, which `tests/sample-data.test.js`
-already pins as unmistakably fake: every organization is named "Sample ...",
-every published name contains "Fulan" (the Arabic equivalent of John Doe),
-and every address is an example street. A demo of a funeral app must never
-look like a real funeral.
-
-Every document is written at a `sample-` prefixed id, so removal is exact and
-touches nothing else. Needs real credentials
-(`gcloud auth application-default login`), and refuses to run against a
-`demo-` project id, where `npm run demo` is the right tool.
+Every document goes in at a `sample-` prefixed id, so removal is exact and
+touches nothing else. It needs real credentials
+(`gcloud auth application-default login`) and refuses to run against a
+`demo-` project id. Prefer the config flag unless you specifically need the
+records to exist server-side.
 
 ## Tests
 

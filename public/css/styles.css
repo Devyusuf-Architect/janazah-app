@@ -151,6 +151,17 @@ a { color: var(--accent); text-underline-offset: 2px; }
   border-bottom: 1px solid var(--gold-line);
 }
 
+.sample-banner {
+  margin: 0;
+  padding: .55rem 1rem;
+  text-align: center;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: .82rem;
+  border-bottom: 1px solid var(--gold-line);
+}
+.sample-banner strong { font-weight: 600; }
+
 .masthead {
   position: sticky;
   top: 0;

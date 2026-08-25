@@ -7,6 +7,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast, friendlyError } from './ui.js';
+import { isSampleMode } from './sample-mode.js';
 import { revealIn } from './motion.js';
 import * as store from './store.js';
 
@@ -154,6 +155,10 @@ onAuthStateChanged(auth, async (user) => {
 
   route();
 });
+
+// Fictional notices are on screen, so say so, on every page, without a
+// dismiss control. See APP.sampleData in config.js.
+if (isSampleMode()) $('#sample-banner')?.removeAttribute('hidden');
 
 if (usingEmulator) {
   document.body.classList.add('is-emulator');
