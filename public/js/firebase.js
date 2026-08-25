@@ -25,7 +25,15 @@ const demoConfig = {
   appId: 'demo-app',
 };
 
-const firebaseConfig = unconfigured && isLocal ? demoConfig : configured;
+// On localhost, always talk to the local emulator suite unless explicitly
+// asked to use the real project with ?live=1. Every test script and
+// `npm run demo`/`serve` starts the emulators under the fixed demo-janazah
+// project id (see package.json), so a local run has to initialize the SDK
+// with that same id too -- even once config.js holds real values -- or the
+// SDK ends up connected to the emulator while requesting a different project
+// than the one it is emulating.
+export const usingEmulator = isLocal && !(!unconfigured && location.search.includes('live=1'));
+const firebaseConfig = usingEmulator ? demoConfig : configured;
 
 if (unconfigured && !isLocal) {
   // Replacing documentElement.innerHTML drops the linked stylesheet along
@@ -80,9 +88,6 @@ if (unconfigured && !isLocal) {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-export const usingEmulator =
-  isLocal && (unconfigured || !location.search.includes('live=1'));
 
 if (usingEmulator) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
