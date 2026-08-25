@@ -1,4 +1,4 @@
-// The masajid directory: every verified organization, so following one does
+// The masjids directory: every verified organization, so following one does
 // not require first finding one of its notices.
 //
 // Reads the same `store.verifiedOrganizations()` and `follows.js` the feed's
@@ -12,7 +12,7 @@ import * as push from '../push.js';
 
 /**
  * One organization row with its follow toggle. Shared by the full directory
- * page and the feed's "Masajid I follow" modal.
+ * page and the feed's "Masjids I follow" modal.
  * @param {object} org
  * @param {() => void} onChange  Called after the follow state changes.
  */
@@ -46,7 +46,7 @@ export function orgRow(org, onChange = () => {}) {
   ]);
 }
 
-export function renderMasajid(mount) {
+export function renderMasjids(mount) {
   mount.replaceChildren(el('div', { class: 'skeletons', 'aria-hidden': 'true' }));
 
   store.verifiedOrganizations()
@@ -59,7 +59,7 @@ export function renderMasajid(mount) {
 function paint(mount, orgs) {
   const list = el('ul', { class: 'list' });
   mount.replaceChildren(
-    el('div', { class: 'page-head' }, [el('h1', { text: 'Masajid' })]),
+    el('div', { class: 'page-head' }, [el('h1', { text: 'Masjids' })]),
     el('p', { class: 'muted', style: 'margin-bottom:1.25rem' },
       'Every verified masjid and funeral coordinator on Ta’ziyah. Follow one ' +
       'and its notices gather on your feed and, if you turn alerts on, reach ' +
@@ -69,7 +69,7 @@ function paint(mount, orgs) {
 
   if (!orgs.length) {
     mount.append(el('div', { class: 'empty' }, [
-      el('h2', { text: 'No verified masajid yet' }),
+      el('h2', { text: 'No verified masjids yet' }),
       el('p', { text: 'Once one is verified, it will appear here.' }),
     ]));
   } else {
@@ -83,6 +83,6 @@ function paint(mount, orgs) {
     el('p', { class: 'muted' },
       'Register it, then a platform administrator verifies it before it can ' +
       'publish. This keeps every notice traceable to a real, checked organization.'),
-    el('a', { class: 'btn btn--primary', href: '/console', text: 'Register your masjid' }),
+    el('a', { class: 'btn btn--primary', href: '/register-masjid', text: 'Register your masjid' }),
   ]));
 }

@@ -12,7 +12,7 @@ const LINKS = [
   { href: '/', label: 'Home' },
   { href: '/janazahs', label: 'Janazahs' },
   { href: '/near-me', label: 'Near Me' },
-  { href: '/masajid', label: 'Masajid' },
+  { href: '/masjids', label: 'Masjids' },
   { href: '/about', label: 'About' },
 ];
 
@@ -60,7 +60,7 @@ export function renderNav(nav, { path, user }) {
       text: 'Sign in',
     }));
   }
-  account.append(el('a', { class: 'nav-item nav-item--ghost', href: '/console', text: 'Masjid / Coordinator' }));
+  account.append(el('a', { class: 'nav-item nav-item--ghost', href: '/register-masjid', text: 'Masjid / Coordinator' }));
 
   nav.append(links, account);
 }

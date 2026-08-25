@@ -354,6 +354,45 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
 .home-footnote { padding-top: 1rem; border-top: 1px solid var(--line); }
 
+.hero--compact { padding-bottom: 2rem; }
+
+/* ---------- numbered process steps ---------- */
+
+.steps { margin-bottom: clamp(2rem, 5vw, 3rem); }
+.steps__list { list-style: none; padding: 0; margin: 1.25rem 0 0; counter-reset: none; }
+.steps__item {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  gap: .9rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+.steps__item:first-child { border-top: 0; padding-top: 0; }
+.steps__num {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: .9rem;
+}
+.steps__item h3 { margin: .25rem 0 .3rem; font-size: 1rem; }
+.steps__item p { margin: 0; font-size: .93rem; }
+
+/* ---------- verification state ---------- */
+
+.verify-state { max-width: 38rem; }
+.verify-state h1 { font-size: clamp(1.4rem, 4vw, 1.8rem); margin: 0; }
+.verify-state h2 { font-size: 1rem; margin: 1.6rem 0 .5rem; }
+.verify-state .notice-strip { flex-direction: column; align-items: flex-start; gap: .2rem; }
+.verify-state .notice-strip strong { display: block; }
+.verify-state .notice-strip p { margin: 0; }
+.verify-state ol.list { padding-left: 1.15rem; }
+.verify-state ol.list li { margin-bottom: .45rem; color: var(--ink-2); }
+
 @media (max-width: 640px) {
   .hero { padding-top: 1.25rem; }
   .hero__actions .btn { flex: 1 1 auto; }

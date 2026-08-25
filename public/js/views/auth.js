@@ -20,7 +20,7 @@ const COPY = {
       'publish notices in your masjid’s name.',
   },
   community: {
-    blurb: 'For a personal dashboard: followed masajid, alert settings and ' +
+    blurb: 'For a personal dashboard: followed masjids, alert settings and ' +
       'account security in one place. Reading notices never requires this.',
     passwordHint: 'At least 8 characters. Use a password manager.',
   },

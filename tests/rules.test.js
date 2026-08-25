@@ -334,6 +334,44 @@ describe('verification cannot be self-granted', () => {
     }));
   });
 
+  test('a rejected organization cannot promote itself back into the queue', async () => {
+    // Being turned down is the strongest motive anyone has to try this, and
+    // the applicant still owns the document afterwards, so it is worth
+    // proving rather than assuming the pending case covers it.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        verificationStatus: 'rejected', statusReason: 'Could not confirm.',
+      });
+    });
+    for (const status of ['pending', 'verified']) {
+      await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+        verificationStatus: status,
+      }));
+    }
+    // Nor by clearing the administrator's reason so the decline reads as
+    // never having happened.
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      statusReason: '',
+    }));
+  });
+
+  test('a suspended organization cannot reinstate itself', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG), {
+        verificationStatus: 'suspended', statusReason: 'Under review.',
+      });
+    });
+    await assertFails(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG), {
+      verificationStatus: 'verified',
+    }));
+  });
+
+  test('a non-owner staff member cannot change verification status', async () => {
+    await assertFails(updateDoc(doc(as(STAFF), 'organizations', VERIFIED_ORG), {
+      verificationStatus: 'suspended',
+    }));
+  });
+
   test('a non-owner staff member cannot change the staff list', async () => {
     await assertFails(updateDoc(doc(as(STAFF), 'organizations', VERIFIED_ORG), {
       staffUids: [OWNER, STAFF, OUTSIDER],

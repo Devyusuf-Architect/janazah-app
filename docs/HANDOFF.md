@@ -15,7 +15,7 @@ masjid announcements and word of mouth. People miss funerals they would have
 attended, sometimes while standing a few streets away, because they never heard
 in time.
 
-This is one trusted place where **verified** masajid and funeral coordinators
+This is one trusted place where **verified** masjids and funeral coordinators
 publish Janazah notices, and community members find out in time to attend.
 
 Three kinds of user:
@@ -24,8 +24,8 @@ Three kinds of user:
   notices. Several staff can be authorised per masjid. A masjid must be
   verified by a platform administrator before it can publish anything.
 - **Community members** see current and upcoming Janazahs, follow specific
-  masajid, and can opt in to alerts for any Janazah near where they currently
-  are, including from masajid they do not follow.
+  masjids, and can opt in to alerts for any Janazah near where they currently
+  are, including from masjids they do not follow.
 - **A platform administrator** verifies organisations and handles reports of
   incorrect or fraudulent notices.
 
@@ -37,8 +37,8 @@ home address.
 
 These come from the requirements and shaped most of the architecture:
 
-- Only verified masajid and approved coordinators can publish.
-- A user's location must never be visible to masajid, to other users, or to
+- Only verified masjids and approved coordinators can publish.
+- A user's location must never be visible to masjids, to other users, or to
   anyone but that user and whatever logic decides to send an alert. No travel
   history may be stored or exposed.
 - Private family information, internal notes and phone numbers must never
@@ -75,9 +75,9 @@ each HTML page, which is the single place its version is pinned.
 
 ```
 public/
-  index.html          Public site: home, feed, near me, masajid, about,
+  index.html          Public site: home, feed, near me, masjids, about,
                       sign-in, dashboard   →  /, /janazahs, /near-me,
-                      /masajid, /about, /n/{id}, /privacy, /terms,
+                      /masjids, /register-masjid, /about, /n/{id}, /privacy, /terms,
                       /signin, /dashboard
   console.html        Coordinator + admin console    →  /console
   css/styles.css      The whole design system
@@ -92,13 +92,14 @@ public/
     location.js       Nearby matching, all of it on the device
     push.js           FCM token and topic subscription
     alerts.js         In-page alerts (the fallback when push is unavailable)
-    follows.js        Followed masajid, in localStorage
+    follows.js        Followed masjids, in localStorage
     audit.js          Audit trail reads (writes are server-side, see below)
     nav.js            The public site's nav bar and mobile menu toggle
     ui.js             DOM helpers, icons, toasts, modals
     feed.js / app.js  Entry points for the two pages
-    views/            home, feed, nearby, alerts-panel, masajid, about,
-                      privacy, terms, auth, dashboard, notices, org,
+    views/            home, feed, nearby, alerts-panel, masjids, about,
+                      privacy, terms, auth, dashboard, register-masjid,
+                      notices, org,
                       admin, account
       auth.js         Sign-in/up, shared by the console and the public site's
                       /signin via a `variant` (copy differs; same accounts,
@@ -149,6 +150,15 @@ model, and `tests/rules.test.js` is what proves they hold.
 
 There is **no collection for user locations**, and the rules deny any
 collection not explicitly matched, so one cannot appear by accident.
+
+## 5b. Organization verification
+
+A masjid or funeral coordinator registers, lands as `pending`, and cannot
+publish until a platform administrator approves it. The four states
+(`pending`, `verified`, `rejected`, `suspended`), the fields, and the rules
+that stop anyone approving themselves are documented in
+[`docs/verification-workflow.md`](verification-workflow.md), which is also
+the contract the Admin Portal is being built against.
 
 ## 6. Decisions that were deliberate
 

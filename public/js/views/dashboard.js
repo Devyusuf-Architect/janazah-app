@@ -1,5 +1,5 @@
 // The community dashboard: one place for a signed-in member's followed
-// masajid, alert settings and account security.
+// masjids, alert settings and account security.
 //
 // Every card here reuses an existing module rather than re-implementing it —
 // follows.js, location.js, nearby.js's location/alert panels, and
@@ -12,7 +12,7 @@ import { el, friendlyError } from '../ui.js';
 import { publicNoticeView } from '../notice-view.js';
 import { consentPanel, settingsPanel } from './nearby.js';
 import { renderAccount } from './account.js';
-import { orgRow } from './masajid.js';
+import { orgRow } from './masjids.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
@@ -46,7 +46,7 @@ export function renderDashboard(mount, ctx) {
     el('h2', { text: 'Janazahs near me' }),
   ]);
   const followedCard = el('div', { class: 'card dash-card' }, [
-    el('h2', { text: 'Followed masajid' }),
+    el('h2', { text: 'Followed masjids' }),
     el('p', { class: 'muted', text: 'Loading…' }),
   ]);
   const alertsCard = el('div', { class: 'card dash-card dash-card--wide' }, [
@@ -88,16 +88,16 @@ export function renderDashboard(mount, ctx) {
   };
   paintNearMe();
 
-  // Followed masajid: same follows.js the feed and the masajid directory use.
+  // Followed masjids: same follows.js the feed and the masjids directory use.
   store.verifiedOrganizations()
     .then((orgs) => {
       const followedIds = new Set(follows.followedOrgIds());
       const followed = orgs.filter((o) => followedIds.has(o.id));
-      followedCard.replaceChildren(el('h2', { text: 'Followed masajid' }));
+      followedCard.replaceChildren(el('h2', { text: 'Followed masjids' }));
       if (!followed.length) {
         followedCard.append(
-          el('p', { class: 'muted', text: 'You are not following any masajid yet.' }),
-          el('a', { class: 'btn btn--small', href: '/masajid', text: 'Browse masajid' }),
+          el('p', { class: 'muted', text: 'You are not following any masjids yet.' }),
+          el('a', { class: 'btn btn--small', href: '/masjids', text: 'Browse masjids' }),
         );
         return;
       }
@@ -106,12 +106,12 @@ export function renderDashboard(mount, ctx) {
         followed.length > 5
           ? el('p', { class: 'muted small', text: `and ${followed.length - 5} more` })
           : null,
-        el('a', { class: 'btn btn--small', href: '/masajid', text: 'Manage in directory' }),
+        el('a', { class: 'btn btn--small', href: '/masjids', text: 'Manage in directory' }),
       );
     })
     .catch((err) => {
       followedCard.replaceChildren(
-        el('h2', { text: 'Followed masajid' }),
+        el('h2', { text: 'Followed masjids' }),
         el('p', { class: 'form-error', text: friendlyError(err) }),
       );
     });

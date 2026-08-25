@@ -26,8 +26,8 @@ const DEFAULTS = {
   enabled: false,
   radiusKm: 10,
   alertsEnabled: false,
-  // 'nearby'  every Janazah in range, plus masajid you follow
-  // 'follows'  only masajid you follow, wherever they are
+  // 'nearby'  every Janazah in range, plus masjids you follow
+  // 'follows'  only masjids you follow, wherever they are
   //
   // In a dense city "every Janazah in range" can be several alerts a day,
   // which is the fastest way to have notifications switched off altogether.
@@ -38,8 +38,8 @@ const DEFAULTS = {
 };
 
 export const ALERT_SCOPES = [
-  { value: 'nearby', label: 'Janazahs near me, and masajid I follow' },
-  { value: 'follows', label: 'Only masajid I follow' },
+  { value: 'nearby', label: 'Janazahs near me, and masjids I follow' },
+  { value: 'follows', label: 'Only masjids I follow' },
 ];
 
 /** A stored position older than this is shown as stale, not silently trusted. */

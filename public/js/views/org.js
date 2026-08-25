@@ -24,9 +24,125 @@ export function statusBadge(status) {
   return el('span', { class: `badge badge--${copy.tone}`, text: status });
 }
 
+/**
+ * The full-screen state a coordinator sees when their only organization is
+ * not verified. A status strip on a card is enough once someone knows the
+ * system; the first thing after submitting an application should say plainly
+ * what happens next instead of leaving them looking for a publish button that
+ * is not going to appear.
+ *
+ * Publishing is blocked by firestore.rules (isOrgVerified on every notice
+ * create and update), not by this screen. This only explains it.
+ */
+function verificationStateScreen(org, ctx) {
+  const submitted = org.createdAt?.toDate
+    ? org.createdAt.toDate().toLocaleDateString('en-CA',
+        { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
+
+  const STATE = {
+    pending: {
+      tone: 'warn',
+      heading: 'Verification pending',
+      lede: 'Your registration has been received and is waiting for a platform '
+          + 'administrator to review it. Until it is approved, this '
+          + 'organization cannot publish Janazah notices.',
+      next: [
+        'An administrator checks that the organization is real and that you are entitled to register it.',
+        'They may contact you at the address you gave for verification.',
+        'When it is approved, publishing unlocks here with no further action from you.',
+      ],
+      nextHeading: 'What happens next',
+    },
+    rejected: {
+      tone: 'error',
+      heading: 'Application not approved',
+      lede: 'A platform administrator reviewed this registration and did not '
+          + 'approve it. This organization cannot publish Janazah notices.',
+      next: [
+        'If the reason above is something you can correct, update the organization’s details and contact the administrators to ask for another review.',
+        'If you believe this was a mistake, reply to the address you registered with.',
+      ],
+      nextHeading: 'What you can do',
+    },
+    suspended: {
+      tone: 'error',
+      heading: 'Publishing suspended',
+      lede: 'A platform administrator has suspended this organization. '
+          + 'Publishing is disabled while it is under review. Notices already '
+          + 'published stay visible.',
+      next: [
+        'The reason is shown above where one was given.',
+        'Contact the platform administrators to resolve it. Publishing resumes as soon as the suspension is lifted.',
+      ],
+      nextHeading: 'What you can do',
+    },
+  }[org.verificationStatus];
+
+  if (!STATE) return null;
+
+  return el('div', { class: 'card verify-state' }, [
+    el('div', { class: 'card-head' }, [
+      el('div', {}, [
+        el('h1', { text: STATE.heading }),
+        el('p', { class: 'muted', text: org.name }),
+      ]),
+      statusBadge(org.verificationStatus),
+    ]),
+    el('p', { text: STATE.lede }),
+
+    org.statusReason
+      ? el('div', { class: `notice-strip notice-strip--${STATE.tone}` }, [
+          el('strong', { text: 'Administrator’s note' }),
+          el('p', { text: org.statusReason }),
+        ])
+      : null,
+
+    el('dl', { class: 'kv' }, [
+      el('dt', { text: 'Organization' }),
+      el('dd', { text: org.name }),
+      el('dt', { text: 'Type' }),
+      el('dd', { text: ORG_TYPES.find((t) => t.value === org.type)?.label || org.type }),
+      el('dt', { text: 'Address' }),
+      el('dd', { text: `${org.address}, ${org.city}, ${org.province}` }),
+      el('dt', { text: 'Submitted' }),
+      el('dd', { text: submitted || '—' }),
+      el('dt', { text: 'Status' }),
+      el('dd', { text: org.verificationStatus }),
+    ]),
+
+    el('h2', { text: STATE.nextHeading }),
+    el('ol', { class: 'list' }, STATE.next.map((t) => el('li', { text: t }))),
+
+    el('div', { class: 'card-actions' }, [
+      org.ownerUid === ctx.user.uid
+        ? el('button', { class: 'btn', onclick: () => manageStaff(org, ctx) }, 'Manage staff')
+        : null,
+      el('button', { class: 'btn', onclick: () => ctx.refresh() }, 'Check again'),
+      el('a', { class: 'btn btn--link', href: '/janazahs' }, 'View the public feed'),
+    ]),
+  ]);
+}
+
 export function renderOrgs(mount, ctx) {
   mount.replaceChildren();
   const { orgs } = ctx;
+
+  // Someone whose single organization is not verified has nothing to do on a
+  // list screen: give them the state itself, in full, rather than a card in a
+  // list of one. With more than one organization the list is the right view,
+  // since the statuses may differ.
+  if (orgs.length === 1 && orgs[0].verificationStatus !== 'verified') {
+    const screen = verificationStateScreen(orgs[0], ctx);
+    if (screen) {
+      mount.append(screen);
+      mount.append(el('button', {
+        class: 'btn btn--link',
+        onclick: () => renderRegisterForm(mount, ctx),
+      }, 'Register another organization'));
+      return;
+    }
+  }
 
   mount.append(el('div', { class: 'page-head' }, [
     el('h1', { text: 'Organizations' }),
@@ -106,8 +222,10 @@ function renderRegisterForm(mount, ctx) {
     el('h1', { text: 'Register an organization' }),
     el('p', {
       class: 'muted',
-      text: 'A platform administrator reviews every registration before it can ' +
-            'publish. Give details that make verification straightforward.',
+      text: 'Submitting this does not grant publishing. The organization is ' +
+            'saved as pending until a platform administrator approves it, and ' +
+            'there is no way to approve your own. Give details that make ' +
+            'verification straightforward.',
     }),
     field('name', 'Organization name', { required: true, maxlength: 140 }),
     el('div', { class: 'field-group' }, [
@@ -130,8 +248,17 @@ function renderRegisterForm(mount, ctx) {
       text: 'Coordinates decide which nearby alerts this organization triggers. ' +
             'Right-click the building in Google Maps and copy the pair it shows.',
     }),
-    field('contactEmail', 'Contact email for verification', { type: 'email' },
-      'Used by the platform administrator only. Not shown on public notices.'),
+    // Required: it is how an administrator reaches the applicant during
+    // review, and the only contact they have that is not a raw account id.
+    // Note what this hint does not claim: the organization record becomes
+    // publicly readable once verified (firestore.rules, /organizations get),
+    // so promising this address stays administrator-only would be false. It
+    // is kept off the notice itself, which is what actually holds.
+    field('contactEmail', 'Contact email for verification',
+      { type: 'email', required: true },
+      'How a platform administrator reaches you about this application. Not ' +
+      'shown on published notices. Use an address belonging to the ' +
+      'organization where you can.'),
     field('website', 'Website', { type: 'url' }),
     error,
     el('div', { class: 'form-actions' }, [
@@ -147,7 +274,7 @@ function renderRegisterForm(mount, ctx) {
     submit.disabled = true;
     try {
       await store.registerOrganization(readForm(form));
-      toast('Registered. A platform administrator will review it.');
+      toast('Submitted. A platform administrator will review it.');
       await ctx.refresh();
     } catch (err) {
       error.hidden = false;

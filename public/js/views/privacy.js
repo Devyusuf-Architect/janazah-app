@@ -29,7 +29,7 @@ export function renderPrivacy(mount) {
     el('p', { class: 'policy__updated', text: `Last updated ${LAST_UPDATED}` }),
 
     el('p',
-      { text: 'This service publishes Janazah notices from verified masajid ' +
+      { text: 'This service publishes Janazah notices from verified masjids ' +
               'and funeral coordinators. It is built to collect as little as ' +
               'possible, because it handles funeral information and, if you ' +
               'choose, your location.' }),
@@ -37,9 +37,9 @@ export function renderPrivacy(mount) {
     section('Reading notices', [
       el('p', { text: 'You do not need an account to read notices, follow a ' +
                       'masjid, or open directions. No sign-up, no email, no name.' }),
-      el('p', { text: 'The masajid you follow are stored in your own browser ' +
+      el('p', { text: 'The masjids you follow are stored in your own browser ' +
                       'on this device. They are never sent to us or to the ' +
-                      'masajid, so nobody can see whose notices you watch.' }),
+                      'masjids, so nobody can see whose notices you watch.' }),
     ]),
 
     section('Your location', [
@@ -67,7 +67,7 @@ export function renderPrivacy(mount) {
 
     section('What we do hold', [
       list([
-        'Notices published by verified masajid, which are public by design.',
+        'Notices published by verified masjids, which are public by design.',
         'Accounts for masjid staff and administrators: an email address and, ' +
           'if they add one, a name.',
         'A record of who created, changed or cancelled each notice, and when.',

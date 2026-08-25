@@ -140,8 +140,41 @@ const run = async () => {
     await coord.locator('#lng').fill('-79.3832');
     await coord.locator('#contactEmail').fill('office@example.com');
     await coord.getByRole('button', { name: 'Submit for verification' }).click();
-    await coord.getByText('pending', { exact: true }).first().waitFor({ timeout: 15000 });
+    await coord.locator('.verify-state').waitFor({ timeout: 15000 });
     log('organization registered as pending');
+
+    // ---- the verification-pending state ------------------------------------
+    // Submitting must land on something that says plainly what happened and
+    // what comes next, not a publish screen with a disabled button.
+    const pendingText = await coord.locator('.verify-state').innerText();
+    assert.match(pendingText, /Verification pending/i, 'expected a pending heading');
+    assert.match(pendingText, /cannot publish/i,
+      'the pending screen must say publishing is not available yet');
+    assert.match(pendingText, /administrator/i,
+      'the pending screen must say who reviews it');
+    assert.match(pendingText, /Submitted/i,
+      'the pending screen must show when the application was submitted');
+    log('verification-pending screen states the status, the reason and what is next');
+
+    // The organization was stored as pending, with the submitter recorded.
+    // This is what the Admin Portal will later read to build its queue.
+    const orgDocs = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/organizations`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    const storedOrg = (orgDocs.documents || [])[0];
+    assert.ok(storedOrg, 'the organization was not stored');
+    assert.equal(storedOrg.fields.verificationStatus.stringValue, 'pending',
+      'a new registration must be stored as pending');
+    assert.ok(storedOrg.fields.createdBy?.stringValue, 'the submitter was not recorded');
+    assert.ok(storedOrg.fields.createdAt?.timestampValue, 'the submission time was not recorded');
+    assert.ok(!storedOrg.fields.verifiedAt && !storedOrg.fields.verifiedBy,
+      'a pending registration must not carry verification fields');
+    log('registration stored as pending, with who submitted it and when');
+
+    // A coordinator cannot promote their own organization: that is enforced
+    // by firestore.rules, and proved against the real rules engine in
+    // tests/rules.test.js ("verification cannot be self-granted"), which is
+    // a stronger place to assert it than a browser click-path.
 
     // ---- publishing is blocked while unverified ----------------------------
     await coord.getByRole('button', { name: 'Notices' }).click();
@@ -158,9 +191,9 @@ const run = async () => {
     await admin.getByRole('button', { name: 'Admin' }).click();
     log('platform admin console reachable');
 
-    await admin.getByRole('button', { name: 'Verify' }).first().click();
+    await admin.getByRole('button', { name: 'Approve' }).first().click();
     await admin.locator('#reason-input').fill('Confirmed by phone with the masjid office.');
-    await admin.getByRole('button', { name: 'Verify', exact: true }).last().click();
+    await admin.getByRole('button', { name: 'Approve', exact: true }).last().click();
     await admin.getByText('Test Masjid').first().waitFor({ state: 'hidden', timeout: 15000 });
     log('organization verified');
 
@@ -239,7 +272,7 @@ const run = async () => {
     assert.ok(followState && JSON.parse(followState).length === 1,
       'follow was not stored on the device');
 
-    await visitor.getByRole('button', { name: 'Masajid I follow (1)' }).click();
+    await visitor.getByRole('button', { name: 'Masjids I follow (1)' }).click();
     await visitor.locator('.notice-card').first().waitFor({ timeout: 5000 });
     log('follow persisted on the device and filters the feed');
 
@@ -570,9 +603,9 @@ const run = async () => {
     await guest.goto(BASE);
     await guest.locator('.hero').waitFor({ timeout: 15000 });
     const homeText = await guest.locator('#view').innerText();
-    assert.match(homeText, /verified masajid/i, 'home page must state who publishes');
+    assert.match(homeText, /verified masjids/i, 'home page must state who publishes');
     assert.match(homeText, /optional/i, 'home page must state location alerts are optional');
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masajid', 'About', 'Sign in']) {
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'About', 'Sign in']) {
       await guest.getByRole('link', { name: label, exact: true }).first().waitFor({ timeout: 5000 });
     }
     log('home page explains the product and links to every major section');
@@ -582,10 +615,10 @@ const run = async () => {
     assert.match(guest.url(), /\/janazahs$/, 'expected /janazahs after "View Janazahs"');
     log('home page routes into the feed with no account');
 
-    // ---- the masajid directory -----------------------------------------------
-    await guest.goto(`${BASE}/masajid`);
+    // ---- the masjids directory -----------------------------------------------
+    await guest.goto(`${BASE}/masjids`);
     await guest.getByRole('button', { name: /^Follow Test Masjid$/ }).waitFor({ timeout: 15000 });
-    log('masajid directory lists a verified organization with a follow control');
+    log('masjids directory lists a verified organization with a follow control');
 
     // ---- the dashboard is not reachable while signed out ---------------------
     await guest.goto(`${BASE}/dashboard`);
@@ -605,7 +638,7 @@ const run = async () => {
 
     const dashboardText = await member.locator('#view').innerText();
     for (const claim of [
-      /Upcoming Janazahs/, /Janazahs near me/i, /Followed masajid/i,
+      /Upcoming Janazahs/, /Janazahs near me/i, /Followed masjids/i,
       /Notification settings/i, /Account security/i,
     ]) {
       assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);

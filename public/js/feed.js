@@ -1,5 +1,5 @@
 // Bootstrap for the public site: home, the community feed, near me, the
-// masajid directory, about, community sign-in and the personal dashboard.
+// masjids directory, about, community sign-in and the personal dashboard.
 //
 // A separate entry point from the coordinator console (console.html / app.js):
 // this surface needs no sign-in for its most important job, reading notices,
@@ -11,8 +11,9 @@ import { $, el } from './ui.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { renderHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
-import { renderMasajid } from './views/masajid.js';
+import { renderMasjids } from './views/masjids.js';
 import { renderAbout } from './views/about.js';
+import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
 import { renderTerms } from './views/terms.js';
 import { renderAuth } from './views/auth.js';
@@ -45,6 +46,15 @@ function route() {
     return;
   }
 
+  // The directory was at /masajid before the terminology change. Anyone
+  // holding that link keeps working rather than landing on the home page
+  // wondering where it went.
+  if (/^\/masajid\/?$/.test(path)) {
+    history.replaceState(null, '', '/masjids');
+    route();
+    return;
+  }
+
   if (/^\/janazahs\/?$/.test(path)) {
     document.title = "Janazahs — Ta'ziyah";
     renderFeed(mount());
@@ -55,9 +65,14 @@ function route() {
     renderFeed(mount(), { initialFilter: 'nearby' });
     return;
   }
-  if (/^\/masajid\/?$/.test(path)) {
-    document.title = "Masajid — Ta'ziyah";
-    renderMasajid(mount());
+  if (/^\/masjids\/?$/.test(path)) {
+    document.title = "Masjids — Ta'ziyah";
+    renderMasjids(mount());
+    return;
+  }
+  if (/^\/register-masjid\/?$/.test(path)) {
+    document.title = "Register your masjid — Ta'ziyah";
+    renderRegisterMasjid(mount());
     return;
   }
   if (/^\/about\/?$/.test(path)) {

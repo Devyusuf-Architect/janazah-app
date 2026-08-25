@@ -1,6 +1,6 @@
 # Ta'ziyah
 
-One trusted place where verified masajid and approved funeral coordinators
+One trusted place where verified masjids and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.
 
 **Status: Phase 5 complete. Feature-complete for the MVP scope.** The public
@@ -23,11 +23,12 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 | `/`             | Home: what Ta'ziyah is, and where to go        |
 | `/janazahs`     | Public feed of current and upcoming Janazahs   |
 | `/near-me`      | The feed, opened to the nearby-matching tab    |
-| `/masajid`      | Directory of verified masajid, with follow     |
+| `/masjids`      | Directory of verified masjids, with follow     |
+| `/register-masjid` | What registering as a masjid/coordinator involves |
 | `/about`        | What Ta'ziyah is, in plain terms               |
 | `/n/{id}`       | A single notice, the shareable link            |
 | `/signin`       | Community sign-in, for a personal dashboard    |
-| `/dashboard`    | A signed-in member's followed masajid, alerts and account |
+| `/dashboard`    | A signed-in member's followed masjids, alerts and account |
 | `/console`      | Coordinator and platform administrator console |
 
 ## Handing this to someone else, or to Claude
@@ -65,7 +66,7 @@ npm install
 npm run demo
 ```
 
-That starts the emulators, seeds two verified masajid and a set of notices,
+That starts the emulators, seeds two verified masjids and a set of notices,
 and prints sign-in details. The feed is at `http://127.0.0.1:5000` and the
 coordinator console at `/console`. Ctrl+C stops it and wipes the data.
 
@@ -108,7 +109,7 @@ CHROMIUM_PATH=/path/to/chrome npm run test:e2e
 - A per-organization notification rate limit that suppresses a burst and raises
   a report, while never blocking a notice, because a false positive that
   silenced a real Janazah would be far worse
-- An alert scope so a reader in a busy city can narrow to masajid they follow,
+- An alert scope so a reader in a busy city can narrow to masjids they follow,
   controlling volume at subscription time rather than by hiding messages
 - A duplicate warning before publishing, which warns and never blocks
 - Two-step sign-in for coordinators, using time-based codes rather than SMS
@@ -122,7 +123,7 @@ See [`docs/phase-5-notes.md`](docs/phase-5-notes.md).
 ### Phase 4, push notifications
 
 - Alerts that arrive when the page is closed, for Janazahs in your area and
-  from masajid you follow
+  from masjids you follow
 - The device subscribes itself to coarse area topics; a notice is published to
   the topics covering its own location, so the backend receives no position and
   has no way to ask which devices are in a given area
@@ -151,8 +152,8 @@ See [`docs/phase-3-notes.md`](docs/phase-3-notes.md).
 
 - Current and upcoming Janazahs, grouped by date in each notice's own time
   zone, with no account and no location
-- Follow specific masajid, stored on the device rather than in an account, so
-  the platform never learns which masajid anyone cares about
+- Follow specific masjids, stored on the device rather than in an account, so
+  the platform never learns which masjid anyone cares about
 - Directions to the prayer and burial locations
 - Share a notice, through the native share sheet where available and the
   clipboard otherwise

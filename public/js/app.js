@@ -100,9 +100,12 @@ onAuthStateChanged(auth, async (user) => {
   mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
   await loadContext();
 
-  // A coordinator with no organization yet has nothing to do on the notices
-  // screen, so start them where the work is.
-  if (!ctx.orgs.length && !ctx.isAdmin) ctx.route = 'organizations';
+  // A coordinator with nothing publishable has nothing to do on the notices
+  // screen, so start them where the work is: registering, or reading why
+  // their application is not approved yet. Rules are what actually stop them
+  // publishing (isOrgVerified); this only decides where they land.
+  const canPublish = ctx.orgs.some((o) => o.verificationStatus === 'verified');
+  if (!canPublish && !ctx.isAdmin) ctx.route = 'organizations';
   else if (ctx.isAdmin && !ctx.orgs.length) ctx.route = 'admin';
 
   route();

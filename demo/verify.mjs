@@ -68,7 +68,7 @@ assert(wide > tight, `radius filters (5 km: ${tight}, any: ${wide})`);
 await page.getByRole('button', { name: 'All notices' }).click();
 await page.locator('.notice-card').first().waitFor({ timeout: 10000 });
 await page.getByRole('button', { name: /^Follow Sample Masjid, Riverbend$/ }).first().click();
-await page.getByRole('button', { name: 'Masajid I follow (1)' }).waitFor({ timeout: 8000 });
+await page.getByRole('button', { name: 'Masjids I follow (1)' }).waitFor({ timeout: 8000 });
 assert(true, 'follow persists and updates the tab count');
 
 // Single notice via hash route

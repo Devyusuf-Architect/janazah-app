@@ -10,6 +10,13 @@ import { publicNoticeView } from '../notice-view.js';
 import { ORG_TYPES } from '../model.js';
 import * as store from '../store.js';
 
+const EMPTY_COPY = {
+  pending: 'No registrations are waiting for review.',
+  verified: 'No verified masjids or funeral coordinators yet.',
+  rejected: 'No declined registrations.',
+  suspended: 'No suspended organizations.',
+};
+
 let unwatchers = [];
 
 export function teardownAdmin() {
@@ -30,14 +37,15 @@ export function renderAdmin(mount, ctx) {
   mount.append(tabs, panel);
 
   const views = {
-    'Verification queue': () => queueView(panel, 'pending', ctx),
-    'Verified': () => queueView(panel, 'verified', ctx),
+    'Verification requests': () => queueView(panel, 'pending', ctx),
+    'Verified masjids': () => queueView(panel, 'verified', ctx),
+    'Declined': () => queueView(panel, 'rejected', ctx),
     'Suspended': () => queueView(panel, 'suspended', ctx),
     'Reports': () => reportsView(panel),
     'Audit log': () => auditView(panel),
   };
 
-  let active = 'Verification queue';
+  let active = 'Verification requests';
   const paint = () => {
     tabs.replaceChildren(...Object.keys(views).map((name) =>
       el('button', {
@@ -56,7 +64,7 @@ function queueView(panel, status, ctx) {
     panel.replaceChildren();
     if (!orgs.length) {
       panel.append(el('div', { class: 'empty' }, [
-        el('p', { text: `No ${status} organizations.` }),
+        el('p', { text: EMPTY_COPY[status] || `No ${status} organizations.` }),
       ]));
       return;
     }
@@ -65,8 +73,14 @@ function queueView(panel, status, ctx) {
 }
 
 function orgReviewCard(org) {
-  const decide = async (nextStatus, { title, label, confirmText, required = true }) => {
-    const reason = await askReason({ title, body: `Organization: ${org.name}`, label, confirmText, required });
+  const decide = async (nextStatus, { title, body, label, confirmText, required = true }) => {
+    const reason = await askReason({
+      title,
+      body: body || `Organization: ${org.name}`,
+      label,
+      confirmText,
+      required,
+    });
     if (reason === null) return;
     try {
       await store.setVerificationStatus(org.id, nextStatus, reason);
@@ -81,21 +95,24 @@ function orgReviewCard(org) {
     actions.push(el('button', {
       class: 'btn btn--primary btn--small',
       onclick: () => decide('verified', {
-        title: 'Verify this organization?',
+        title: 'Approve this organization?',
+        body: `${org.name} will be able to publish Janazah notices immediately.`,
         label: 'What did you check? (recorded in the audit trail)',
-        confirmText: 'Verify',
+        confirmText: 'Approve',
       }),
-    }, 'Verify'));
+    }, org.verificationStatus === 'pending' ? 'Approve' : 'Verify'));
   }
   if (org.verificationStatus === 'pending') {
     actions.push(el('button', {
       class: 'btn btn--small',
       onclick: () => decide('rejected', {
-        title: 'Decline this registration?',
+        title: 'Reject this registration?',
+        body: `${org.name} will not be able to publish. The reason below is `
+            + 'shown to the applicant.',
         label: 'Reason shown to the applicant',
-        confirmText: 'Decline',
+        confirmText: 'Reject',
       }),
-    }, 'Decline'));
+    }, 'Reject'));
   }
   if (org.verificationStatus === 'verified') {
     actions.push(el('button', {
@@ -144,7 +161,7 @@ function orgReviewCard(org) {
       el('dd', { class: 'mono', text: `${org.lat}, ${org.lng} (cell ${org.cell})` }),
       el('dt', { text: 'Owner' }),
       el('dd', { class: 'mono', text: org.ownerUid }),
-      el('dt', { text: 'Registered' }),
+      el('dt', { text: 'Submitted' }),
       el('dd', { text: org.createdAt?.toDate ? org.createdAt.toDate().toLocaleString('en-CA') : '—' }),
     ]),
     org.statusReason ? el('p', { class: 'muted', text: `Last note: ${org.statusReason}` }) : null,

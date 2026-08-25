@@ -11,10 +11,10 @@ export function renderHome(mount) {
   mount.replaceChildren(
     el('section', { class: 'hero' }, [
       el('p', { class: 'hero__eyebrow', text: 'Janazah notices you can trust' }),
-      el('h1', { text: 'Reliable Janazah information, from masajid you can verify, to people close enough to attend.' }),
+      el('h1', { text: 'Reliable Janazah information, from masjids you can verify, to people close enough to attend.' }),
       el('p', { class: 'hero__lede' },
         'Janazah information is scattered across group chats, word of mouth and ' +
-        'masjid announcements. Ta’ziyah is one place where verified masajid and ' +
+        'masjid announcements. Ta’ziyah is one place where verified masjids and ' +
         'funeral coordinators publish it directly, so nobody misses a funeral ' +
         'they would have attended.'),
       el('div', { class: 'hero__actions' }, [
@@ -28,7 +28,7 @@ export function renderHome(mount) {
 
     el('section', { class: 'promise' }, [
       promiseCard('shield', 'Verified sources only',
-        'Only masajid and funeral coordinators checked by a platform ' +
+        'Only masjids and funeral coordinators checked by a platform ' +
         'administrator can publish an official notice. Nothing here is ' +
         'user-submitted or crowd-sourced.'),
       promiseCard('pin', 'Nearby, if you want it',
@@ -36,7 +36,7 @@ export function renderHome(mount) {
         'right now, not just your home address. Your position is used in ' +
         'your browser only and is never sent to us or to any masjid.'),
       promiseCard('bell', 'As much or as little as you choose',
-        'Follow specific masajid, set an alert radius, or just check the feed ' +
+        'Follow specific masjids, set an alert radius, or just check the feed ' +
         'when you want to. Notification volume is yours to control.'),
     ]),
 
@@ -45,7 +45,7 @@ export function renderHome(mount) {
         el('h2', { text: 'Community members' }),
         el('p', { class: 'muted' },
           'Browse notices with no account, or sign in for a personal dashboard ' +
-          'with your followed masajid and alert settings in one place.'),
+          'with your followed masjids and alert settings in one place.'),
         el('div', { class: 'cta-card__actions' }, [
           el('a', { class: 'btn btn--primary', href: '/signin', text: 'Sign in' }),
           el('a', { class: 'btn', href: '/signin?mode=signup', text: 'Create account' }),
@@ -57,7 +57,7 @@ export function renderHome(mount) {
           'Register your organization and publish once a platform ' +
           'administrator has verified it.'),
         el('div', { class: 'cta-card__actions' }, [
-          el('a', { class: 'btn btn--primary', href: '/console', text: 'Masjid / Coordinator access' }),
+          el('a', { class: 'btn btn--primary', href: '/register-masjid', text: 'Masjid / Coordinator access' }),
         ]),
       ]),
     ]),

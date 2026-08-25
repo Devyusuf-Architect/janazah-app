@@ -1,6 +1,6 @@
 // The public community feed. No account, no location, no tracking.
 //
-// Phase 2 scope: see current and upcoming Janazahs, follow specific masajid,
+// Phase 2 scope: see current and upcoming Janazahs, follow specific masjids,
 // open directions, share a notice, and report one that looks wrong. Nearby
 // matching is Phase 3 and notifications are Phase 4; nothing here depends on
 // either, and no user location is read or stored.
@@ -11,7 +11,7 @@ import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
 import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
 import { renderNearby } from './nearby.js';
-import { orgRow } from './masajid.js';
+import { orgRow } from './masjids.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
@@ -105,7 +105,7 @@ export function renderFeed(mount, { initialFilter } = {}) {
   mount.append(el('div', { class: 'feed-intro' }, [
     el('h1', { text: 'Current and upcoming Janazahs' }),
     el('p', { class: 'muted' },
-      'Published by verified masajid and funeral coordinators. No account ' +
+      'Published by verified masjids and funeral coordinators. No account ' +
       'needed, and nothing about you is collected to show this page.'),
   ]));
 
@@ -129,7 +129,7 @@ export function renderFeed(mount, { initialFilter } = {}) {
       tab('all', 'grid', 'All notices', () => { filter = 'all'; paint(); }),
       tab('nearby', 'pin', 'Near me', () => { filter = 'nearby'; paint(); }),
       tab('following', 'bookmark',
-        `Masajid I follow${followed ? ` (${followed})` : ''}`,
+        `Masjids I follow${followed ? ` (${followed})` : ''}`,
         () => { filter = 'following'; paint(); }),
       tab('manage', 'users', 'Manage', () => openFollowManager()),
     );
@@ -160,9 +160,9 @@ export function renderFeed(mount, { initialFilter } = {}) {
         icon(noFollows ? 'bookmark' : 'clock', { size: 30 }),
         el('h2', {
           text: noFollows
-            ? 'No masajid followed yet'
+            ? 'No masjids followed yet'
             : filter === 'following'
-              ? 'Nothing from the masajid you follow'
+              ? 'Nothing from the masjids you follow'
               : 'No current or upcoming Janazahs',
         }),
         el('p', {
@@ -172,7 +172,7 @@ export function renderFeed(mount, { initialFilter } = {}) {
         }),
         filter === 'following'
           ? el('button', { class: 'btn', onclick: () => openFollowManager() },
-              'Choose masajid to follow')
+              'Choose masjids to follow')
           : null,
       ]));
       return;
@@ -462,8 +462,8 @@ function openReport(notice) {
 // ------------------------------------------------------------ follow manager
 
 async function openFollowManager() {
-  const body = el('div', {}, [el('p', { class: 'muted', text: 'Loading masajid…' })]);
-  showModal('Masajid you follow', body, { wide: true });
+  const body = el('div', {}, [el('p', { class: 'muted', text: 'Loading masjids…' })]);
+  showModal('Masjids you follow', body, { wide: true });
 
   let orgs = [...orgsById.values()];
   if (!orgs.length) {
@@ -488,7 +488,7 @@ async function openFollowManager() {
       el('p', { class: 'muted' }, [
         'Follows are kept on this device only. Nothing is sent to the masjid ' +
         'or to us, and there is no account to create. Browse the full ',
-        el('a', { class: 'link', href: '/masajid', text: 'directory of masajid' }),
+        el('a', { class: 'link', href: '/masjids', text: 'directory of masjids' }),
         '.',
       ]),
       el('ul', { class: 'list' }, orgs.map((org) => orgRow(org, render))),

@@ -166,7 +166,7 @@ async function seed() {
   Sign in to the console with:
 
     Coordinator   coordinator@example.com   ${PASSWORD}
-                  staff of two verified masajid, one still pending
+                  staff of two verified masjids, one still pending
 
     Administrator admin@example.com         ${PASSWORD}
                   verification queue, reports, audit log
@@ -177,7 +177,7 @@ async function seed() {
   publicly.
 
   All of it is invented. The names are the Arabic equivalent of
-  "John Doe", the masajid are named "Sample", and the addresses are
+  "John Doe", the masjids are named "Sample", and the addresses are
   example streets. Nothing here refers to a real person or place.
 
   Nothing here touches a real Firebase project. Data is wiped when

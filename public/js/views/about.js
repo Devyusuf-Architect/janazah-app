@@ -16,7 +16,7 @@ export function renderAbout(mount) {
               'group chats, masjid announcements and word of mouth. People ' +
               'miss funerals they would have attended, sometimes while ' +
               'standing a few streets away, because they never heard in ' +
-              'time. Ta’ziyah is one place where verified masajid and ' +
+              'time. Ta’ziyah is one place where verified masjids and ' +
               'funeral coordinators publish Janazah notices directly, and ' +
               'community members find out in time to attend.' }),
 

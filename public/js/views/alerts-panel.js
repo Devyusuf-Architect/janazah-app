@@ -65,7 +65,7 @@ function pushToggle(onChange) {
   const status = el('p', { class: 'hint' },
     enabled
       ? 'On. You will be alerted about new Janazahs in your area and from the ' +
-        'masajid you follow, even when this page is closed.'
+        'masjids you follow, even when this page is closed.'
       : 'Alerts arrive even when this page is closed. Your location is not ' +
         'sent: this device subscribes itself to a general area, and notices ' +
         'are published to that area.');
@@ -101,7 +101,7 @@ function pushToggle(onChange) {
     const settings = loc.settings();
     if (settings.alertScope !== 'follows' && (!settings.enabled || !settings.last)) {
       rows.push(el('p', { class: 'notice-strip notice-strip--warn' },
-        'Location is off, so you will only be alerted about masajid you ' +
+        'Location is off, so you will only be alerted about masjids you ' +
         'follow. Turn location on above to hear about Janazahs near you.'));
     }
   }
@@ -126,7 +126,7 @@ function scopeControl() {
     try {
       await push.syncTopics();
       toast(select.value === 'follows'
-        ? 'You will only be alerted about masajid you follow.'
+        ? 'You will only be alerted about masjids you follow.'
         : 'You will be alerted about Janazahs near you too.');
     } catch (err) {
       toast(err.message, 'error');
