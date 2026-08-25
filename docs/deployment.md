@@ -260,6 +260,13 @@ whatever is committed, so a deploy before that step shows the app's own
 "Firebase is not configured yet" screen, which is correct behaviour for an
 unconfigured build rather than a bug.
 
+## 14c. Set up error alerting
+
+So a broken publish or a failed push is something you find out about, not
+something a masjid discovers. Five-minute walkthrough:
+`docs/monitoring-setup.md`. Do this before step 13's walkthrough, so the
+alert is proven to fire before anyone relies on it.
+
 ## 15. Optional: a custom domain
 
 **Hosting → Add custom domain**, follow the DNS instructions. Then update

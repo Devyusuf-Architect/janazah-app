@@ -24,6 +24,7 @@ import { isValidTopic } from './lib/topics.js';
 import { kindOfChange, buildMessage, topicsForNotice } from './lib/notify.js';
 import { RETENTION, daysAgo, redactionPatch, needsRedaction } from './lib/retention.js';
 import { LIMITS, checkAndCount } from './lib/limits.js';
+import { eachIndependently } from './lib/resilient-batch.js';
 import {
   classifyNoticeChange, classifyOrgChange, classifyStaffRequestChange,
   classifyReportChange,
@@ -130,7 +131,10 @@ export const onNoticeWritten = onDocumentWritten('notices/{noticeId}', async (ev
 
   const topics = topicsForNotice(after);
   if (!topics.length) {
-    logger.warn('Notice has no routable topics', { noticeId });
+    // A published notice that cannot be routed to a single topic means
+    // nobody following this masjid and nobody nearby will be alerted: the
+    // core feature failed for this notice, not merely a delivery hiccup.
+    logger.error('Notice has no routable topics: nobody will be notified', { noticeId, kind });
     return;
   }
 
@@ -154,13 +158,23 @@ export const onNoticeWritten = onDocumentWritten('notices/{noticeId}', async (ev
   );
 
   const failed = sent.filter((r) => r.status === 'rejected');
-  logger.info('Notice notification sent', {
-    noticeId, kind, topics: topics.length, failed: failed.length,
-  });
-  if (failed.length) {
-    logger.warn('Some sends failed', {
-      reason: String(failed[0].reason?.message || failed[0].reason).slice(0, 200),
+  const reason = failed.length
+    ? String(failed[0].reason?.message || failed[0].reason).slice(0, 200)
+    : null;
+
+  if (failed.length === topics.length) {
+    // Every send failed: this notice reached nobody. Distinct from a partial
+    // failure, and the one outcome here that genuinely needs attention rather
+    // than routine monitoring.
+    logger.error('Notice notification totally failed: nobody was notified', {
+      noticeId, kind, topics: topics.length, reason,
     });
+  } else if (failed.length) {
+    logger.warn('Notice notification partially failed', {
+      noticeId, kind, topics: topics.length, failed: failed.length, reason,
+    });
+  } else {
+    logger.info('Notice notification sent', { noticeId, kind, topics: topics.length });
   }
 
   // The audit trail is client-written elsewhere; this entry is server-written
@@ -349,6 +363,15 @@ export const enforceRetention = onSchedule(
   async () => {
     const db = getFirestore();
     const counts = { privateDeleted: 0, redacted: 0, runsDeleted: 0, reportsDeleted: 0 };
+    // One malformed document used to be able to abort the entire daily run:
+    // an uncaught throw partway through a loop meant nothing after it ran,
+    // and nothing before it was reported either, just a generic crash log
+    // with no indication of how much of the batch actually completed.
+    // eachIndependently (lib/resilient-batch.js) is what fixes that: every
+    // item in every stage below is attempted regardless of earlier failures,
+    // and every failure is tagged with which stage and which document.
+    const errors = [];
+    const tag = (stage, list) => list.map((e) => ({ stage, ...e }));
 
     // 1. Family contacts and internal notes, once the prayer is well past.
     const oldNotices = await db.collection('notices')
@@ -356,13 +379,13 @@ export const enforceRetention = onSchedule(
       .limit(400)
       .get();
 
-    for (const noticeDoc of oldNotices.docs) {
+    errors.push(...tag('privateDetails', await eachIndependently(oldNotices.docs, async (noticeDoc) => {
       const privateDocs = await noticeDoc.ref.collection('private').get();
       for (const priv of privateDocs.docs) {
         await priv.ref.delete();
         counts.privateDeleted += 1;
       }
-    }
+    })));
 
     // 2. The deceased's name, once the notice is old enough that keeping it
     //    serves nobody.
@@ -371,23 +394,23 @@ export const enforceRetention = onSchedule(
       .limit(400)
       .get();
 
-    for (const noticeDoc of toRedact.docs) {
-      if (!needsRedaction(noticeDoc.data())) continue;
+    errors.push(...tag('redaction', await eachIndependently(toRedact.docs, async (noticeDoc) => {
+      if (!needsRedaction(noticeDoc.data())) return;
       await noticeDoc.ref.update(redactionPatch(FieldValue.serverTimestamp()));
       counts.redacted += 1;
       await writeSystemAudit(db, 'notice.redacted', noticeDoc.id,
         noticeDoc.data().orgId ?? null, { policyDays: RETENTION.publicNameDays });
-    }
+    })));
 
     // 3. Delivery bookkeeping.
     const staleRuns = await db.collection('notificationRuns')
       .where('at', '<', daysAgo(RETENTION.notificationRunsDays))
       .limit(400)
       .get();
-    for (const run of staleRuns.docs) {
+    errors.push(...tag('notificationRuns', await eachIndependently(staleRuns.docs, async (run) => {
       await run.ref.delete();
       counts.runsDeleted += 1;
-    }
+    })));
 
     // 4. Reports that were dealt with long ago.
     const staleReports = await db.collection('reports')
@@ -395,10 +418,19 @@ export const enforceRetention = onSchedule(
       .where('resolvedAt', '<', daysAgo(RETENTION.resolvedReportsDays))
       .limit(400)
       .get();
-    for (const report of staleReports.docs) {
+    errors.push(...tag('resolvedReports', await eachIndependently(staleReports.docs, async (report) => {
       await report.ref.delete();
       counts.reportsDeleted += 1;
-    }
+    })));
 
-    logger.info('Retention pass complete', counts);
+    if (errors.length) {
+      // Loud on purpose: this is exactly the kind of failure that used to be
+      // invisible, so a summary that undercounted or omitted it entirely
+      // would recreate the same gap in a quieter form.
+      logger.error('Retention pass completed with errors', {
+        ...counts, errorCount: errors.length, errors: errors.slice(0, 10),
+      });
+    } else {
+      logger.info('Retention pass complete', counts);
+    }
   });
