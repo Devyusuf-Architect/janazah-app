@@ -95,8 +95,9 @@ oddly.
    `janazah-web`. Do **not** tick "Also set up Firebase Hosting" in that
    dialog; this repository already has a hosting config.
 2. Copy the `firebaseConfig` object shown.
-3. Paste the values into `public/js/config.js`, replacing the `REPLACE_ME`
-   placeholders.
+3. Run `npm run setup` and paste it. That writes `public/js/config.js` for
+   you, refuses an incomplete paste rather than half-writing the file, and
+   leaves the rest of the file alone. Editing it by hand works too.
 
 These values are **not secrets**. They identify the project; they grant
 nothing. Access is decided entirely by `firestore.rules`. Committing them is

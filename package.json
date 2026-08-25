@@ -20,7 +20,10 @@
     "predemo": "npm run preflight",
     "pretest": "npm run preflight",
     "preview": "node demo/build.mjs",
-    "preview:verify": "node demo/build.mjs && node demo/verify.mjs"
+    "preview:verify": "node demo/build.mjs && node demo/verify.mjs",
+    "setup": "node scripts/configure.mjs",
+    "predeploy": "node scripts/preflight.mjs --skip-java",
+    "predeploy:rules": "node scripts/preflight.mjs --skip-java"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

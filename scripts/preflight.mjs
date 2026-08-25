@@ -9,6 +9,9 @@
 import { execFileSync } from 'node:child_process';
 
 const SUPPORTED_NODE = [20, 22, 24];
+// Deploying needs the Firebase CLI but not the emulators, so it does not need
+// Java. Only the demo and the tests do.
+const skipJava = process.argv.includes('--skip-java');
 const problems = [];
 
 // --- Node ---------------------------------------------------------------
@@ -31,17 +34,19 @@ if (major < Math.min(...SUPPORTED_NODE)) {
 
 // --- Java ---------------------------------------------------------------
 
-try {
-  execFileSync('java', ['-version'], { stdio: 'ignore' });
-} catch {
-  problems.push({
-    what: 'Java is not installed, and the Firebase emulators are Java programs.',
-    fix: process.platform === 'darwin'
-      ? 'Download the macOS installer from https://adoptium.net (the site picks\n'
-        + '      the right one for your Mac), run it, then close and reopen your terminal.\n'
-        + '      With Homebrew: brew install --cask temurin'
-      : 'Install a JDK from https://adoptium.net, then reopen your terminal.',
-  });
+if (!skipJava) {
+  try {
+    execFileSync('java', ['-version'], { stdio: 'ignore' });
+  } catch {
+    problems.push({
+      what: 'Java is not installed, and the Firebase emulators are Java programs.',
+      fix: process.platform === 'darwin'
+        ? 'Download the macOS installer from https://adoptium.net (the site picks\n'
+          + '      the right one for your Mac), run it, then close and reopen your terminal.\n'
+          + '      With Homebrew: brew install --cask temurin'
+        : 'Install a JDK from https://adoptium.net, then reopen your terminal.',
+    });
+  }
 }
 
 // ------------------------------------------------------------------------
