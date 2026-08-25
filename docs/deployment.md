@@ -10,6 +10,10 @@ Roughly 45 minutes, most of it waiting for Firebase.
 ## 0. What you need first
 
 - **Node.js 20 or newer** and npm.
+- **Java**, for the Firebase emulators, if you want to run the tests or the
+  local demo. [adoptium.net](https://adoptium.net) is the easy source. Nothing
+  else in the project uses Java, which makes it a surprising thing to be
+  missing.
 - **A Google account** for the Firebase console.
 - **A credit card.** Push notifications and two-step sign-in both require the
   Blaze plan. Real usage sits inside the free allowance and the bill rounds to
@@ -283,6 +287,7 @@ rewrite.
 ## Routine operations
 
 ```bash
+npm run demo                  # the whole app locally, seeded, no project needed
 npm test                      # before every deploy
 npm run deploy:rules          # rules and indexes only
 npm run deploy:functions      # functions only

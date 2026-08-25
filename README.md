@@ -29,15 +29,21 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 **Deploying for the first time: [`docs/deployment.md`](docs/deployment.md)** is
 the full sequence from an empty machine to a live site.
 
-To run against the local emulators without any Firebase project at all:
+To see the whole thing running locally, with no Firebase project and no
+credit card:
 
 ```bash
 npm install
-npm run serve        # http://127.0.0.1:5000
+npm run demo
 ```
 
-With no config in `public/js/config.js`, the app falls back to an
-emulator-only `demo-` project, so nothing can reach a real backend.
+That starts the emulators, seeds two verified masajid and a set of notices,
+and prints sign-in details. The feed is at `http://127.0.0.1:5000` and the
+coordinator console at `/console`. Ctrl+C stops it and wipes the data.
+
+Needs Node 20 or newer and Java (the Firebase emulators are Java programs;
+nothing else here uses it). `npm run serve` does the same without the seed
+data.
 
 ## Tests
 
