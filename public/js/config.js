@@ -9,12 +9,12 @@
 // See docs/phase-1-setup.md step 4.
 
 export const firebaseConfig = {
-  apiKey: 'REPLACE_ME',
-  authDomain: 'REPLACE_ME.firebaseapp.com',
-  projectId: 'REPLACE_ME',
-  storageBucket: 'REPLACE_ME.firebasestorage.app',
-  messagingSenderId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
+  apiKey: 'AIzaSyBWYAmlSHrBFIiHu5C_gwSaPqGULyHPqQs',
+  authDomain: 'janaza-app-5baf2.firebaseapp.com',
+  projectId: 'janaza-app-5baf2',
+  storageBucket: 'janaza-app-5baf2.firebasestorage.app',
+  messagingSenderId: '471694085674',
+  appId: '1:471694085674:web:9c5e33b529985e47bfbd53',
 };
 
 export const APP = {
