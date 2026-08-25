@@ -10,3 +10,4 @@ ui-debug.log
 functions/node_modules/
 functions/.env
 functions/.env.*
+screenshots/

@@ -12,7 +12,8 @@
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-janazah \"node tests/e2e.smoke.mjs\"",
     "test": "npm run test:unit && npm run test:rules && npm run test:e2e",
     "test:unit": "node --test \"tests/nearby.test.js\" \"tests/duplicates.test.js\" \"tests/public-surface.test.js\" \"functions/test/*.test.js\"",
-    "deploy:functions": "firebase deploy --only functions"
+    "deploy:functions": "firebase deploy --only functions",
+    "screenshots": "firebase emulators:exec --only auth,firestore --project demo-janazah \"node scripts/screenshots.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
