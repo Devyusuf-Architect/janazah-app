@@ -16,11 +16,14 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 
 import { isValidTopic } from './lib/topics.js';
 import { kindOfChange, buildMessage, topicsForNotice } from './lib/notify.js';
+import { RETENTION, daysAgo, redactionPatch, needsRedaction } from './lib/retention.js';
+import { LIMITS, checkAndCount } from './lib/limits.js';
 
 initializeApp();
 
@@ -124,6 +127,11 @@ export const onNoticeWritten = onDocumentWritten('notices/{noticeId}', async (ev
     return;
   }
 
+  // A burst of notifications from one organization is the signature of a
+  // compromised coordinator account. The notice itself is never blocked, only
+  // the notification, and an administrator is told either way.
+  if (after.orgId && !(await allowNotification(db, after.orgId, noticeId, kind))) return;
+
   let message;
   try {
     message = buildMessage(noticeId, after, kind, { origin: SITE_ORIGIN.value() });
@@ -150,14 +158,128 @@ export const onNoticeWritten = onDocumentWritten('notices/{noticeId}', async (ev
 
   // The audit trail is client-written elsewhere; this entry is server-written
   // and therefore cannot be skipped by whoever triggered it.
-  await db.collection('auditLog').add({
-    actorUid: 'system',
-    actorEmail: '',
-    action: `notification.${kind}`,
-    targetType: 'notice',
-    targetId: noticeId,
-    orgId: after.orgId ?? null,
-    at: FieldValue.serverTimestamp(),
-    details: { topics: topics.length, failed: failed.length },
+  await writeSystemAudit(db, `notification.${kind}`, noticeId, after.orgId ?? null, {
+    topics: topics.length, failed: failed.length,
   });
 });
+
+/** Server-written audit entry. Never carries notice content, only counts. */
+function writeSystemAudit(db, action, targetId, orgId, details = {}) {
+  return db.collection('auditLog').add({
+    actorUid: 'system',
+    actorEmail: '',
+    action,
+    targetType: 'notice',
+    targetId,
+    orgId,
+    at: FieldValue.serverTimestamp(),
+    details,
+  });
+}
+
+/**
+ * Rolling per-organization notification budget.
+ *
+ * Returns false when the budget is spent. The first message over the line
+ * raises a report for an administrator; later ones in the same burst are
+ * simply dropped so the queue is not flooded too.
+ */
+async function allowNotification(db, orgId, noticeId, kind) {
+  const ref = db.collection('orgNotificationRates').doc(orgId);
+  const outcome = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const result = checkAndCount(snap.exists ? snap.data() : null, Date.now());
+    tx.set(ref, result.next, { merge: true });
+    return result;
+  });
+
+  if (outcome.allowed) return true;
+
+  logger.warn('Notification suppressed by rate limit', {
+    orgId, noticeId, kind, count: outcome.next.count,
+  });
+
+  if (outcome.tripped) {
+    await db.collection('reports').add({
+      noticeId,
+      reportedBy: 'system',
+      reason: 'rate_limit',
+      detail:
+        `${orgId} triggered more than ${LIMITS.notificationsPerWindow} notifications `
+        + `in ${LIMITS.windowMinutes} minutes. Notifications are suppressed for this `
+        + 'organization until the window clears. Notices are still being published.',
+      status: 'open',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  await writeSystemAudit(db, 'notification.suppressed', noticeId, orgId, {
+    reason: 'rate_limit', count: outcome.next.count,
+  });
+  return false;
+}
+
+/**
+ * Retention. Runs daily and enforces the policy in lib/retention.js.
+ *
+ * Deliberately batched and bounded: a purge that half-finishes is fine,
+ * because tomorrow's run picks up whatever is left.
+ */
+export const enforceRetention = onSchedule(
+  { schedule: '17 4 * * *', timeZone: 'America/Toronto' },
+  async () => {
+    const db = getFirestore();
+    const counts = { privateDeleted: 0, redacted: 0, runsDeleted: 0, reportsDeleted: 0 };
+
+    // 1. Family contacts and internal notes, once the prayer is well past.
+    const oldNotices = await db.collection('notices')
+      .where('janazahAt', '<', daysAgo(RETENTION.privateDetailsDays))
+      .limit(400)
+      .get();
+
+    for (const noticeDoc of oldNotices.docs) {
+      const privateDocs = await noticeDoc.ref.collection('private').get();
+      for (const priv of privateDocs.docs) {
+        await priv.ref.delete();
+        counts.privateDeleted += 1;
+      }
+    }
+
+    // 2. The deceased's name, once the notice is old enough that keeping it
+    //    serves nobody.
+    const toRedact = await db.collection('notices')
+      .where('janazahAt', '<', daysAgo(RETENTION.publicNameDays))
+      .limit(400)
+      .get();
+
+    for (const noticeDoc of toRedact.docs) {
+      if (!needsRedaction(noticeDoc.data())) continue;
+      await noticeDoc.ref.update(redactionPatch(FieldValue.serverTimestamp()));
+      counts.redacted += 1;
+      await writeSystemAudit(db, 'notice.redacted', noticeDoc.id,
+        noticeDoc.data().orgId ?? null, { policyDays: RETENTION.publicNameDays });
+    }
+
+    // 3. Delivery bookkeeping.
+    const staleRuns = await db.collection('notificationRuns')
+      .where('at', '<', daysAgo(RETENTION.notificationRunsDays))
+      .limit(400)
+      .get();
+    for (const run of staleRuns.docs) {
+      await run.ref.delete();
+      counts.runsDeleted += 1;
+    }
+
+    // 4. Reports that were dealt with long ago.
+    const staleReports = await db.collection('reports')
+      .where('status', '==', 'resolved')
+      .where('resolvedAt', '<', daysAgo(RETENTION.resolvedReportsDays))
+      .limit(400)
+      .get();
+    for (const report of staleReports.docs) {
+      await report.ref.delete();
+      counts.reportsDeleted += 1;
+    }
+
+    logger.info('Retention pass complete', counts);
+  });

@@ -7,19 +7,25 @@
 import { usingEmulator } from './firebase.js';
 import { $ } from './ui.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
+import { renderPrivacy } from './views/privacy.js';
 
 const mount = () => $('#view');
 
-/** `/n/{id}` opens one notice; anything else is the feed. */
+/** `/n/{id}` opens one notice, `/privacy` the policy, anything else the feed. */
 function route() {
   teardownFeed();
-  const match = location.pathname.match(/^\/n\/([A-Za-z0-9_-]+)\/?$/);
-  if (match) {
-    renderSingleNotice(mount(), match[1]);
-  } else {
-    document.title = 'Janazah Notices';
-    renderFeed(mount());
+  const notice = location.pathname.match(/^\/n\/([A-Za-z0-9_-]+)\/?$/);
+  if (notice) {
+    renderSingleNotice(mount(), notice[1]);
+    return;
   }
+  if (/^\/privacy\/?$/.test(location.pathname)) {
+    document.title = 'Privacy — Janazah Notices';
+    renderPrivacy(mount());
+    return;
+  }
+  document.title = 'Janazah Notices';
+  renderFeed(mount());
 }
 
 // Handle in-app links without reloading the document. Links to the console are

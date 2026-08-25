@@ -91,14 +91,15 @@ function pushToggle(onChange) {
   const rows = [
     el('label', { class: 'check', for: 'push-toggle' }, [
       checkbox,
-      el('span', { text: 'Alert me about Janazahs near me, even when this page is closed' }),
+      el('span', { text: 'Alert me about Janazahs, even when this page is closed' }),
     ]),
     status,
   ];
 
   if (enabled) {
+    rows.push(scopeControl());
     const settings = loc.settings();
-    if (!settings.enabled || !settings.last) {
+    if (settings.alertScope !== 'follows' && (!settings.enabled || !settings.last)) {
       rows.push(el('p', { class: 'notice-strip notice-strip--warn' },
         'Location is off, so you will only be alerted about masajid you ' +
         'follow. Turn location on above to hear about Janazahs near you.'));
@@ -106,6 +107,39 @@ function pushToggle(onChange) {
   }
 
   return el('div', {}, rows);
+}
+
+/**
+ * How much to be alerted about. In a busy city the difference between these
+ * two is the difference between a useful app and one whose notifications get
+ * switched off in the first week.
+ */
+function scopeControl() {
+  const settings = loc.settings();
+  const select = el('select', { class: 'field field--inline', id: 'alert-scope' },
+    loc.ALERT_SCOPES.map((opt) => el('option', {
+      value: opt.value, text: opt.label, selected: opt.value === settings.alertScope,
+    })));
+
+  select.addEventListener('change', async () => {
+    loc.update({ alertScope: select.value });
+    try {
+      await push.syncTopics();
+      toast(select.value === 'follows'
+        ? 'You will only be alerted about masajid you follow.'
+        : 'You will be alerted about Janazahs near you too.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  return el('div', { class: 'field-group' }, [
+    el('label', { class: 'label', for: 'alert-scope', text: 'Alert me about' }),
+    select,
+    el('p', { class: 'hint' },
+      'In a busy area, alerts for every Janazah nearby can add up. Narrowing ' +
+      'this stops them at the source rather than sending and hiding them.'),
+  ]);
 }
 
 function pageAlertToggle(onChange) {

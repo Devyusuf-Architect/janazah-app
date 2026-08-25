@@ -325,6 +325,55 @@ const run = async () => {
     await coord.locator('.notice-card--published').first().waitFor({ timeout: 15000 });
     log('second notice published, far away');
 
+    // ---- duplicate warning -------------------------------------------------
+    // The same masjid posting again for the same slot is the usual shape of an
+    // accidental double announcement.
+    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.locator('#janazahAt').fill('2026-12-03T13:30');
+    await coord.locator('#timeZone').selectOption('America/Vancouver');
+    await coord.locator('#prayerName').fill('Vancouver Prayer Hall');
+    await coord.locator('#prayerAddress').fill('1 Pacific Street, Vancouver');
+    await coord.locator('#prayerLat').fill('49.2827');
+    await coord.locator('#prayerLng').fill('-123.1207');
+    await coord.getByRole('button', { name: 'Publish', exact: true }).click();
+
+    await coord.locator('.dup-warning').waitFor({ timeout: 15000 });
+    const dupText = await coord.locator('.dup-warning').innerText();
+    assert.match(dupText, /similar notice/i);
+    log('duplicate warning shown before publishing a likely repeat');
+
+    // It warns; it must not block. Backing out returns to the form.
+    await coord.getByRole('button', { name: 'Back to editing' }).click();
+    await coord.getByRole('button', { name: 'Back' }).click();
+    await coord.locator('.notice-card').first().waitFor({ timeout: 15000 });
+
+    // ---- report triage -----------------------------------------------------
+    await admin.reload();
+    await admin.getByRole('button', { name: 'Admin' }).click();
+    await admin.getByRole('button', { name: 'Reports' }).click();
+    await admin.getByText('Details are wrong').first().waitFor({ timeout: 15000 });
+
+    await admin.getByRole('button', { name: 'Resolve' }).first().click();
+    await admin.locator('#reason-input').fill('Checked with the masjid; time was right.');
+    await admin.getByRole('button', { name: 'Resolve', exact: true }).last().click();
+    await admin.getByText('resolved', { exact: true }).first().waitFor({ timeout: 15000 });
+
+    const resolvedReports = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/reports`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    const resolved = resolvedReports.documents[0].fields;
+    assert.equal(resolved.status.stringValue, 'resolved');
+    assert.ok(resolved.resolvedBy?.stringValue, 'the outcome must name who decided it');
+    log('administrator resolved a report, with the outcome recorded');
+
+    // ---- account security --------------------------------------------------
+    await coord.getByRole('button', { name: 'Account' }).click();
+    const accountText = await coord.locator('#view').innerText();
+    assert.match(accountText, /two-step sign-in/i, 'expected the second-factor section');
+    assert.match(accountText, /publish notices in your masjid/i,
+      'expected the reason two-step matters to be stated');
+    log('account security screen offers a second factor');
+
     // A visitor physically in Toronto.
     const local = await newPage({
       permissions: ['geolocation', 'notifications'],
@@ -405,6 +454,21 @@ const run = async () => {
     assert.equal(afterOptOut.last, null, 'the stored position survived opting out');
     assert.equal(afterOptOut.enabled, false);
     log('opting out erases the stored position');
+
+    // ---- the privacy page --------------------------------------------------
+    await local.goto(`${BASE}/privacy`);
+    await local.locator('.policy').waitFor({ timeout: 15000 });
+    const policy = await local.locator('.policy').innerText();
+    for (const claim of [
+      /not sent to us/i,
+      /replaces the last/i,
+      /erases the stored position/i,
+      /30 days/,
+      /PIPEDA/,
+    ]) {
+      assert.match(policy, claim, `privacy page is missing: ${claim}`);
+    }
+    log('privacy page states what the code actually does');
 
     if (failures.length) {
       throw new Error(`browser reported errors:\n  - ${failures.join('\n  - ')}`);

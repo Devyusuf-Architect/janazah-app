@@ -26,8 +26,21 @@ const DEFAULTS = {
   enabled: false,
   radiusKm: 10,
   alertsEnabled: false,
+  // 'nearby'  every Janazah in range, plus masajid you follow
+  // 'follows'  only masajid you follow, wherever they are
+  //
+  // In a dense city "every Janazah in range" can be several alerts a day,
+  // which is the fastest way to have notifications switched off altogether.
+  // This is the volume control, and it works by narrowing what the device
+  // subscribes to rather than by discarding messages on arrival.
+  alertScope: 'nearby',
   last: null, // { lat, lng, at }
 };
+
+export const ALERT_SCOPES = [
+  { value: 'nearby', label: 'Janazahs near me, and masajid I follow' },
+  { value: 'follows', label: 'Only masajid I follow' },
+];
 
 /** A stored position older than this is shown as stale, not silently trusted. */
 export const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
@@ -41,6 +54,7 @@ export function settings() {
       ...DEFAULTS,
       ...parsed,
       radiusKm: Number.isFinite(parsed.radiusKm) ? parsed.radiusKm : DEFAULTS.radiusKm,
+      alertScope: parsed.alertScope === 'follows' ? 'follows' : DEFAULTS.alertScope,
     };
   } catch {
     return { ...DEFAULTS };

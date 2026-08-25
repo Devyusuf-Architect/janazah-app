@@ -343,3 +343,17 @@ textarea.field { resize: vertical; }
 }
 .alerts-panel .notice-strip strong { display: block; margin-bottom: .25rem; }
 .alerts-panel .notice-strip p { margin: 0; }
+
+/* ---------- launch hardening (Phase 5) ---------- */
+
+.dup-warning strong { display: block; margin-bottom: .25rem; }
+.dup-warning ul { margin: .5rem 0 0; }
+.dup-warning li { padding: .4rem 0; border-top: 1px solid currentColor; }
+
+.policy { max-width: 42rem; }
+.policy h2 { margin-top: 1.75rem; }
+.policy h3 { margin-top: 1.25rem; font-size: .95rem; }
+.policy li { margin-bottom: .35rem; }
+.policy__updated { font-size: .85rem; color: var(--ink-muted); }
+
+.report-card__meta { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

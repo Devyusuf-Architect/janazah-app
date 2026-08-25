@@ -13,6 +13,7 @@ import { renderAuth, signOutUser } from './views/auth.js';
 import { renderOrgs } from './views/org.js';
 import { renderNotices, teardownNotices } from './views/notices.js';
 import { renderAdmin, teardownAdmin } from './views/admin.js';
+import { renderAccount } from './views/account.js';
 
 const mount = () => $('#view');
 
@@ -28,6 +29,7 @@ const ROUTES = {
   notices: { label: 'Notices', render: renderNotices },
   organizations: { label: 'Organizations', render: renderOrgs },
   admin: { label: 'Admin', render: renderAdmin, adminOnly: true },
+  account: { label: 'Account', render: renderAccount },
 };
 
 function teardown() {

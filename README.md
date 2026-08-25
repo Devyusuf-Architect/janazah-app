@@ -3,9 +3,14 @@
 One trusted place where verified masajid and approved funeral coordinators
 publish Janazah notices, so that people close enough to attend hear in time.
 
-**Status: Phase 4 complete.** The public feed, on-device nearby matching, push
-notifications, and the coordinator and administrator console are all built and
-tested.
+**Status: Phase 5 complete. Feature-complete for the MVP scope.** The public
+feed, on-device nearby matching, push notifications, the coordinator and
+administrator console, and the launch hardening around retention, abuse and
+account security are all built and tested.
+
+Before a real launch, `docs/phase-5-notes.md` lists what is still outstanding:
+a named privacy contact, delivery tested against real FCM, the retention job
+watched on real data, and somebody other than the author trying to break it.
 
 Push requires the Blaze plan, because sending to Firebase Cloud Messaging needs
 a service account credential that cannot live in a browser. Usage sits inside
@@ -37,8 +42,8 @@ emulator-only `demo-` project, so nothing can reach a real backend.
 ## Tests
 
 ```bash
-npm run test:unit    # 57 tests of the distance, cell and notification logic
-npm run test:rules   # 56 security rule tests
+npm run test:unit    # 88 tests of the distance, cell, notification and policy logic
+npm run test:rules   # 60 security rule tests
 npm run test:e2e     # browser run through the whole product path
 npm test             # all three
 ```
@@ -55,6 +60,26 @@ CHROMIUM_PATH=/path/to/chrome npm run test:e2e
 ```
 
 ## What is built
+
+### Phase 5, launch hardening
+
+- A retention policy that is enforced, not merely stated: family contacts
+  deleted a week after the prayer, the deceased's name removed from the public
+  notice after thirty days, with the notice itself left in place so an old link
+  explains rather than breaks
+- A per-organization notification rate limit that suppresses a burst and raises
+  a report, while never blocking a notice, because a false positive that
+  silenced a real Janazah would be far worse
+- An alert scope so a reader in a busy city can narrow to masajid they follow,
+  controlling volume at subscription time rather than by hiding messages
+- A duplicate warning before publishing, which warns and never blocks
+- Two-step sign-in for coordinators, using time-based codes rather than SMS
+- Report triage with recorded outcomes, and rules that stop an administrator
+  rewriting what was reported
+- A privacy page written from what the code does, and a test that pins the
+  exact set of fields the world can read
+
+See [`docs/phase-5-notes.md`](docs/phase-5-notes.md).
 
 ### Phase 4, push notifications
 

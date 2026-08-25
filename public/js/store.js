@@ -10,7 +10,11 @@ import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from './firebase.js';
 import { geohash } from './geo.js';
 import { APP } from './config.js';
-import { assertPublicNoticeShape, buildPublicNotice, buildPrivateDetails } from './model.js';
+import {
+  assertPublicNoticeShape, buildPublicNotice, buildPrivateDetails,
+  looksLikeDuplicate, DUPLICATE_WINDOW_HOURS,
+} from './model.js';
+import { distanceKm } from './geo.js';
 import { writeAudit, ACTIONS } from './audit.js';
 
 const withId = (snap) => ({ id: snap.id, ...snap.data() });
@@ -319,6 +323,38 @@ export function watchOrgNotices(orgId, cb) {
 }
 
 /**
+ * Published notices that might be announcing the same funeral as this draft.
+ *
+ * Reads the public feed window, which any visitor may read, and compares in
+ * the browser. Returns an empty list on failure: a duplicate check that cannot
+ * run must never stand between a coordinator and a genuine Janazah.
+ */
+export async function findPossibleDuplicates(candidate, { excludeId = null } = {}) {
+  try {
+    const at = candidate.janazahAt instanceof Date
+      ? candidate.janazahAt : new Date(candidate.janazahAt);
+    if (Number.isNaN(at.getTime())) return [];
+    const windowMs = DUPLICATE_WINDOW_HOURS * 3600 * 1000;
+
+    const snap = await getDocs(query(
+      collection(db, 'notices'),
+      where('isPublic', '==', true),
+      where('janazahAt', '>=', new Date(at.getTime() - windowMs)),
+      where('janazahAt', '<=', new Date(at.getTime() + windowMs)),
+      limit(100),
+    ));
+
+    return snap.docs
+      .map(withId)
+      .filter((existing) => existing.id !== excludeId)
+      .filter((existing) => looksLikeDuplicate(candidate, existing, distanceKm));
+  } catch (err) {
+    console.error('findPossibleDuplicates', err);
+    return [];
+  }
+}
+
+/**
  * Sign in anonymously if there is no session yet.
  *
  * Reading the feed needs no account. Filing a report does, because the rules
@@ -344,6 +380,21 @@ export async function submitReport(noticeId, reason, detail) {
   };
   if (detail?.trim()) payload.detail = detail.trim().slice(0, 1000);
   await addDoc(collection(db, 'reports'), payload);
+}
+
+/** Platform admin triage of a community report. */
+export async function resolveReport(reportId, status, resolution) {
+  const user = auth.currentUser;
+  await updateDoc(doc(db, 'reports', reportId), {
+    status,
+    resolution: resolution || '',
+    resolvedBy: user.uid,
+    resolvedAt: serverTimestamp(),
+  });
+  await writeAudit(status === 'resolved' ? ACTIONS.REPORT_RESOLVED : ACTIONS.REPORT_DISMISSED, {
+    targetType: 'report', targetId: reportId,
+    details: { status, resolution: resolution || '' },
+  });
 }
 
 /**

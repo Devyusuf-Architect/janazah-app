@@ -23,7 +23,7 @@ export const NOTICE_PUBLIC_KEYS = [
   'prayerLocation', 'burialLocation', 'instructions',
   'version', 'createdBy', 'createdAt', 'updatedAt',
   'lastEditedBy', 'publishedAt', 'cancelledAt', 'cancelReason',
-  'correctionNote',
+  'correctionNote', 'redactedAt',
 ];
 
 // Fields that must never appear on the public notice document. Kept as an
@@ -179,6 +179,68 @@ export function noticeToForm(notice) {
     burialLng: notice.burialLocation?.lng ?? '',
     instructions: notice.instructions || '',
   };
+}
+
+/**
+ * Normalise a name for comparison: case, accents and punctuation removed.
+ * Used only to warn a coordinator about a possible duplicate, never to block
+ * anything, so being approximate is fine and being cautious is not.
+ */
+export function normaliseName(name) {
+  return String(name || '')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Hours either side of a prayer time within which two notices might be one. */
+export const DUPLICATE_WINDOW_HOURS = 12;
+/** Two prayer locations closer than this are treated as the same place. */
+export const DUPLICATE_RADIUS_KM = 25;
+
+/**
+ * Whether an existing notice might be announcing the same funeral as a draft.
+ *
+ * Two coordinators posting the same Janazah is a real and common failure: it
+ * produces two cards on the feed and two notifications for one funeral, which
+ * erodes trust quickly. This is a warning shown before publishing, never a
+ * block: a false positive must not be able to stop a genuine notice.
+ *
+ * @param {object} candidate  The notice about to be published.
+ * @param {object} existing   An already published notice.
+ * @param {(a, b) => number} distanceBetween  Kilometres between two points.
+ */
+export function looksLikeDuplicate(candidate, existing, distanceBetween) {
+  if (existing.status === 'cancelled') return false;
+
+  const candidateAt = candidate.janazahAt?.toDate
+    ? candidate.janazahAt.toDate() : new Date(candidate.janazahAt);
+  const existingAt = existing.janazahAt?.toDate
+    ? existing.janazahAt.toDate() : new Date(existing.janazahAt);
+  if (Number.isNaN(candidateAt?.getTime()) || Number.isNaN(existingAt?.getTime())) return false;
+
+  const hoursApart = Math.abs(candidateAt - existingAt) / 3600000;
+  if (hoursApart > DUPLICATE_WINDOW_HOURS) return false;
+
+  const a = normaliseName(candidate.deceasedName);
+  const b = normaliseName(existing.deceasedName);
+  const namesMatch = a.length > 2 && b.length > 2 && (a === b || a.includes(b) || b.includes(a));
+
+  const sameOrg = candidate.orgId && candidate.orgId === existing.orgId;
+
+  let nearby = false;
+  const from = candidate.prayerLocation;
+  const to = existing.prayerLocation;
+  if (Number.isFinite(from?.lat) && Number.isFinite(to?.lat)) {
+    nearby = distanceBetween(from, to) <= DUPLICATE_RADIUS_KM;
+  }
+
+  // A matching name close in time is the strong signal. Failing that, the same
+  // organization posting twice for the same slot is worth a second look.
+  if (namesMatch && (nearby || sameOrg)) return true;
+  return sameOrg && hoursApart <= 2;
 }
 
 /** Format a Date for a datetime-local input without shifting the zone. */

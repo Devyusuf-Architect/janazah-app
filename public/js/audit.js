@@ -31,6 +31,8 @@ export const ACTIONS = {
   NOTICE_CANCELLED: 'notice.cancelled',
   NOTICE_DELETED_DRAFT: 'notice.draft_deleted',
   NOTICE_TAKEN_DOWN: 'notice.admin_takedown',
+  REPORT_RESOLVED: 'report.resolved',
+  REPORT_DISMISSED: 'report.dismissed',
 };
 
 /**

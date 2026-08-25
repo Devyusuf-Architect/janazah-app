@@ -2,10 +2,63 @@
 
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
-  updateProfile, sendPasswordResetEmail,
+  updateProfile, sendPasswordResetEmail, getMultiFactorResolver,
+  TotpMultiFactorGenerator,
 } from 'firebase/auth';
 import { auth } from '../firebase.js';
 import { el, toast, friendlyError } from '../ui.js';
+
+/**
+ * Second step of sign-in for an account with two-step sign-in on.
+ * Resolves once the code is accepted; rejects if the person backs out.
+ */
+function askForCode(resolver) {
+  return new Promise((resolve, reject) => {
+    const error = el('p', { class: 'form-error', hidden: true });
+    const code = el('input', {
+      class: 'field', id: 'mfa-code', inputmode: 'numeric',
+      autocomplete: 'one-time-code', maxlength: 6, placeholder: '123456',
+    });
+    const backdrop = el('div', { class: 'modal-backdrop' });
+    const submit = el('button', { class: 'btn btn--primary' }, 'Verify');
+
+    submit.addEventListener('click', async () => {
+      error.hidden = true;
+      submit.disabled = true;
+      try {
+        const hint = resolver.hints.find((h) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID)
+          || resolver.hints[0];
+        const assertion = TotpMultiFactorGenerator.assertionForSignIn(
+          hint.uid, code.value.trim());
+        await resolver.resolveSignIn(assertion);
+        backdrop.remove();
+        resolve();
+      } catch (err) {
+        error.hidden = false;
+        error.textContent = err?.code === 'auth/invalid-verification-code'
+          ? 'That code was not accepted. Codes change every 30 seconds.'
+          : friendlyError(err);
+        submit.disabled = false;
+      }
+    });
+
+    backdrop.append(el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' }, [
+      el('h2', { text: 'Enter your six-digit code' }),
+      el('p', { class: 'muted', text: 'From your authenticator app.' }),
+      code,
+      error,
+      el('div', { class: 'modal-actions' }, [
+        el('button', {
+          class: 'btn',
+          onclick: () => { backdrop.remove(); reject(new Error('cancelled')); },
+        }, 'Cancel'),
+        submit,
+      ]),
+    ]));
+    document.body.append(backdrop);
+    code.focus();
+  });
+}
 
 export function renderAuth(mount) {
   mount.replaceChildren();
@@ -65,8 +118,9 @@ export function renderAuth(mount) {
     el('button', { class: 'btn btn--link btn--quiet', type: 'button', id: 'reset' }, 'Forgot password'),
     el('p', {
       class: 'hint hint--boxed',
-      text: 'Multi-factor authentication is not enabled in this phase. It needs ' +
-            'the Identity Platform upgrade and is planned before public launch.',
+      text: 'If two-step sign-in is on for your account, you will be asked for ' +
+            'a six-digit code next. You can turn it on under Account once ' +
+            'signed in.',
     }),
   );
 
@@ -96,6 +150,18 @@ export function renderAuth(mount) {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
+      if (err?.code === 'auth/multi-factor-auth-required') {
+        try {
+          await askForCode(getMultiFactorResolver(auth, err));
+          return;
+        } catch (cancelled) {
+          if (cancelled?.message !== 'cancelled') {
+            error.hidden = false;
+            error.textContent = friendlyError(cancelled);
+          }
+          return;
+        }
+      }
       error.hidden = false;
       error.textContent = friendlyError(err);
     } finally {

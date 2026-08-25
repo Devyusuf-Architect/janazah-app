@@ -196,27 +196,116 @@ async function reviewNotices(org) {
   }
 }
 
+const REPORT_REASON_LABELS = {
+  incorrect_details: 'Details are wrong',
+  already_cancelled: 'Already cancelled',
+  duplicate: 'Duplicate notice',
+  privacy: 'Shares something unapproved',
+  fraudulent: 'Believed fake',
+  rate_limit: 'Notification rate limit tripped',
+  other: 'Other',
+};
+
+const REPORT_STATUS_TONE = { open: 'warn', resolved: 'ok', dismissed: 'muted' };
+
 async function reportsView(panel) {
   panel.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
+
+  let reports;
   try {
     const snap = await getDocs(query(
       collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)));
-    const reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (!reports.length) {
-      panel.replaceChildren(el('div', { class: 'empty' }, [
-        el('p', { text: 'No reports. The community reporting form arrives with the public feed in Phase 2.' }),
-      ]));
-      return;
-    }
-    panel.replaceChildren(...reports.map((r) => el('div', { class: 'card' }, [
-      el('h3', { text: r.reason }),
-      el('p', { class: 'muted mono', text: `notice ${r.noticeId}` }),
-      r.detail ? el('p', { text: r.detail }) : null,
-      el('span', { class: 'badge badge--warn', text: r.status }),
-    ])));
+    reports = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   } catch (err) {
     panel.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err) }));
+    return;
   }
+
+  const render = () => {
+    panel.replaceChildren();
+    const open = reports.filter((r) => r.status === 'open');
+    const closed = reports.filter((r) => r.status !== 'open');
+
+    panel.append(el('p', { class: 'hint hint--boxed' },
+      'Reports come from community members over an anonymous session, and ' +
+      'from the system when an organization trips the notification rate ' +
+      'limit. Resolving one is recorded in the audit trail.'));
+
+    if (!open.length) {
+      panel.append(el('div', { class: 'empty' }, [el('p', { text: 'Nothing open.' })]));
+    }
+    for (const report of open) panel.append(reportCard(report, render));
+
+    if (closed.length) {
+      panel.append(el('h3', { text: `Closed (${closed.length})` }));
+      for (const report of closed) panel.append(reportCard(report, render));
+    }
+  };
+  render();
+}
+
+function reportCard(report, refresh) {
+  const decide = async (status) => {
+    const resolution = await askReason({
+      title: status === 'resolved' ? 'Resolve this report?' : 'Dismiss this report?',
+      body: status === 'resolved'
+        ? 'Use this once you have acted on it, for example by taking the notice down.'
+        : 'Use this when no action is needed.',
+      label: 'What did you do? (recorded in the audit trail)',
+      confirmText: status === 'resolved' ? 'Resolve' : 'Dismiss',
+    });
+    if (resolution === null) return;
+    try {
+      await store.resolveReport(report.id, status, resolution);
+      report.status = status;
+      report.resolution = resolution;
+      toast(`Report ${status}.`);
+      refresh();
+    } catch (err) {
+      toast(friendlyError(err), 'error');
+    }
+  };
+
+  const created = report.createdAt?.toDate
+    ? report.createdAt.toDate().toLocaleString('en-CA') : '—';
+
+  return el('div', { class: 'card' }, [
+    el('div', { class: 'card-head' }, [
+      el('div', {}, [
+        el('h3', { text: REPORT_REASON_LABELS[report.reason] || report.reason }),
+        el('p', { class: 'report-card__meta muted small' }, [
+          el('span', { class: 'mono', text: `notice ${report.noticeId}` }),
+          el('span', { text: created }),
+          el('span', {
+            text: report.reportedBy === 'system' ? 'raised by the system' : 'reported by a member',
+          }),
+        ]),
+      ]),
+      el('span', {
+        class: `badge badge--${REPORT_STATUS_TONE[report.status] || 'muted'}`,
+        text: report.status,
+      }),
+    ]),
+    report.detail ? el('p', { text: report.detail }) : null,
+    report.resolution
+      ? el('p', { class: 'muted', text: `Outcome: ${report.resolution}` })
+      : null,
+    el('div', { class: 'card-actions' }, [
+      el('a', {
+        class: 'btn btn--small', href: `/n/${report.noticeId}`,
+        target: '_blank', rel: 'noopener noreferrer',
+      }, 'Open the notice'),
+      report.status === 'open'
+        ? el('button', {
+            class: 'btn btn--small btn--primary',
+            onclick: () => decide('resolved'),
+          }, 'Resolve')
+        : null,
+      report.status === 'open'
+        ? el('button', { class: 'btn btn--small', onclick: () => decide('dismissed') }, 'Dismiss')
+        : null,
+    ]),
+  ]);
 }
 
 async function auditView(panel) {

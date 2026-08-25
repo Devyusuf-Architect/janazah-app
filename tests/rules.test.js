@@ -202,6 +202,17 @@ describe('public readability of the feed', () => {
 });
 
 describe('corrections and cancellation', () => {
+  test('a redacted notice keeps its shape for later edits', async () => {
+    // The retention job writes redactedAt through the Admin SDK. If the field
+    // were not on the allowlist, every later client write would be rejected.
+    await seedNotice('n1', { redactedAt: Timestamp.now(), deceasedName: null });
+    await assertSucceeds(updateDoc(doc(as(STAFF), 'notices', 'n1'), {
+      instructions: 'Corrected after redaction.',
+      version: 2,
+      lastEditedBy: STAFF,
+    }));
+  });
+
   test('staff can correct their own notice when the version advances by one', async () => {
     await seedNotice('n1');
     await assertSucceeds(updateDoc(doc(as(STAFF), 'notices', 'n1'), {
@@ -439,6 +450,42 @@ describe('reports', () => {
       report({ detail: 'x'.repeat(1001) })));
   });
 
+  test('an administrator can resolve a report but not rewrite it', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reports', 'r1'),
+        { ...report(), createdAt: Timestamp.now() });
+    });
+
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'reports', 'r1'), {
+      status: 'resolved', resolution: 'Notice taken down.',
+      resolvedBy: ADMIN, resolvedAt: serverTimestamp(),
+    }));
+
+    // The reported facts are not the administrator's to change.
+    await assertFails(updateDoc(doc(as(ADMIN), 'reports', 'r1'), {
+      status: 'dismissed', reason: 'other', resolvedBy: ADMIN,
+    }));
+    await assertFails(updateDoc(doc(as(ADMIN), 'reports', 'r1'), {
+      status: 'dismissed', noticeId: 'somethingElse', resolvedBy: ADMIN,
+    }));
+    await assertFails(updateDoc(doc(as(ADMIN), 'reports', 'r1'), {
+      status: 'dismissed', reportedBy: ADMIN, resolvedBy: ADMIN,
+    }));
+    // And the outcome must be attributed to whoever actually decided it.
+    await assertFails(updateDoc(doc(as(ADMIN), 'reports', 'r1'), {
+      status: 'dismissed', resolvedBy: STAFF,
+    }));
+  });
+
+  test('a member cannot resolve their own report', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reports', 'r1'),
+        { ...report(), createdAt: Timestamp.now() });
+    });
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'reports', 'r1'),
+      { status: 'resolved', resolvedBy: OUTSIDER }));
+  });
+
   test('only a platform admin can read the report queue', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'reports', 'r1'),
@@ -484,6 +531,17 @@ describe('the public feed needs no account', () => {
 });
 
 describe('everything else is closed', () => {
+  test('the notification rate counter cannot be reset by a client', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'orgNotificationRates', VERIFIED_ORG),
+        { windowStart: Date.now(), count: 99 });
+    });
+    for (const db of [anon(), as(STAFF), as(OWNER), as(ADMIN)]) {
+      await assertFails(getDoc(doc(db, 'orgNotificationRates', VERIFIED_ORG)));
+      await assertFails(setDoc(doc(db, 'orgNotificationRates', VERIFIED_ORG), { count: 0 }));
+    }
+  });
+
   test('notification bookkeeping is closed to every client', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'notificationRuns', 'n1_published_v1'),

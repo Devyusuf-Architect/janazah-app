@@ -74,7 +74,9 @@ export const isEnabled = () => !!state().token;
 export function desiredTopics() {
   const topics = new Set(followedOrgIds().map((id) => `org_${id}`));
   const settings = loc.settings();
-  if (settings.enabled && settings.last) {
+  // Narrowing the scope unsubscribes from the area topics entirely, so the
+  // volume control works at the source rather than by discarding messages.
+  if (settings.alertScope !== 'follows' && settings.enabled && settings.last) {
     const { cells } = subscriptionCells(
       settings.last.lat, settings.last.lng, settings.radiusKm);
     for (const cell of cells) topics.add(`cell_${cell}`);

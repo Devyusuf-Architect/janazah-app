@@ -165,6 +165,37 @@ async function cancelFlow(notice) {
   }
 }
 
+/**
+ * Shown before publishing when something similar is already on the feed.
+ *
+ * A warning, never a block. Two coordinators announcing the same funeral
+ * produces two cards and two notifications for one Janazah, but a false
+ * positive that stopped a genuine notice would be far worse.
+ */
+function duplicateWarning(duplicates) {
+  return el('div', { class: 'notice-strip notice-strip--warn dup-warning' }, [
+    el('strong', {
+      text: duplicates.length === 1
+        ? 'A similar notice is already published'
+        : `${duplicates.length} similar notices are already published`,
+    }),
+    el('p', { class: 'small' },
+      'This may be the same Janazah announced by someone else. Two notices ' +
+      'means two notifications for one funeral. Check before publishing.'),
+    el('ul', { class: 'list list--plain' }, duplicates.map((notice) => el('li', {}, [
+      el('strong', {
+        text: notice.showDeceasedName && notice.deceasedName
+          ? notice.deceasedName : 'Name not shared',
+      }),
+      el('div', { class: 'small', text: `${notice.orgName} — ${formatJanazahTime(notice)}` }),
+      el('a', {
+        class: 'link small', href: `/n/${notice.id}`,
+        target: '_blank', rel: 'noopener noreferrer',
+      }, 'Open this notice'),
+    ]))),
+  ]);
+}
+
 // ------------------------------------------------------------------ composer
 
 function fieldGroup(id, label, attrs = {}, hint = null) {
@@ -322,7 +353,10 @@ async function openComposer(mount, ctx, org, existing) {
     }
     if (publish) {
       const draft = buildPublicNotice(data, { org, uid: ctx.user.uid, status: 'published' });
-      const confirmed = await confirmPublish(draft, editing);
+      const duplicates = await store.findPossibleDuplicates(draft, {
+        excludeId: existing?.id ?? null,
+      });
+      const confirmed = await confirmPublish(draft, editing, duplicates);
       if (!confirmed) return;
     }
 
@@ -355,9 +389,10 @@ async function openComposer(mount, ctx, org, existing) {
 }
 
 /** Mandatory preview-and-confirm before anything reaches the public. */
-function confirmPublish(draft, editing) {
+function confirmPublish(draft, editing, duplicates = []) {
   return new Promise((resolve) => {
     const body = el('div', {}, [
+      duplicates.length ? duplicateWarning(duplicates) : null,
       el('p', { class: 'muted' },
         'This is exactly what the community will see. Nothing else from the ' +
         'form is published.'),
@@ -365,7 +400,10 @@ function confirmPublish(draft, editing) {
       el('label', { class: 'check' }, [
         el('input', { type: 'checkbox', id: 'confirm-check' }),
         el('span', {
-          text: 'I confirm these details are correct and approved for public sharing.',
+          text: duplicates.length
+            ? 'I have checked the notice above and confirm this is a different ' +
+              'Janazah, or that publishing it anyway is correct.'
+            : 'I confirm these details are correct and approved for public sharing.',
         }),
       ]),
     ]);

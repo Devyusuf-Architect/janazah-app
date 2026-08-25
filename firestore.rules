@@ -181,7 +181,7 @@ service cloud.firestore {
               'prayerLocation', 'burialLocation', 'instructions',
               'version', 'createdBy', 'createdAt', 'updatedAt',
               'lastEditedBy', 'publishedAt', 'cancelledAt', 'cancelReason',
-              'correctionNote'];
+              'correctionNote', 'redactedAt'];
     }
 
     function noticeRequiredKeys() {
@@ -333,7 +333,19 @@ service cloud.firestore {
         && request.resource.data.reason.size() <= 60
         && (!('detail' in request.resource.data)
             || request.resource.data.detail.size() <= 1000);
-      allow get, list, update: if isPlatformAdmin();
+      allow get, list: if isPlatformAdmin();
+      // Triage only: an administrator resolves or dismisses a report, and
+      // cannot rewrite what was reported or who reported it.
+      allow update: if isPlatformAdmin()
+        && request.resource.data.keys().hasOnly(
+             ['noticeId', 'reportedBy', 'reason', 'detail', 'status',
+              'createdAt', 'resolvedBy', 'resolvedAt', 'resolution'])
+        && request.resource.data.noticeId == resource.data.noticeId
+        && request.resource.data.reportedBy == resource.data.reportedBy
+        && request.resource.data.reason == resource.data.reason
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.status in ['open', 'resolved', 'dismissed']
+        && request.resource.data.resolvedBy == uid();
       allow delete: if false;
     }
 
@@ -344,6 +356,12 @@ service cloud.firestore {
     // allowlist that guards the public notice document.
 
     match /notificationRuns/{runId} {
+      allow read, write: if false;
+    }
+
+    // Per-organization notification budget, maintained by the notification
+    // function. Closed to clients so it cannot be reset to dodge the limit.
+    match /orgNotificationRates/{orgId} {
       allow read, write: if false;
     }
 
