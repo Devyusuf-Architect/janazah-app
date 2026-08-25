@@ -82,6 +82,32 @@ async function grantPlatformAdmin(uid, email) {
   assert.equal(res.status, 200, `granting admin failed: ${await res.text()}`);
 }
 
+/**
+ * Serve the address lookup locally, in the geocoder's own GeoJSON shape.
+ *
+ * The registration form's coordinates now come from whatever this returns,
+ * so the response is deliberately the real format rather than something the
+ * app would only accept in a test: if normalizeFeature stops reading Photon
+ * correctly, this fails.
+ */
+async function stubGeocoder(page) {
+  await page.route('**/photon.komoot.io/api/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [-79.3832, 43.6532] },
+        properties: {
+          housenumber: '100', street: 'Example Street', city: 'Toronto',
+          state: 'ON', postcode: 'M5H 2N2', country: 'Canada',
+        },
+      }],
+    }),
+  }));
+}
+
 async function signUp(page, { email, password }, name) {
   await page.goto(`${BASE}/console`);
   await page.getByRole('button', { name: 'Create an account' }).click();
@@ -133,11 +159,25 @@ const run = async () => {
 
     await coord.getByRole('button', { name: 'Register an organization' }).first().click();
     await coord.locator('#name').fill('Test Masjid');
-    await coord.locator('#address').fill('100 Example Street');
-    await coord.locator('#city').fill('Toronto');
-    await coord.locator('#province').fill('ON');
-    await coord.locator('#lat').fill('43.6532');
-    await coord.locator('#lng').fill('-79.3832');
+
+    // The coordinates come from an address the coordinator picks, not from
+    // numbers they were asked to look up. Registration must not be able to
+    // fail because a third-party geocoder is slow or down while the suite
+    // runs, so the lookup is served locally with a canned Photon response.
+    await stubGeocoder(coord);
+    await coord.locator('#addressSearch').fill('100 Example Street');
+    await coord.locator('.address-result').first().click();
+
+    // What was picked has to be confirmed back before submitting, and the
+    // coordinates must have actually landed in the payload.
+    await coord.locator('.address-chosen').waitFor({ timeout: 5000 });
+    const confirmed = await coord.locator('.address-chosen').innerText();
+    assert.match(confirmed, /Selected location: /,
+      'the chosen address must be confirmed before submitting');
+    assert.equal(await coord.locator('#lat').inputValue(), '43.6532');
+    assert.equal(await coord.locator('#lng').inputValue(), '-79.3832');
+    assert.equal(await coord.locator('#city').inputValue(), 'Toronto');
+
     await coord.locator('#contactEmail').fill('office@example.com');
     await coord.getByRole('button', { name: 'Submit for verification' }).click();
     await coord.locator('.verify-state').waitFor({ timeout: 15000 });

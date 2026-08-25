@@ -1,6 +1,7 @@
 // Organization registration, profile, and staff authorization.
 
 import { el, toast, readForm, friendlyError, showModal } from '../ui.js';
+import { searchAddresses } from '../geocode.js';
 import { ORG_TYPES } from '../model.js';
 import * as store from '../store.js';
 import { auditForOrg } from '../audit.js';
@@ -220,10 +221,161 @@ function field(id, label, attrs = {}, hint = null) {
   ]);
 }
 
+/**
+ * Address search with suggestions, replacing the latitude/longitude pair the
+ * form used to ask for.
+ *
+ * The coordinates still exist and are still required: nearby matching,
+ * distance on a notice card, area topics for alerts and the directions links
+ * all depend on them (geo.js, location.js, functions/lib/topics.js). They are
+ * now taken from the chosen result and carried in hidden inputs, so
+ * store.registerOrganization keeps reading `form.lat` and `form.lng` exactly
+ * as before and nothing downstream changes.
+ *
+ * Nothing is submitted until a suggestion is actually chosen. A typed string
+ * that was never resolved has no coordinates, and an organization with no
+ * coordinates is invisible to every nearby feature, which is a worse outcome
+ * than making someone pick from a list.
+ *
+ * @returns {{ node: Node, selected: () => object|null, focusInput: () => void }}
+ */
+function addressPicker() {
+  let selected = null;
+  let controller = null;
+  let debounce = null;
+
+  const input = el('input', {
+    class: 'field', id: 'addressSearch', type: 'text',
+    autocomplete: 'off', role: 'combobox', 'aria-expanded': 'false',
+    'aria-controls': 'address-results', 'aria-autocomplete': 'list',
+    placeholder: 'Start typing the masjid’s name or street address',
+  });
+  const results = el('ul', { class: 'address-results', id: 'address-results', role: 'listbox', hidden: true });
+  const status = el('p', { class: 'hint', role: 'status', 'aria-live': 'polite' });
+  const chosen = el('div', { class: 'address-chosen', hidden: true });
+
+  // Read by store.registerOrganization via readForm(), unchanged.
+  const latInput = el('input', { type: 'hidden', name: 'lat', id: 'lat' });
+  const lngInput = el('input', { type: 'hidden', name: 'lng', id: 'lng' });
+  const addressInput = el('input', { type: 'hidden', name: 'address', id: 'address' });
+  const cityInput = el('input', { type: 'hidden', name: 'city', id: 'city' });
+  const provinceInput = el('input', { type: 'hidden', name: 'province', id: 'province' });
+  const postalInput = el('input', { type: 'hidden', name: 'postalCode', id: 'postalCode' });
+  const countryInput = el('input', { type: 'hidden', name: 'country', id: 'country' });
+
+  const clearResults = () => {
+    results.replaceChildren();
+    results.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  };
+
+  const choose = (place) => {
+    selected = place;
+    latInput.value = String(place.lat);
+    lngInput.value = String(place.lng);
+    addressInput.value = place.address || place.label;
+    cityInput.value = place.city;
+    provinceInput.value = place.province;
+    postalInput.value = place.postalCode;
+    countryInput.value = place.country;
+
+    input.value = place.label;
+    clearResults();
+    status.textContent = '';
+
+    chosen.hidden = false;
+    chosen.replaceChildren(
+      el('p', { class: 'address-chosen__label' }, [
+        el('strong', { text: 'Selected location: ' }),
+        el('span', { text: place.label }),
+      ]),
+      // Confirming against a map matters here: an address that geocodes to
+      // the wrong side of a city sends every nearby alert to the wrong
+      // people, and nobody would find out until a Janazah was missed.
+      el('a', {
+        class: 'link', target: '_blank', rel: 'noopener noreferrer',
+        href: `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`,
+      }, 'Check this on a map'),
+      el('p', { class: 'hint' },
+        'This is the location used for nearby alerts and directions. If it ' +
+        'is not the right building, search again.'),
+    );
+  };
+
+  const search = async (query) => {
+    controller?.abort();
+    controller = new AbortController();
+    status.textContent = 'Searching…';
+    try {
+      const places = await searchAddresses(query, { signal: controller.signal });
+      if (!places.length) {
+        clearResults();
+        status.textContent = 'No matching address found. Try the street address on its own.';
+        return;
+      }
+      status.textContent = '';
+      results.replaceChildren(...places.map((place) => {
+        const item = el('li', { class: 'address-result', role: 'option', tabindex: '0' },
+          [el('span', { text: place.label })]);
+        const pick = () => choose(place);
+        item.addEventListener('click', pick);
+        item.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+        });
+        return item;
+      }));
+      results.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.error('searchAddresses', err);
+      clearResults();
+      status.textContent = 'Address lookup is unavailable right now. Please try again shortly.';
+    }
+  };
+
+  input.addEventListener('input', () => {
+    // Typing invalidates a previous choice: the box no longer shows what was
+    // actually selected, so treating it as still selected would submit
+    // coordinates that do not match the text on screen.
+    selected = null;
+    chosen.hidden = true;
+    latInput.value = '';
+    lngInput.value = '';
+
+    clearTimeout(debounce);
+    const query = input.value.trim();
+    if (query.length < 3) { clearResults(); status.textContent = ''; return; }
+    debounce = setTimeout(() => search(query), 300);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') clearResults();
+    // Enter in a search box must not submit a form that has no coordinates yet.
+    if (e.key === 'Enter') { e.preventDefault(); results.firstChild?.focus(); }
+  });
+
+  const node = el('div', { class: 'field-group address-picker' }, [
+    el('label', { class: 'label', for: 'addressSearch', text: 'Address' }),
+    input,
+    el('p', { class: 'hint' },
+      'Start typing and choose the right result. The exact location is taken ' +
+      'from your choice, so nearby alerts and directions point at the right ' +
+      'building.'),
+    results,
+    status,
+    chosen,
+    latInput, lngInput, addressInput, cityInput, provinceInput, postalInput, countryInput,
+  ]);
+
+  return { node, selected: () => selected, focusInput: () => input.focus() };
+}
+
 function renderRegisterForm(mount, ctx) {
   mount.replaceChildren();
   const error = el('p', { class: 'form-error', hidden: true });
   const form = el('form', { class: 'card card--narrow' });
+  const picker = addressPicker();
 
   form.append(
     el('h1', { text: 'Register an organization' }),
@@ -240,21 +392,7 @@ function renderRegisterForm(mount, ctx) {
       el('select', { class: 'field', id: 'type', name: 'type' },
         ORG_TYPES.map((t) => el('option', { value: t.value, text: t.label }))),
     ]),
-    field('address', 'Street address', { required: true }),
-    el('div', { class: 'field-row' }, [
-      field('city', 'City', { required: true }),
-      field('province', 'Province', { required: true, maxlength: 40 }),
-      field('postalCode', 'Postal code', { maxlength: 7 }),
-    ]),
-    el('div', { class: 'field-row' }, [
-      field('lat', 'Latitude', { required: true, type: 'number', step: 'any', placeholder: '43.6532' }),
-      field('lng', 'Longitude', { required: true, type: 'number', step: 'any', placeholder: '-79.3832' }),
-    ]),
-    el('p', {
-      class: 'hint',
-      text: 'Coordinates decide which nearby alerts this organization triggers. ' +
-            'Right-click the building in Google Maps and copy the pair it shows.',
-    }),
+    picker.node,
     // Required: it is how an administrator reaches the applicant during
     // review, and the only contact they have that is not a raw account id.
     // Note what this hint does not claim: the organization record becomes
@@ -279,6 +417,18 @@ function renderRegisterForm(mount, ctx) {
     error.hidden = true;
     const submit = form.querySelector('button[type=submit]');
     submit.disabled = true;
+    // Coordinates come from a chosen suggestion, never from typed text.
+    // Without them the organization would never appear in a nearby search
+    // or an area alert, which is most of the point of registering.
+    if (!picker.selected()) {
+      error.hidden = false;
+      error.textContent = 'Choose your address from the suggestions, so the '
+        + 'exact location is known for nearby alerts and directions.';
+      picker.focusInput();
+      submit.disabled = false;
+      return;
+    }
+
     try {
       await store.registerOrganization(readForm(form));
       toast('Submitted. A platform administrator will review it.');

@@ -9,7 +9,7 @@ import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast, friendlyError } from './ui.js';
 import * as store from './store.js';
 
-import { renderAuth, signOutUser } from './views/auth.js';
+import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
 import { renderOrgs } from './views/org.js';
 import { renderNotices, teardownNotices } from './views/notices.js';
 import { renderAdmin, teardownAdmin } from './views/admin.js';
@@ -90,6 +90,10 @@ async function loadContext() {
   ctx.isAdmin = isAdmin;
   ctx.orgs = orgs.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+// See feed.js: the return leg of a Google redirect sign-in has to be claimed
+// or it silently drops the person back on the sign-in form.
+completeRedirectSignIn((message) => toast(message, 'error'));
 
 onAuthStateChanged(auth, async (user) => {
   teardown();

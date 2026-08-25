@@ -89,6 +89,7 @@ public/
     model.js          Notice shape, validation, the public field allowlist
     notice-view.js    How a notice renders, shared by feed/preview/admin
     geo.js            Geohash, distance, the alert cell grid
+    geocode.js        Address search for org registration (never user location)
     location.js       Nearby matching, all of it on the device
     push.js           FCM token and topic subscription
     alerts.js         In-page alerts (the fallback when push is unavailable)

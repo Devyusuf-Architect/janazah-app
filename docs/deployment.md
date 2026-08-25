@@ -81,6 +81,7 @@ a smoke detector, not a fuse.
 | --- | --- |
 | **Email/Password** | Masjid staff and platform administrators |
 | **Anonymous** | Community reporting and alert subscription. No personal data is collected; it exists so a report is attributable enough to rate limit |
+| **Google** | Optional, for community members and coordinators who prefer it. Also needs section 4b, or it fails on any domain but Firebase Hosting |
 
 Leave passwordless sign-in off.
 
@@ -88,6 +89,20 @@ Then, for two-step sign-in: **Authentication → Sign-in method → Advanced →
 upgrade to Identity Platform**, and enable **TOTP** as a second factor. Without
 this, the Account screen says two-step is unavailable rather than failing
 oddly.
+
+## 4b. Authorize every domain the app is served from
+
+**Authentication → Settings → Authorized domains.**
+
+Firebase refuses Google sign-in on any origin not in this list, and the
+failure looks like the button doing nothing. Out of the box the list holds
+`localhost` and the project's own `*.firebaseapp.com` and `*.web.app`, so
+sign-in works on Firebase Hosting and breaks everywhere else.
+
+Add every domain the app is actually served from. If you host the static
+files on Vercel (section 14b), that means the `*.vercel.app` deployment
+domain **and** any custom domain, both of them. Email/password sign-in is
+unaffected, which is why this can go unnoticed until someone tries Google.
 
 ## 5. Register the web app and copy its config
 
@@ -248,6 +263,17 @@ them on Vercel instead works too. This does **not** replace Firebase: Firestore,
 Authentication, security rules and the Cloud Functions all still have to exist
 in a Firebase project exactly as described above. Vercel only serves the HTML,
 CSS and JS.
+
+Two things bite here, both of them console settings rather than code:
+
+- **Google sign-in stops working** unless the Vercel domain is added under
+  Authentication, Settings, Authorized domains (section 4b). The app now
+  names the offending domain in the error rather than failing silently.
+- **The security rules still have to be deployed** from this repo with
+  `npm run deploy:rules`. Vercel serves the static files; it has nothing to
+  do with Firestore. Without that deploy the project runs Firebase's default
+  production-mode rules, which deny every read and write, and the whole app
+  fails on permissions while looking correctly built.
 
 To do it: connect the repo in Vercel and deploy. `vercel.json` in the repo root
 mirrors the routing `firebase.json` does, so `/console`, `/n/{id}`, `/privacy`

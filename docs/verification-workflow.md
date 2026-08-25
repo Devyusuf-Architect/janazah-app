@@ -86,7 +86,14 @@ by a platform administrator. No new collection, no new field.
 | Date submitted | `createdAt` |
 | Current verification status | `verificationStatus` |
 | Who submitted it | `createdBy` / `ownerUid` |
-| Registration extras | `website`, `lat`/`lng`, `cell` |
+| Registration extras | `website`, `country`, `lat`/`lng`, `cell` |
+
+`lat`, `lng` and `cell` are not typed by the applicant. The registration
+form asks for an address, they pick the right result from suggestions, and
+the coordinates come from that (`public/js/geocode.js`). Everything that
+depends on an organization having a real location, nearby matching, distance
+on a notice card, area topics for alerts and the directions links, keeps
+working unchanged, because the stored shape did not change.
 
 Query: `store.watchOrganizationsByStatus(status, cb)`, which is a live
 `onSnapshot` over `where('verificationStatus', '==', status)`. The

@@ -72,6 +72,7 @@ service cloud.firestore {
 
     function orgKeys() {
       return ['name', 'type', 'address', 'city', 'province', 'postalCode',
+              'country',
               'lat', 'lng', 'cell', 'contactEmail', 'website',
               'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
               'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt'];

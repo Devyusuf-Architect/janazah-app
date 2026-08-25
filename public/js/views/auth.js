@@ -7,11 +7,69 @@
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   updateProfile, sendPasswordResetEmail, getMultiFactorResolver,
-  GoogleAuthProvider, signInWithPopup,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
   TotpMultiFactorGenerator,
 } from 'firebase/auth';
 import { auth } from '../firebase.js';
 import { el, toast, friendlyError } from '../ui.js';
+
+/**
+ * Sign in with Google, falling back from a popup to a full-page redirect.
+ *
+ * A popup is the better experience when it works, but browsers block popups
+ * that are not clearly user-initiated, and some in-app browsers (the ones
+ * inside WhatsApp, Instagram and Gmail, which is exactly how a link to a
+ * Janazah notice tends to get opened) do not support them at all. Falling
+ * back rather than failing is the difference between "Google sign-in is
+ * broken" and a slightly slower sign-in.
+ *
+ * Errors are thrown to the caller so it can show them. The two that mean
+ * "the person changed their mind" are swallowed, because they are not
+ * failures and an error message about them is noise.
+ */
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  // Always ask which account, rather than silently reusing whichever Google
+  // session the browser happens to hold. Someone publishing in a masjid's
+  // name should see which identity they are about to use.
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (err) {
+    const code = err?.code || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      return;
+    }
+    if (code === 'auth/popup-blocked'
+        || code === 'auth/operation-not-supported-in-this-environment') {
+      // Leaves the page entirely; completeRedirectSignIn() picks it up when
+      // the browser comes back.
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Finish a redirect sign-in, if this page load is the return leg of one.
+ *
+ * Must be called once at bootstrap on every page that offers Google sign-in.
+ * Without it a redirect sign-in silently does nothing: the browser comes
+ * back, the pending credential is never claimed, and the person is looking
+ * at the sign-in form again with no explanation.
+ *
+ * @param {(message: string) => void} [onError]
+ */
+export async function completeRedirectSignIn(onError) {
+  try {
+    await getRedirectResult(auth);
+  } catch (err) {
+    console.error('getRedirectResult', err);
+    if (onError) onError(friendlyError(err));
+  }
+}
 
 const COPY = {
   coordinator: {
@@ -107,12 +165,13 @@ export function renderAuth(mount, { variant = 'coordinator', initialMode = 'sign
     error.hidden = true;
     google.disabled = true;
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await signInWithGoogle();
     } catch (err) {
-      if (err?.code !== 'auth/popup-closed-by-user' && err?.code !== 'auth/cancelled-popup-request') {
-        error.hidden = false;
-        error.textContent = friendlyError(err);
-      }
+      // Never fail silently here: a button that appears to do nothing is the
+      // single most common way a working sign-in reads as broken.
+      console.error('signInWithGoogle', err);
+      error.hidden = false;
+      error.textContent = friendlyError(err);
     } finally {
       google.disabled = false;
     }

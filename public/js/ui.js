@@ -221,6 +221,29 @@ export function friendlyError(err, context) {
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
     return 'Email or password is incorrect.';
   }
+  // Firebase refuses OAuth on any origin not listed under Authentication >
+  // Settings > Authorized domains. Naming the actual domain turns this from
+  // a dead end into a one-line fix, and it is the failure that greets you
+  // the first time the app is served from anywhere but Firebase Hosting.
+  if (code === 'auth/unauthorized-domain') {
+    return `Google sign-in is not allowed from ${location.hostname}. Add that ` +
+      'domain in the Firebase console under Authentication, Settings, ' +
+      'Authorized domains.';
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'That sign-in method is not switched on for this project yet.';
+  }
+  if (code === 'auth/account-exists-with-different-credential') {
+    return 'You already have an account with that email address, created a ' +
+      'different way. Sign in with your email and password instead.';
+  }
+  if (code === 'auth/popup-blocked') {
+    return 'Your browser blocked the sign-in window. Allow pop-ups for this ' +
+      'site, or try again and we will send you to Google instead.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Could not reach the sign-in service. Check your connection and try again.';
+  }
   if (code === 'auth/email-already-in-use') return 'That email already has an account.';
   if (code === 'auth/weak-password') return 'Password must be at least 6 characters.';
   if (code === 'auth/invalid-email') return 'That email address is not valid.';

@@ -7,7 +7,7 @@
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
-import { $, el } from './ui.js';
+import { $, el, toast } from './ui.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { renderHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
@@ -16,7 +16,7 @@ import { renderAbout } from './views/about.js';
 import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
 import { renderTerms } from './views/terms.js';
-import { renderAuth } from './views/auth.js';
+import { renderAuth, completeRedirectSignIn } from './views/auth.js';
 import { renderDashboard, teardownDashboard } from './views/dashboard.js';
 
 const mount = () => $('#view');
@@ -139,6 +139,11 @@ if (usingEmulator) $('#env-banner')?.removeAttribute('hidden');
 // onAuthStateChanged only ever repaints the nav and, on /signin or
 // /dashboard, decides where those two routes actually land.
 route();
+
+// If this load is the return leg of a Google redirect sign-in, claim the
+// pending credential before anything else. Without this the browser comes
+// back and simply shows the sign-in form again, with no explanation.
+completeRedirectSignIn((message) => toast(message, 'error'));
 
 onAuthStateChanged(auth, (nextUser) => {
   user = nextUser;

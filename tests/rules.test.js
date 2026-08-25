@@ -334,6 +334,38 @@ describe('verification cannot be self-granted', () => {
     }));
   });
 
+  test('a registration may carry the country the address picker resolved', async () => {
+    // `country` was added to orgKeys when the form stopped asking for
+    // coordinates and started resolving a real address. Additive only: it
+    // widens what may be stored, and grants nothing.
+    await assertSucceeds(addDoc(collection(as(OUTSIDER), 'organizations'), {
+      name: 'Geocoded Masjid', type: 'masjid', address: '100 Queen St W',
+      city: 'Toronto', province: 'ON', postalCode: 'M5H 2N2', country: 'Canada',
+      lat: 43.6532, lng: -79.3832, cell: 'dpz83',
+      verificationStatus: 'pending',
+      ownerUid: OUTSIDER, staffUids: [OUTSIDER],
+      createdAt: serverTimestamp(), createdBy: OUTSIDER,
+    }));
+  });
+
+  test('coordinates are still required, and still have to be real numbers', async () => {
+    // The form no longer shows lat/lng, but they remain the basis of every
+    // nearby feature. Rules stay the backstop against an organization that
+    // no distance calculation could ever place.
+    const base = {
+      name: 'No Coords Masjid', type: 'masjid', address: '1 A St',
+      city: 'Toronto', province: 'ON', cell: 'dpz83',
+      verificationStatus: 'pending',
+      ownerUid: OUTSIDER, staffUids: [OUTSIDER],
+      createdAt: serverTimestamp(), createdBy: OUTSIDER,
+    };
+    await assertFails(addDoc(collection(as(OUTSIDER), 'organizations'), base));
+    await assertFails(addDoc(collection(as(OUTSIDER), 'organizations'),
+      { ...base, lat: '43.6532', lng: '-79.3832' }));
+    await assertFails(addDoc(collection(as(OUTSIDER), 'organizations'),
+      { ...base, lat: 91, lng: -79.3832 }));
+  });
+
   test('a rejected organization cannot promote itself back into the queue', async () => {
     // Being turned down is the strongest motive anyone has to try this, and
     // the applicant still owns the document afterwards, so it is worth

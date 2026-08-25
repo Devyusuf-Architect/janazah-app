@@ -54,6 +54,8 @@ export async function registerOrganization(form) {
     createdBy: user.uid,
   };
   if (form.postalCode?.trim()) payload.postalCode = form.postalCode.trim().toUpperCase();
+  // Set by the address picker from the chosen result, not typed.
+  if (form.country?.trim()) payload.country = form.country.trim();
   if (form.contactEmail?.trim()) payload.contactEmail = form.contactEmail.trim();
   if (form.website?.trim()) payload.website = form.website.trim();
 
