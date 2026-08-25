@@ -645,7 +645,7 @@ const run = async () => {
     const homeText = await guest.locator('#view').innerText();
     assert.match(homeText, /verified masjids/i, 'home page must state who publishes');
     assert.match(homeText, /optional/i, 'home page must state location alerts are optional');
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'About', 'Sign in']) {
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Following', 'Sign in']) {
       await guest.getByRole('link', { name: label, exact: true }).first().waitFor({ timeout: 5000 });
     }
     log('home page explains the product and links to every major section');
@@ -653,7 +653,16 @@ const run = async () => {
     await guest.getByRole('link', { name: 'View Janazahs' }).click();
     await guest.locator('.notice-card').first().waitFor({ timeout: 15000 });
     assert.match(guest.url(), /\/janazahs$/, 'expected /janazahs after "View Janazahs"');
-    log('home page routes into the feed with no account');
+    assert.equal(
+      await guest.locator('#nav .nav-item--active').first().innerText(), 'Janazahs',
+      'the nav must show which section you are in');
+    log('home page routes into the feed, and the nav shows where you are');
+
+    // The name in the corner is the way home from anywhere.
+    await guest.locator('.brand').click();
+    await guest.locator('.hero').waitFor({ timeout: 10000 });
+    assert.match(guest.url(), /\/$/, 'the brand must return to the public home page');
+    log('the Ta’ziyah brand returns to the home page');
 
     // ---- the masjids directory -----------------------------------------------
     await guest.goto(`${BASE}/masjids`);
@@ -710,6 +719,19 @@ const run = async () => {
     await member.locator('form.card--narrow').waitFor({ timeout: 15000 });
     assert.match(member.url(), /\/signin$/, 'signing out of the dashboard must return to sign-in');
     log('signing out of the community dashboard returns to sign-in');
+
+    // ---- the console is not a trap -----------------------------------------
+    // The brand in the corner must leave the console for the public site,
+    // not point at the console's own root, and there must be a way out in
+    // the nav as well.
+    const consoleBrandHref = await coord.locator('.brand').getAttribute('href');
+    assert.equal(consoleBrandHref, '/',
+      'the console brand must go to the public home page, not /console');
+    await coord.getByRole('link', { name: 'Public site' }).first().waitFor({ timeout: 5000 });
+    await coord.locator('.brand').click();
+    await coord.locator('.hero').waitFor({ timeout: 15000 });
+    assert.match(coord.url(), /\/$/, 'the console brand did not reach the home page');
+    log('the console brand and nav both lead back to the public site');
 
     // ---- a community account cannot reach coordinator/admin functionality ---
     // The console's own sign-in accepts the same account (one Firebase

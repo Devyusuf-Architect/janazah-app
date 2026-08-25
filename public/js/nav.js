@@ -13,11 +13,22 @@ const LINKS = [
   { href: '/janazahs', label: 'Janazahs' },
   { href: '/near-me', label: 'Near Me' },
   { href: '/masjids', label: 'Masjids' },
-  { href: '/about', label: 'About' },
+  { href: '/following', label: 'Following' },
 ];
 
-/** True for an exact match, or for any path nested under a non-root link. */
+// Deeper pages are not in the nav but still belong to one of its sections, so
+// the current place stays lit rather than the whole bar going dark the moment
+// someone opens a masjid or a single notice.
+const SECTION_OF = [
+  [/^\/o\//, '/masjids'],
+  [/^\/n\//, '/janazahs'],
+  [/^\/register-masjid/, '/register-masjid'],
+];
+
+/** True for an exact match, for a nested path, or for a page in that section. */
 function isActive(href, path) {
+  const section = SECTION_OF.find(([pattern]) => pattern.test(path))?.[1];
+  if (section) return href === section;
   if (href === '/') return path === '/';
   return path === href || path.startsWith(`${href}/`);
 }
@@ -43,6 +54,11 @@ export function renderNav(nav, { path, user }) {
         class: `nav-item${isActive('/dashboard', path) ? ' nav-item--active' : ''}`,
         href: '/dashboard',
         text: 'Dashboard',
+      }),
+      el('a', {
+        class: `nav-item${isActive('/account', path) ? ' nav-item--active' : ''}`,
+        href: '/account',
+        text: 'Account',
       }),
       el('span', { class: 'nav-user', text: user.displayName || user.email || 'Signed in' }),
       el('button', {

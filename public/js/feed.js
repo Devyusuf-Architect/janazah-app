@@ -13,6 +13,8 @@ import { renderHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
 import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
+import { renderFollowing } from './views/following.js';
+import { renderAccount } from './views/account.js';
 import { renderAbout } from './views/about.js';
 import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
@@ -81,6 +83,18 @@ function route() {
   if (/^\/register-masjid\/?$/.test(path)) {
     document.title = "Register your masjid — Ta'ziyah";
     renderRegisterMasjid(mount());
+    return;
+  }
+  if (/^\/following\/?$/.test(path)) {
+    document.title = "Following — Ta'ziyah";
+    renderFollowing(mount());
+    return;
+  }
+  if (/^\/account\/?$/.test(path)) {
+    if (!authReady) { mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' })); return; }
+    if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
+    document.title = "Account — Ta'ziyah";
+    renderAccount(mount(), { user });
     return;
   }
   if (/^\/about\/?$/.test(path)) {
@@ -156,6 +170,6 @@ completeRedirectSignIn((message) => toast(message, 'error'));
 onAuthStateChanged(auth, (nextUser) => {
   user = nextUser;
   authReady = true;
-  if (/^\/(signin|dashboard)\/?$/.test(location.pathname)) route();
+  if (/^\/(signin|dashboard|account)\/?$/.test(location.pathname)) route();
   else paintNav();
 });

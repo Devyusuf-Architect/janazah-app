@@ -63,6 +63,9 @@ function renderNav() {
   }
 
   nav.append(el('div', { class: 'nav-spacer' }));
+  // The console is a place you can leave. Without this the only way back to
+  // the public site is the footer link or the browser's back button.
+  nav.append(el('a', { class: 'nav-item nav-item--ghost', href: '/', text: 'Public site' }));
   nav.append(el('span', { class: 'nav-user', text: ctx.user.email || '' }));
   nav.append(el('button', {
     class: 'nav-item',
