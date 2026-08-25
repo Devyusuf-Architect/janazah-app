@@ -41,7 +41,7 @@ export function renderHome(mount) {
     ]),
 
     el('section', { class: 'cta-row' }, [
-      el('div', { class: 'cta-card' }, [
+      el('div', { class: 'cta-card reveal' }, [
         el('h2', { text: 'Community members' }),
         el('p', { class: 'muted' },
           'Browse notices with no account, or sign in for a personal dashboard ' +
@@ -51,7 +51,7 @@ export function renderHome(mount) {
           el('a', { class: 'btn', href: '/signin?mode=signup', text: 'Create account' }),
         ]),
       ]),
-      el('div', { class: 'cta-card' }, [
+      el('div', { class: 'cta-card reveal' }, [
         el('h2', { text: 'Masjid or funeral coordinator' }),
         el('p', { class: 'muted' },
           'Register your organization and publish once a platform ' +
@@ -75,7 +75,7 @@ export function renderHome(mount) {
 }
 
 function promiseCard(iconName, title, body) {
-  return el('div', { class: 'promise-card' }, [
+  return el('div', { class: 'promise-card reveal' }, [
     el('div', { class: 'promise-card__mark' }, [icon(iconName, { size: 22 })]),
     el('h3', { text: title }),
     el('p', { class: 'muted', text: body }),

@@ -52,6 +52,13 @@
 
   --page: 46rem;
   --page-wide: 62rem;
+
+  /* Motion. One easing and three durations, so everything moves the same way.
+     Short on purpose: this is a calm app, not a slow one. */
+  --ease: cubic-bezier(.2, .8, .3, 1);
+  --dur-fast: .14s;
+  --dur: .22s;
+  --dur-slow: .38s;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -93,6 +100,12 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+/* Anchored content clears the sticky masthead instead of hiding under it. */
+:target { scroll-margin-top: 5rem; }
 
 body {
   margin: 0;
@@ -1110,4 +1123,117 @@ select.field { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* ---------- motion ----------
+ *
+ * Everything here animates opacity and transform only, so it stays on the
+ * compositor and a mid-range phone scrolling a long feed does no layout work.
+ * The reduced-motion block at the end of this file switches all of it off.
+ *
+ * Content is never hidden by CSS alone: .reveal starts slightly faded, and
+ * public/js/motion.js adds .is-revealed. If that script never runs, the rule
+ * below its declaration still leaves everything readable, because a broken
+ * animation must never mean an unreadable Janazah notice.
+ */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease);
+  will-change: opacity, transform;
+}
+.reveal.is-revealed { opacity: 1; transform: none; will-change: auto; }
+
+/* The safety net: with no JavaScript at all, nothing stays invisible. */
+@media (scripting: none) {
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* Staggered only within a group, and only slightly. A long feed must not
+   have the last card waiting on a queue of twenty. */
+.reveal:nth-child(2) { transition-delay: .04s; }
+.reveal:nth-child(3) { transition-delay: .08s; }
+.reveal:nth-child(4) { transition-delay: .12s; }
+
+/* ---------- interactive polish ---------- */
+
+.card {
+  transition: border-color var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease),
+              transform var(--dur) var(--ease);
+}
+/* Only cards that lead somewhere lift. A static card that moves under the
+   cursor suggests it is clickable when it is not. */
+.notice-card:hover { box-shadow: var(--shadow); border-color: var(--line-strong); }
+
+.cta-card { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.cta-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.btn { transition: background var(--dur-fast) var(--ease),
+                   border-color var(--dur-fast) var(--ease),
+                   color var(--dur-fast) var(--ease),
+                   transform var(--dur-fast) var(--ease),
+                   box-shadow var(--dur-fast) var(--ease); }
+.btn--primary:hover:not(:disabled) { box-shadow: 0 4px 14px -6px var(--accent); }
+.btn:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+
+.link, .btn--link { transition: color var(--dur-fast) var(--ease); }
+
+.tab { transition: background var(--dur) var(--ease), color var(--dur) var(--ease),
+                   box-shadow var(--dur) var(--ease); }
+
+.address-result { transition: background var(--dur-fast) var(--ease),
+                              color var(--dur-fast) var(--ease); }
+
+/* Following a masjid changes nothing on screen except the word on a button,
+   so the button acknowledges the press itself. */
+@keyframes followPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.btn--pulse { animation: followPulse .32s var(--ease); }
+
+/* ---------- form feedback ---------- */
+
+.field {
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.field:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* An error appearing should register, without shaking the page around. */
+@keyframes errorIn { from { opacity: 0; transform: translateY(-4px); } }
+.form-error:not([hidden]) { animation: errorIn var(--dur) var(--ease); }
+
+/* ---------- menus and panels ---------- */
+
+@keyframes menuIn { from { opacity: 0; transform: translateY(-6px); } }
+
+@media (max-width: 720px) {
+  .nav.is-open { animation: menuIn var(--dur) var(--ease); }
+}
+
+.address-results { animation: menuIn var(--dur-fast) var(--ease); }
+
+/* The masthead already blurs what passes under it; this keeps the edge from
+   appearing abruptly on the first scroll. */
+.masthead { transition: box-shadow var(--dur) var(--ease); }
+
+/* ---------- reduced motion ----------
+ *
+ * Everything above is decoration. Someone who has asked their system for
+ * less movement gets the app with none of it, including the parts CSS alone
+ * would not have caught: smooth scrolling, and the reveal's starting state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal, .reveal.is-revealed {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }

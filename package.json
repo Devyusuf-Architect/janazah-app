@@ -11,7 +11,7 @@
     "deploy": "firebase deploy",
     "test:e2e": "firebase emulators:exec --only auth,firestore,functions --project demo-janazah \"node tests/e2e.smoke.mjs\"",
     "test": "npm run test:unit && npm run test:rules && npm run test:e2e",
-    "test:unit": "node --test \"tests/nearby.test.js\" \"tests/duplicates.test.js\" \"tests/public-surface.test.js\" \"tests/sample-data.test.js\" \"tests/takedown.test.js\" \"tests/error-copy.test.js\" \"tests/geocode.test.js\" \"functions/test/*.test.js\"",
+    "test:unit": "node --test \"tests/nearby.test.js\" \"tests/duplicates.test.js\" \"tests/public-surface.test.js\" \"tests/sample-data.test.js\" \"tests/takedown.test.js\" \"tests/error-copy.test.js\" \"tests/geocode.test.js\" \"tests/motion.test.js\" \"functions/test/*.test.js\"",
     "deploy:functions": "firebase deploy --only functions",
     "screenshots": "firebase emulators:exec --only auth,firestore,functions --project demo-janazah \"node scripts/screenshots.mjs\"",
     "demo": "firebase emulators:exec --only auth,firestore,functions,hosting --project demo-janazah \"node scripts/seed-demo.mjs --hold\"",
@@ -23,14 +23,17 @@
     "preview:verify": "node demo/build.mjs && node demo/verify.mjs",
     "setup": "node scripts/configure.mjs",
     "predeploy": "node scripts/preflight.mjs --skip-java",
-    "predeploy:rules": "node scripts/preflight.mjs --skip-java"
+    "predeploy:rules": "node scripts/preflight.mjs --skip-java",
+    "sample:add": "node scripts/sample-data-live.mjs",
+    "sample:remove": "node scripts/sample-data-live.mjs --remove"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
     "esbuild": "^0.28.2",
     "firebase": "^12.18.0",
     "firebase-tools": "^14.0.0",
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "firebase-admin": "^13.0.0"
   },
   "engines": {
     "node": "20.x || 22.x || 24.x"

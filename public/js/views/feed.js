@@ -271,7 +271,7 @@ function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
     return at && at.getTime() < Date.now();
   })();
 
-  const card = el('div', { class: `card notice-card notice-card--${notice.status}` }, [
+  const card = el('div', { class: `card notice-card notice-card--${notice.status} reveal` }, [
     started && notice.status !== 'cancelled'
       ? el('p', { class: 'notice-strip notice-strip--muted', text: 'This prayer time has passed.' })
       : null,

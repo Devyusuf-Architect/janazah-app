@@ -48,7 +48,7 @@ export function renderRegisterMasjid(mount) {
     el('section', { class: 'steps' }, [
       el('h2', { text: 'What happens, in order' }),
       el('ol', { class: 'steps__list' }, STEPS.map(([title, body], i) =>
-        el('li', { class: 'steps__item' }, [
+        el('li', { class: 'steps__item reveal' }, [
           el('span', { class: 'steps__num', 'aria-hidden': 'true', text: String(i + 1) }),
           el('div', {}, [
             el('h3', { text: title }),

@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast } from './ui.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
+import { revealIn, autoReveal } from './motion.js';
 import { renderHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
@@ -39,7 +40,7 @@ function paintNav() {
   renderNav(nav(), { path: location.pathname, user });
 }
 
-function route() {
+function renderRoute() {
   teardownAll();
   paintNav();
 
@@ -135,6 +136,19 @@ function route() {
 
   document.title = "Ta'ziyah";
   renderHome(mount());
+}
+
+
+// Views render synchronously, but several then repaint from a live Firestore
+// snapshot, so a single reveal pass would miss every card that matters.
+// autoReveal keeps watching the mount for whatever arrives later.
+let stopReveal = () => {};
+
+function route() {
+  stopReveal();
+  renderRoute();
+  revealIn(mount());
+  stopReveal = autoReveal(mount());
 }
 
 // Handle in-app links without reloading the document. Links to the console are

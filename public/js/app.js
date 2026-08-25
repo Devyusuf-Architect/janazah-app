@@ -7,6 +7,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast, friendlyError } from './ui.js';
+import { revealIn } from './motion.js';
 import * as store from './store.js';
 
 import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
@@ -66,6 +67,7 @@ function route() {
   }
   renderNav();
   target.render(mount(), ctx);
+  revealIn(mount());
 }
 
 function renderNav() {

@@ -78,6 +78,27 @@ tells you what to do; it runs automatically before `npm run demo` and
 
 `npm run serve` does the same without the seed data.
 
+## Sample data for testers
+
+To show testers a populated app on a real project, and take it out again
+before launch:
+
+```bash
+npm run sample:add      # write visibly fictional notices and masjids
+npm run sample:remove   # take every one of them back out
+```
+
+It reuses `demo/sample-data.js` verbatim, which `tests/sample-data.test.js`
+already pins as unmistakably fake: every organization is named "Sample ...",
+every published name contains "Fulan" (the Arabic equivalent of John Doe),
+and every address is an example street. A demo of a funeral app must never
+look like a real funeral.
+
+Every document is written at a `sample-` prefixed id, so removal is exact and
+touches nothing else. Needs real credentials
+(`gcloud auth application-default login`), and refuses to run against a
+`demo-` project id, where `npm run demo` is the right tool.
+
 ## Tests
 
 ```bash
