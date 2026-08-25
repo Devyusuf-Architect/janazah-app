@@ -300,13 +300,16 @@ const run = async () => {
     log('feed shows the cancellation with its reason');
 
     // ---- the audit trail recorded every step -------------------------------
-    // The UI updates optimistically from its own snapshot listener, so the
-    // audit write can still be in flight when the card re-renders. Poll rather
-    // than read once.
+    // Item 3: entries are written by Cloud Functions triggers
+    // (functions/index.js, on*AuditWritten), not by the client, so there is
+    // real latency between the document write that caused an entry and the
+    // entry existing: the trigger has to be invoked, and in the emulator the
+    // very first invocation can carry a cold-start cost on top of that. Poll
+    // with real margin rather than read once.
     const expectedActions =
       ['org.registered', 'org.verified', 'notice.published', 'notice.cancelled'];
     let actions = [];
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < 60; attempt++) {
       const auditRes = await (await fetch(
         `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/auditLog`,
         { headers: { Authorization: 'Bearer owner' } })).json();
@@ -319,6 +322,19 @@ const run = async () => {
       assert.ok(actions.includes(expected), `audit trail missing ${expected}; got ${actions}`);
     }
     log(`audit trail complete: ${actions.sort().join(', ')}`);
+
+    // And nothing else claims to have written it: every entry names a real
+    // actor uid, or 'system' for the notification pipeline's own bookkeeping
+    // entries (a separate, pre-existing writeSystemAudit path in
+    // functions/index.js unrelated to item 3), never a bare client guess.
+    const auditDocsRes = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/auditLog`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    for (const d of auditDocsRes.documents || []) {
+      const actorUid = d.fields?.actorUid?.stringValue;
+      assert.ok(actorUid, `an audit entry has no actorUid: ${JSON.stringify(d.fields)}`);
+    }
+    log('every audit entry names an actor');
 
     // ---- nearby matching, on the device ------------------------------------
     // A second notice on the other side of the country, so radius filtering

@@ -15,7 +15,6 @@ import {
   looksLikeDuplicate, DUPLICATE_WINDOW_HOURS,
 } from './model.js';
 import { distanceKm } from './geo.js';
-import { writeAudit, ACTIONS } from './audit.js';
 
 const withId = (snap) => ({ id: snap.id, ...snap.data() });
 
@@ -59,10 +58,6 @@ export async function registerOrganization(form) {
   if (form.website?.trim()) payload.website = form.website.trim();
 
   const ref = await addDoc(collection(db, 'organizations'), payload);
-  await writeAudit(ACTIONS.ORG_REGISTERED, {
-    targetType: 'organization', targetId: ref.id, orgId: ref.id,
-    details: { name: payload.name, type: payload.type },
-  });
   return ref.id;
 }
 
@@ -104,18 +99,7 @@ export async function updateOrganizationProfile(orgId, patch) {
     fields.cell = geohash(patch.lat, patch.lng, APP.cellPrecision);
   }
   await updateDoc(doc(db, 'organizations', orgId), fields);
-  await writeAudit(ACTIONS.ORG_UPDATED, {
-    targetType: 'organization', targetId: orgId, orgId,
-    details: { fields: Object.keys(patch) },
-  });
 }
-
-const STATUS_ACTIONS = {
-  verified: ACTIONS.ORG_VERIFIED,
-  rejected: ACTIONS.ORG_REJECTED,
-  suspended: ACTIONS.ORG_SUSPENDED,
-  pending: ACTIONS.ORG_REINSTATED,
-};
 
 /** Platform admin decision on an organization. */
 export async function setVerificationStatus(orgId, status, reason = '') {
@@ -130,10 +114,6 @@ export async function setVerificationStatus(orgId, status, reason = '') {
     patch.verifiedBy = user.uid;
   }
   await updateDoc(doc(db, 'organizations', orgId), patch);
-  await writeAudit(STATUS_ACTIONS[status] || 'org.status_changed', {
-    targetType: 'organization', targetId: orgId, orgId,
-    details: { status, reason },
-  });
 }
 
 // ------------------------------------------------------------------ staff
@@ -146,9 +126,6 @@ export async function requestStaffAccess(orgId) {
     displayName: user.displayName || '',
     status: 'pending',
     requestedAt: serverTimestamp(),
-  });
-  await writeAudit(ACTIONS.STAFF_REQUESTED, {
-    targetType: 'staffRequest', targetId: user.uid, orgId,
   });
 }
 
@@ -177,9 +154,6 @@ export async function approveStaffRequest(orgId, requestUid, currentStaffUids) {
     decidedAt: serverTimestamp(),
     decidedBy: user.uid,
   });
-  await writeAudit(ACTIONS.STAFF_APPROVED, {
-    targetType: 'staffRequest', targetId: requestUid, orgId,
-  });
 }
 
 export async function rejectStaffRequest(orgId, requestUid) {
@@ -189,18 +163,12 @@ export async function rejectStaffRequest(orgId, requestUid) {
     decidedAt: serverTimestamp(),
     decidedBy: user.uid,
   });
-  await writeAudit(ACTIONS.STAFF_REJECTED, {
-    targetType: 'staffRequest', targetId: requestUid, orgId,
-  });
 }
 
 export async function removeStaff(orgId, staffUid, currentStaffUids) {
   await updateDoc(doc(db, 'organizations', orgId), {
     staffUids: currentStaffUids.filter((u) => u !== staffUid),
     updatedAt: serverTimestamp(),
-  });
-  await writeAudit(ACTIONS.STAFF_REMOVED, {
-    targetType: 'user', targetId: staffUid, orgId,
   });
 }
 
@@ -228,10 +196,6 @@ export async function createNotice(form, org, { publish }) {
     });
   }
 
-  await writeAudit(publish ? ACTIONS.NOTICE_PUBLISHED : ACTIONS.NOTICE_DRAFTED, {
-    targetType: 'notice', targetId: ref.id, orgId: org.id,
-    details: { janazahAt: form.janazahAt, prayer: form.prayerName },
-  });
   return ref.id;
 }
 
@@ -263,11 +227,6 @@ export async function correctNotice(noticeId, existing, form, org, { publish, no
       ...priv, updatedAt: serverTimestamp(), updatedBy: user.uid,
     }, { merge: true });
   }
-
-  await writeAudit(ACTIONS.NOTICE_CORRECTED, {
-    targetType: 'notice', targetId: noticeId, orgId: org.id,
-    details: { version: payload.version, note: note || '' },
-  });
 }
 
 /**
@@ -286,17 +245,10 @@ export async function cancelNotice(noticeId, existing, reason, { asAdmin = false
     updatedAt: serverTimestamp(),
     version: increment(1),
   });
-  await writeAudit(asAdmin ? ACTIONS.NOTICE_TAKEN_DOWN : ACTIONS.NOTICE_CANCELLED, {
-    targetType: 'notice', targetId: noticeId, orgId: existing.orgId,
-    details: { reason: reason || '' },
-  });
 }
 
-export async function deleteDraft(noticeId, existing) {
+export async function deleteDraft(noticeId) {
   await deleteDoc(doc(db, 'notices', noticeId));
-  await writeAudit(ACTIONS.NOTICE_DELETED_DRAFT, {
-    targetType: 'notice', targetId: noticeId, orgId: existing.orgId,
-  });
 }
 
 export async function getNotice(noticeId) {
@@ -390,10 +342,6 @@ export async function resolveReport(reportId, status, resolution) {
     resolution: resolution || '',
     resolvedBy: user.uid,
     resolvedAt: serverTimestamp(),
-  });
-  await writeAudit(status === 'resolved' ? ACTIONS.REPORT_RESOLVED : ACTIONS.REPORT_DISMISSED, {
-    targetType: 'report', targetId: reportId,
-    details: { status, resolution: resolution || '' },
   });
 }
 

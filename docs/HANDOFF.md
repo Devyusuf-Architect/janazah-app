@@ -130,7 +130,8 @@ model, and `tests/rules.test.js` is what proves they hold.
   /private/details              STAFF ONLY. Family contacts, internal notes.
 
 /admins/{uid}                   Platform administrators. No client may write.
-/auditLog/{id}                  Append only. No update or delete, by anyone.
+/auditLog/{id}                  No client write at all, of any kind, by anyone.
+                                 Written only by Cloud Functions triggers.
 /reports/{id}                   Community and system reports.
 /notificationRuns/{id}          Delivery bookkeeping. Closed to all clients.
 /orgNotificationRates/{orgId}   Rate limit counters. Closed to all clients.
@@ -222,8 +223,12 @@ Real work, not oversights. Any of these is a reasonable next task.
    emulate sending. Manual checklist in `docs/phase-4-notes.md`.
 3. The retention job has never run against real data.
 4. Nobody outside the author has tried to break it.
-5. No terms of service, and no stated process for a family asking that a notice
-   come down faster than the retention policy.
+5. ~~No terms of service, and no stated process for a family asking that a
+   notice come down faster than the retention policy.~~ **Resolved.**
+   `/terms` covers who may publish and what happens when a notice is wrong;
+   the "family_takedown" report reason plus the "Asking for a notice to come
+   down" section on `/privacy` is the actual flow, not only a policy
+   statement.
 
 **Product gaps**
 
@@ -240,10 +245,13 @@ Real work, not oversights. Any of these is a reasonable next task.
 
 **Known limitations**
 
-11. Audit entries for client actions are written from the browser. The rules
-    make them unforgeable, unalterable and undeletable, but a determined staff
-    member could act and skip the write. Closing it needs server-side writes,
-    now possible since Cloud Functions exist.
+11. ~~Audit entries for client actions are written from the browser.~~
+    **Resolved.** Every notice, organization, staff request and report change
+    is now audited by a Cloud Functions trigger
+    (`functions/lib/audit-log.js`, wired up in `functions/index.js`), and
+    `firestore.rules` closes `/auditLog` to every client write. An entry can
+    no longer be skipped by whichever action should have produced it, because
+    the write is no longer the client's job.
 12. iPhone push requires the page be added to the Home Screen. The app detects
     and explains this, but expect a meaningful share never to complete it. That
     is the strongest argument for a native wrapper.

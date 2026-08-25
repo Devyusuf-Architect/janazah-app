@@ -293,6 +293,27 @@ describe('verification cannot be self-granted', () => {
     }));
   });
 
+  test('an admin cannot attribute a verification to a different account', async () => {
+    // The server-written audit trail reads verifiedBy to say who verified an
+    // organization. If a client could set it to any uid it likes, that
+    // attribution would be worthless.
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG), {
+      verificationStatus: 'verified', verifiedBy: OWNER,
+      verifiedAt: serverTimestamp(),
+    }));
+  });
+
+  test('an admin editing something unrelated does not have to re-supply verifiedBy', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        verificationStatus: 'verified', verifiedBy: ADMIN, verifiedAt: Timestamp.now(),
+      });
+    });
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG), {
+      statusReason: 'Phone number on file was out of date; corrected.',
+    }));
+  });
+
   test('a new registration must be pending, self-owned and self-staffed', async () => {
     const base = {
       name: 'New Masjid', type: 'masjid', address: '1 A St',
@@ -349,7 +370,71 @@ describe('verification cannot be self-granted', () => {
   });
 });
 
+describe('staff join requests', () => {
+  const requestDoc = (uid, overrides = {}) => ({
+    uid, email: 'someone@example.com', displayName: 'Someone',
+    status: 'pending', requestedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  test('the owner can approve a request, attributed to themselves', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+        requestDoc(OUTSIDER));
+    });
+    await assertSucceeds(updateDoc(
+      doc(as(OWNER), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+      { status: 'approved', decidedBy: OWNER, decidedAt: serverTimestamp() }));
+  });
+
+  test('the owner cannot attribute the decision to someone else', async () => {
+    // Same reasoning as verifiedBy: the audit trail reads decidedBy to say
+    // who approved or rejected a request, so it has to name the real actor.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+        requestDoc(OUTSIDER));
+    });
+    await assertFails(updateDoc(
+      doc(as(OWNER), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+      { status: 'approved', decidedBy: STAFF, decidedAt: serverTimestamp() }));
+  });
+
+  test('a platform admin can reject a request, attributed to themselves', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+        requestDoc(OUTSIDER));
+    });
+    await assertSucceeds(updateDoc(
+      doc(as(ADMIN), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+      { status: 'rejected', decidedBy: ADMIN, decidedAt: serverTimestamp() }));
+  });
+
+  test('a non-owner staff member cannot decide a request at all', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+        requestDoc(OUTSIDER));
+    });
+    await assertFails(updateDoc(
+      doc(as(STAFF), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+      { status: 'approved', decidedBy: STAFF, decidedAt: serverTimestamp() }));
+  });
+
+  test('a user can request access to an organization for themselves only', async () => {
+    await assertSucceeds(setDoc(
+      doc(as(OUTSIDER), 'organizations', VERIFIED_ORG, 'staffRequests', OUTSIDER),
+      requestDoc(OUTSIDER)));
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', VERIFIED_ORG, 'staffRequests', STAFF),
+      requestDoc(STAFF)));
+  });
+});
+
 describe('audit trail integrity', () => {
+  // Entries are written only by Cloud Functions triggers through the Admin
+  // SDK (functions/index.js, functions/lib/audit-log.js), which bypasses
+  // rules entirely. That is what makes the trail unforgeable: it is not that
+  // a client's write is carefully constrained, it is that no client write is
+  // accepted at all, from anyone, in any role, including a platform admin.
   const entry = (overrides = {}) => ({
     actorUid: STAFF,
     actorEmail: 'staff@example.com',
@@ -362,21 +447,20 @@ describe('audit trail integrity', () => {
     ...overrides,
   });
 
-  test('a signed-in user can append an entry for themselves', async () => {
-    await assertSucceeds(addDoc(collection(as(STAFF), 'auditLog'), entry()));
+  test('no client, of any role, can create an entry', async () => {
+    for (const db of [anon(), as(STAFF), as(OWNER), as(ADMIN)]) {
+      await assertFails(addDoc(collection(db, 'auditLog'), entry()));
+    }
   });
 
-  test('an entry cannot be written under another user’s name', async () => {
-    await assertFails(addDoc(collection(as(STAFF), 'auditLog'),
-      entry({ actorUid: OWNER })));
+  test('a well-formed, self-attributed, correctly-timed entry still cannot be created', async () => {
+    // Confirms the closure is unconditional: this is exactly the shape a
+    // legitimate client write used to take, and it is rejected purely for
+    // being a client write, not for any longer being malformed.
+    await assertFails(addDoc(collection(as(STAFF), 'auditLog'), entry({ actorUid: STAFF })));
   });
 
-  test('an entry cannot be backdated', async () => {
-    await assertFails(addDoc(collection(as(STAFF), 'auditLog'),
-      entry({ at: Timestamp.fromDate(new Date('2020-01-01T00:00:00Z')) })));
-  });
-
-  test('an existing entry cannot be altered', async () => {
+  test('an existing entry cannot be altered, by anyone', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'auditLog', 'a1'),
         { ...entry(), at: Timestamp.now() });

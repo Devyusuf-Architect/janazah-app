@@ -136,7 +136,7 @@ function noticeCard(notice, mount, ctx, org) {
           });
           if (reason === null) return;
           try {
-            await store.deleteDraft(notice.id, notice);
+            await store.deleteDraft(notice.id);
             toast('Draft deleted.');
           } catch (err) { toast(friendlyError(err), 'error'); }
         },

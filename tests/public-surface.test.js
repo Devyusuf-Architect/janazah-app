@@ -97,8 +97,13 @@ describe('the rules agree with the client', () => {
       'the rules mention a stored user position');
   });
 
-  test('the audit log cannot be edited or deleted by anyone', () => {
+  test('the audit log cannot be written by any client, at all', () => {
+    // Item 3 (server-side audit writes): entries are written only by Cloud
+    // Functions triggers through the Admin SDK, which bypasses rules
+    // entirely, so this must be closed to every client action, not just
+    // update and delete. A client that could still create an entry could
+    // still forge one, which is exactly the gap this closes.
     const block = rules.slice(rules.indexOf('match /auditLog/'));
-    assert.match(block.slice(0, 1200), /allow update, delete: if false;/);
+    assert.match(block.slice(0, 1200), /allow create, update, delete: if false;/);
   });
 });

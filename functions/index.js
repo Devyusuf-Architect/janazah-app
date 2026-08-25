@@ -24,6 +24,10 @@ import { isValidTopic } from './lib/topics.js';
 import { kindOfChange, buildMessage, topicsForNotice } from './lib/notify.js';
 import { RETENTION, daysAgo, redactionPatch, needsRedaction } from './lib/retention.js';
 import { LIMITS, checkAndCount } from './lib/limits.js';
+import {
+  classifyNoticeChange, classifyOrgChange, classifyStaffRequestChange,
+  classifyReportChange,
+} from './lib/audit-log.js';
 
 initializeApp();
 
@@ -179,6 +183,118 @@ function writeSystemAudit(db, action, targetId, orgId, details = {}) {
     details,
   });
 }
+
+/**
+ * Every create, edit and cancellation of a notice, and every verification and
+ * staff decision, used to be written from the browser by whichever client
+ * action triggered it. That meant the write could be skipped: nothing forced
+ * a compromised or merely buggy client to call it. These four triggers close
+ * that gap structurally. They fire on the document write itself, from the
+ * Admin SDK, so there is no code path that changes a notice, an organization,
+ * a staff request or a report without an entry being written about it.
+ *
+ * classification lives in lib/audit-log.js and is pure; these triggers only
+ * do the Firestore reads and writes the pure functions cannot do themselves.
+ *
+ * Idempotency: Firestore triggers are at-least-once. Each entry's document ID
+ * is derived from the CloudEvent's own id, which is stable across retries of
+ * the same underlying change, and written with create() rather than add(), so
+ * a retry collides with the entry already written instead of duplicating it.
+ */
+
+/** Shared by all four triggers below. */
+async function writeAuditEntry(db, docId, { action, actorUid, targetType, targetId, orgId, details }) {
+  try {
+    await db.collection('auditLog').doc(docId).create({
+      actorUid: actorUid ?? 'unknown',
+      actorEmail: '',
+      action,
+      targetType,
+      targetId,
+      orgId: orgId ?? null,
+      at: FieldValue.serverTimestamp(),
+      details: details ?? {},
+    });
+  } catch {
+    logger.info('Audit entry already recorded for this event', { docId, action });
+  }
+}
+
+export const onNoticeAuditWritten = onDocumentWritten('notices/{noticeId}', async (event) => {
+  const noticeId = event.params.noticeId;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+  // The admin lookup is only meaningful, and only needed, for the one case
+  // that genuinely cannot be told apart from the document alone: whether a
+  // cancellation was the org's own staff or a platform administrator.
+  const cancelling = before && after
+    && before.status !== 'cancelled' && after.status === 'cancelled';
+  const db = getFirestore();
+  let isActorAdmin = false;
+  if (cancelling) {
+    const actorUid = after.lastEditedBy ?? after.createdBy ?? null;
+    if (actorUid) {
+      const adminSnap = await db.collection('admins').doc(actorUid).get();
+      isActorAdmin = adminSnap.exists;
+    }
+  }
+
+  const result = classifyNoticeChange(before, after, isActorAdmin);
+  if (!result) return;
+
+  const orgId = (after ?? before)?.orgId ?? null;
+  await writeAuditEntry(db, event.id, {
+    action: result.action, actorUid: result.actorUid,
+    targetType: 'notice', targetId: noticeId, orgId,
+  });
+});
+
+export const onOrgAuditWritten = onDocumentWritten('organizations/{orgId}', async (event) => {
+  const orgId = event.params.orgId;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+  const entries = classifyOrgChange(before, after);
+  if (!entries.length) return;
+
+  const db = getFirestore();
+  await Promise.all(entries.map((entry, i) => writeAuditEntry(db, `${event.id}_${i}`, {
+    action: entry.action, actorUid: entry.actorUid,
+    targetType: entry.action === 'staff.removed' ? 'user' : 'organization',
+    targetId: entry.action === 'staff.removed' ? entry.targetUid : orgId,
+    orgId,
+  })));
+});
+
+export const onStaffRequestAuditWritten = onDocumentWritten(
+  'organizations/{orgId}/staffRequests/{requestUid}', async (event) => {
+    const { orgId, requestUid } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+    const result = classifyStaffRequestChange(before, after);
+    if (!result) return;
+
+    await writeAuditEntry(getFirestore(), event.id, {
+      action: result.action, actorUid: result.actorUid,
+      targetType: 'staffRequest', targetId: requestUid, orgId,
+    });
+  });
+
+export const onReportAuditWritten = onDocumentWritten('reports/{reportId}', async (event) => {
+  const reportId = event.params.reportId;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+  const result = classifyReportChange(before, after);
+  if (!result) return;
+
+  await writeAuditEntry(getFirestore(), event.id, {
+    action: result.action, actorUid: result.actorUid,
+    targetType: 'report', targetId: reportId, orgId: null,
+  });
+});
 
 /**
  * Rolling per-organization notification budget.

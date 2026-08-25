@@ -228,6 +228,9 @@ requirements ask whether funeral homes should also publish after verification.
 - **No multi-factor authentication.** It needs the Identity Platform upgrade.
 - **No scheduled retention purge.** Expired notices are filtered out of
   queries by time; deletion is manual until there is server-side scheduling.
-- **Client-side audit writes.** Rules make entries unforgeable, unalterable
-  and undeletable, but a determined staff member could act and skip the audit
-  write. Closing that needs server-side writes.
+- ~~Client-side audit writes~~ **Resolved.** Every notice, organization, staff
+  request and report change is now audited by a Cloud Functions trigger
+  (functions/index.js, functions/lib/audit-log.js), through the Admin SDK,
+  which bypasses rules entirely. `/auditLog` is closed to every client write,
+  of any role, so an entry cannot be skipped by whichever action should have
+  produced it.

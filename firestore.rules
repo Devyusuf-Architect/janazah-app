@@ -128,9 +128,15 @@ service cloud.firestore {
         && !('verifiedBy' in request.resource.data);
 
       // Platform admin: may change verification status and nothing structural.
+      // verifiedBy, when it changes at all, must name the admin making the
+      // change: this is what lets the server-written audit trail attribute a
+      // verification decision to a real account rather than trusting whatever
+      // the client happened to send.
       allow update: if isPlatformAdmin()
         && validOrgShape()
-        && !changed(['ownerUid', 'createdAt', 'createdBy']);
+        && !changed(['ownerUid', 'createdAt', 'createdBy'])
+        && (request.resource.data.get('verifiedBy', null) == resource.data.get('verifiedBy', null)
+            || request.resource.data.verifiedBy == uid());
 
       // Owner: may edit the profile and manage staff, never the status.
       allow update: if isOrgOwner(orgId)
@@ -161,9 +167,13 @@ service cloud.firestore {
         allow get: if isSignedIn()
           && (uid() == requestUid || isOrgStaff(orgId) || isPlatformAdmin());
         allow list: if isOrgStaff(orgId) || isPlatformAdmin();
+        // decidedBy must name whoever is actually deciding, for the same reason
+        // verifiedBy is pinned above: the audit trail attributes this to the
+        // account in the document, and that has to be trustworthy.
         allow update: if (isOrgOwner(orgId) || isPlatformAdmin())
           && request.resource.data.uid == resource.data.uid
-          && request.resource.data.status in ['approved', 'rejected'];
+          && request.resource.data.status in ['approved', 'rejected']
+          && request.resource.data.decidedBy == uid();
         allow delete: if isOrgOwner(orgId) || uid() == requestUid;
       }
     }
@@ -302,18 +312,12 @@ service cloud.firestore {
         || (isSignedIn() && resource.data.orgId != null
             && isOrgStaff(resource.data.orgId));
 
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly(
-             ['actorUid', 'actorEmail', 'action', 'targetType', 'targetId',
-              'orgId', 'at', 'details'])
-        && request.resource.data.keys().hasAll(
-             ['actorUid', 'action', 'targetType', 'targetId', 'at'])
-        && request.resource.data.actorUid == uid()
-        && request.resource.data.at == request.time
-        && request.resource.data.action is string
-        && request.resource.data.action.size() <= 60;
-
-      allow update, delete: if false;
+      // Written only by Cloud Functions triggers through the Admin SDK, which
+      // bypasses rules, so that an entry cannot be skipped by whichever client
+      // action should have produced it. See functions/index.js and
+      // functions/lib/audit-log.js. No client, staff or admin included, may
+      // write here at all.
+      allow create, update, delete: if false;
     }
 
     // ---------- reports ----------

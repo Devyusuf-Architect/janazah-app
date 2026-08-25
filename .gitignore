@@ -10,5 +10,6 @@ ui-debug.log
 functions/node_modules/
 functions/.env
 functions/.env.*
+!functions/.env.demo-janazah
 screenshots/
 build/
