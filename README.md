@@ -41,9 +41,13 @@ That starts the emulators, seeds two verified masajid and a set of notices,
 and prints sign-in details. The feed is at `http://127.0.0.1:5000` and the
 coordinator console at `/console`. Ctrl+C stops it and wipes the data.
 
-Needs Node 20 or newer and Java (the Firebase emulators are Java programs;
-nothing else here uses it). `npm run serve` does the same without the seed
-data.
+Needs **Node 20, 22 or 24** (the Firebase tooling does not support newer
+releases yet) and **Java**, because the Firebase emulators are Java programs
+even though nothing else here uses one. `npm run preflight` checks both and
+tells you what to do; it runs automatically before `npm run demo` and
+`npm test`.
+
+`npm run serve` does the same without the seed data.
 
 ## Tests
 

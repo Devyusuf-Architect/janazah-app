@@ -15,7 +15,10 @@
     "deploy:functions": "firebase deploy --only functions",
     "screenshots": "firebase emulators:exec --only auth,firestore --project demo-janazah \"node scripts/screenshots.mjs\"",
     "demo": "firebase emulators:exec --only auth,firestore,hosting --project demo-janazah \"node scripts/seed-demo.mjs --hold\"",
-    "seed:demo": "node scripts/seed-demo.mjs"
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "predemo": "npm run preflight",
+    "pretest": "npm run preflight"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
@@ -25,6 +28,6 @@
     "playwright": "^1.62.1"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x || 22.x || 24.x"
   }
 }
