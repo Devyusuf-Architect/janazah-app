@@ -40,6 +40,21 @@ export function renderHome(mount) {
         'when you want to. Notification volume is yours to control.'),
     ]),
 
+    // Not buried among the sign-in cards: someone who has just been told a
+    // Janazah is in an hour, and has never prayed one, needs this before
+    // they need an account.
+    el('section', { class: 'guide-invite reveal' }, [
+      el('div', { class: 'guide-invite__body' }, [
+        el('h2', { text: 'Never prayed a Janazah before?' }),
+        el('p', { class: 'muted' },
+          'Four takbirs, standing, a few minutes long. The prayer step by '
+          + 'step, with the Arabic, how to say it and what it means. No '
+          + 'account needed.'),
+      ]),
+      el('a', { class: 'btn btn--primary btn--lg', href: '/janazah-guide' },
+        'How to pray Janazah'),
+    ]),
+
     el('section', { class: 'cta-row' }, [
       el('div', { class: 'cta-card reveal' }, [
         el('h2', { text: 'Community members' }),

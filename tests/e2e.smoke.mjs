@@ -675,6 +675,21 @@ const run = async () => {
     assert.match(guest.url(), /\/$/, 'the brand must return to the public home page');
     log('the Ta’ziyah brand returns to the home page');
 
+    // ---- the Janazah prayer guide, with no account -------------------------
+    await guest.goto(`${BASE}/janazah-guide`);
+    await guest.locator('.guide-head').waitFor({ timeout: 15000 });
+    const guideText = await guest.locator('#view').innerText();
+    assert.match(guideText, /Allāhu akbar/, 'the takbir transliteration is missing');
+    assert.match(guideText, /Sahih Muslim 963/, 'the dua must show where it is from');
+    assert.match(guideText, /differ/i, 'the note about differing practice is missing');
+    assert.equal(await guest.locator('.takbir').count(), 4, 'expected four takbirs');
+    // Arabic must be marked as Arabic, or a browser will not shape it and a
+    // screen reader will read it in the wrong voice.
+    const arabic = guest.locator('.recite__arabic').first();
+    assert.equal(await arabic.getAttribute('lang'), 'ar');
+    assert.equal(await arabic.getAttribute('dir'), 'rtl');
+    log('the Janazah prayer guide renders for a visitor with no account');
+
     // ---- the masjids directory -----------------------------------------------
     await guest.goto(`${BASE}/masjids`);
     await guest.getByRole('button', { name: /^Follow Test Masjid$/ }).waitFor({ timeout: 15000 });

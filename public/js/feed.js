@@ -18,6 +18,7 @@ import { renderMasjids } from './views/masjids.js';
 import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
 import { renderFollowing } from './views/following.js';
 import { renderAccount } from './views/account.js';
+import { renderJanazahGuide } from './views/janazah-guide.js';
 import { renderAbout } from './views/about.js';
 import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
@@ -30,6 +31,11 @@ const nav = () => $('#nav');
 
 let user = null;
 let authReady = false;
+// Which account the current render was built for: null for signed out.
+// The first route() below renders the signed-out site, so it starts as null
+// rather than undefined, and Firebase reporting "still signed out" a moment
+// later is then recognised as no change.
+let renderedFor = null;
 // Resolved asynchronously after sign-in. False until then, so the nav simply
 // has no Admin link for a moment rather than flickering one in and out.
 let isAdmin = false;
@@ -89,6 +95,11 @@ function renderRoute() {
   if (/^\/register-masjid\/?$/.test(path)) {
     document.title = "Register your masjid — Ta'ziyah";
     renderRegisterMasjid(mount());
+    return;
+  }
+  if (/^\/janazah-guide\/?$/.test(path)) {
+    document.title = "How to pray Salat al-Janazah — Ta'ziyah";
+    renderJanazahGuide(mount());
     return;
   }
   if (/^\/following\/?$/.test(path)) {
@@ -151,6 +162,7 @@ let stopReveal = () => {};
 
 function route() {
   stopReveal();
+  renderedFor = user?.uid ?? null;
   renderRoute();
   revealIn(mount());
   stopReveal = autoReveal(mount());
@@ -207,10 +219,32 @@ route();
 completeRedirectSignIn((message) => toast(message, 'error'));
 
 onAuthStateChanged(auth, (nextUser) => {
+  const nextId = nextUser?.uid ?? null;
+  const changed = nextId !== renderedFor;
+  const firstResolution = !authReady;
   user = nextUser;
   authReady = true;
   isAdmin = false;
-  if (/^\/(signin|dashboard|account)\/?$/.test(location.pathname)) route();
+
+  // Two different reasons to re-render, and conflating them breaks one of
+  // them each way:
+  //
+  //   the account changed        somebody signed in or out.
+  //   the route was waiting      /dashboard and /account render "Loading…"
+  //                              until auth resolves, so they must re-render
+  //                              on the first answer even when it is "still
+  //                              signed out".
+  //
+  // /signin is deliberately not in the second group. It renders its form
+  // immediately and only needs re-rendering if an account appears; treating
+  // the first "signed out" answer as a reason to re-render would rebuild the
+  // form and wipe an email someone had already begun typing, which is
+  // precisely when they are most likely to be typing.
+  const path = location.pathname;
+  const onAuthRoute = /^\/(signin|dashboard|account)\/?$/.test(path);
+  const wasWaiting = firstResolution && /^\/(dashboard|account)\/?$/.test(path);
+
+  if (onAuthRoute && (changed || wasWaiting)) route();
   else paintNav();
 
   // Whether to offer the admin route. Not awaited, and never allowed to break

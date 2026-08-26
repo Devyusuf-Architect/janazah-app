@@ -49,6 +49,10 @@
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Arabic is set in naskh, never in the Latin sans: the fallback is
+     cramped, and religious text that is hard to read is the one thing
+     this page cannot afford. */
+  --arabic: 'Noto Naskh Arabic', 'Geeza Pro', 'Traditional Arabic', serif;
 
   --page: 46rem;
   --page-wide: 62rem;
@@ -1258,4 +1262,213 @@ select.field { cursor: pointer; }
     transform: none;
     transition: none;
   }
+}
+
+/* ---------- Janazah prayer guide ----------
+ *
+ * Reading conditions this is designed for: a phone, held one-handed, in a
+ * hall, by someone who may be about to pray this for the first time and is
+ * probably upset. So: large Arabic, generous line-height, short measure, and
+ * nothing decorative between the reader and the text.
+ */
+
+.guide-head { max-width: 40rem; padding: clamp(1rem, 4vw, 2rem) 0 1.5rem; }
+.guide-head h1 { font-size: clamp(1.8rem, 5vw, 2.5rem); line-height: 1.15; }
+.guide-head__lede { color: var(--ink-2); font-size: 1.03rem; margin-bottom: 1.25rem; }
+
+.guide-scope { margin-bottom: 2rem; }
+.guide-scope p { margin: 0; }
+
+.guide-divider {
+  margin: clamp(2rem, 6vw, 3rem) 0 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 1.4rem;
+}
+
+/* ---------- steps ---------- */
+
+.guide-step { margin-bottom: 2rem; max-width: 40rem; }
+.guide-step__head { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+.guide-step__num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: .9rem;
+}
+.guide-step__head h2 { margin: 0; font-size: 1.25rem; }
+.guide-step__lede { color: var(--ink-2); }
+
+.guide-points { margin: 1rem 0 0; }
+.guide-points dt {
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 1.1rem;
+}
+.guide-points dd { margin: .25rem 0 0; color: var(--ink-2); }
+
+/* ---------- a takbir ---------- */
+
+.takbir {
+  margin-bottom: 1.25rem;
+  padding: clamp(1.1rem, 3.5vw, 1.6rem);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.takbir__head { display: flex; gap: .9rem; align-items: flex-start; }
+.takbir__num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.takbir__label { margin: 0; font-size: 1.1rem; }
+.takbir__say {
+  font-family: var(--arabic);
+  font-size: clamp(1.5rem, 5vw, 1.9rem);
+  line-height: 1.9;
+  margin: .2rem 0 0;
+  color: var(--accent);
+}
+.takbir__translit { margin: 0; font-size: .95rem; }
+.takbir__intro { color: var(--ink-2); margin: 1rem 0 0; }
+
+/* ---------- a recitation ---------- */
+
+.recite {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.recite__title { margin: 0 0 .3rem; font-size: 1rem; font-family: var(--serif); }
+.recite__note { color: var(--ink-3); font-size: .88rem; margin: 0 0 .75rem; }
+
+/* The largest text on the page, deliberately. */
+.recite__arabic {
+  font-family: var(--arabic);
+  font-size: clamp(1.45rem, 5.2vw, 1.75rem);
+  line-height: 2.15;
+  color: var(--ink);
+  margin: .5rem 0 1rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  /* Arabic diacritics sit above and below; without this they clip. */
+  overflow-wrap: break-word;
+}
+
+.recite__translit {
+  color: var(--ink-2);
+  font-style: italic;
+  font-size: .97rem;
+  line-height: 1.75;
+  margin: 0 0 .6rem;
+}
+.recite__meaning { color: var(--ink); margin: 0 0 .6rem; }
+.recite__source { color: var(--ink-3); font-size: .82rem; margin: 0; }
+
+.recite--closing { border-top-style: dashed; }
+
+/* ---------- asides ---------- */
+
+.guide-aside {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border-left: 3px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.guide-aside--warm { border-left-color: var(--gold-line); background: var(--gold-soft); }
+.guide-aside h4 { margin: 0 0 .4rem; font-size: .98rem; }
+.guide-aside p { margin: 0 0 .5rem; font-size: .93rem; }
+.guide-aside .hint { margin: 0; }
+
+.pronouns { list-style: none; margin: .75rem 0; padding: 0; display: grid; gap: .4rem; }
+.pronouns li {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .4rem .6rem;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.pronouns__who { flex: 1 1 8rem; font-size: .9rem; color: var(--ink-2); }
+.pronouns__ar { font-family: var(--arabic); font-size: 1.3rem; line-height: 1.8; }
+.pronouns__tr { font-style: italic; color: var(--ink-3); font-size: .9rem; }
+
+/* ---------- quick reference ---------- */
+
+.quick-ref {
+  margin: clamp(2rem, 6vw, 3rem) 0 2rem;
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  scroll-margin-top: 5rem;
+}
+.quick-ref h2 { margin: 0 0 .25rem; }
+.quick-ref__list { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: .6rem; }
+.quick-ref__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .8rem .9rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.quick-ref__num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: .8rem;
+  font-weight: 600;
+}
+.quick-ref__what { display: block; color: var(--ink-2); font-size: .92rem; }
+
+/* ---------- homepage invitation ---------- */
+
+.guide-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.guide-invite__body { flex: 1 1 20rem; }
+.guide-invite h2 { margin: 0 0 .35rem; font-size: 1.15rem; }
+.guide-invite p { margin: 0; font-size: .94rem; }
+
+.guide-foot {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .takbir__head { gap: .7rem; }
+  .recite__arabic { padding: .9rem .8rem; }
+  .guide-invite .btn { width: 100%; }
 }

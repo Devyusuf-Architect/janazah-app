@@ -25,6 +25,9 @@ failing oddly. See [`docs/phase-4-notes.md`](docs/phase-4-notes.md).
 | `/near-me`      | The feed, opened to the nearby-matching tab    |
 | `/masjids`      | Directory of verified masjids, with follow     |
 | `/register-masjid` | What registering as a masjid/coordinator involves |
+| `/janazah-guide` | How to pray Salat al-Janazah, step by step. Public |
+| `/following`    | Masjids this device follows                    |
+| `/o/{id}`       | One masjid, with its current notices           |
 | `/about`        | What Ta'ziyah is, in plain terms               |
 | `/n/{id}`       | A single notice, the shareable link            |
 | `/signin`       | Community sign-in, for a personal dashboard    |
@@ -77,6 +80,28 @@ tells you what to do; it runs automatically before `npm run demo` and
 `npm test`.
 
 `npm run serve` does the same without the seed data.
+
+## The Janazah prayer guide
+
+`/janazah-guide` explains how to pray Salat al-Janazah: the four takbirs, what
+is recited after each, and what happens before and after. Public, and
+deliberately so, since somebody at the back of a hall who has never prayed one
+should not meet a sign-in screen.
+
+**All of its religious content is in one file,
+`public/js/janazah-guide-content.js`**, separate from the page that renders
+it, so that a scholar can review the whole of it without reading code. Every
+recitation carries its source. Where the schools of law differ, both practices
+are shown and neither is presented as the only valid one.
+
+`tests/janazah-guide.test.js` enforces those properties: every recitation has
+a source, Arabic, transliteration and a meaning; the Arabic really is Arabic
+script; the first and fourth takbirs name the Hanafi practice alongside the
+majority one; and the page needs no account.
+
+**Have an imam or scholar read that file before launch.** The texts are
+sourced and referenced, but this repository is not a religious authority and
+the app says as much on the page itself.
 
 ## Sample data for testers
 

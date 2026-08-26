@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/near-me', label: 'Near Me' },
   { href: '/masjids', label: 'Masjids' },
   { href: '/following', label: 'Following' },
+  { href: '/janazah-guide', label: 'Prayer Guide' },
 ];
 
 // Deeper pages are not in the nav but still belong to one of its sections, so
