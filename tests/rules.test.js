@@ -861,3 +861,176 @@ describe('everything else is closed', () => {
     await assertFails(getDoc(doc(as(STAFF), 'userLocations', STAFF)));
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe('the verification application is private', () => {
+  // Section 15 of the requirement, enforced rather than promised: applicant
+  // name, work email, phone and written explanation must never be reachable
+  // by the community, by other organizations, or by a public Firestore read,
+  // and approving the organization must not change that.
+
+  const submission = (uid, overrides = {}) => ({
+    applicantName: 'Yusuf Siddiqui',
+    applicantRole: 'imam',
+    applicantEmail: 'personal@example.com',
+    workEmail: 'imam@testmasjid.ca',
+    phone: '+1 416 555 0100',
+    roleExplanation: 'I lead the daily prayers and handle funeral arrangements.',
+    authorized: true,
+    verificationMethods: ['listed_on_website', 'work_email'],
+    submittedBy: uid,
+    submittedAt: Timestamp.now(),
+    ...overrides,
+  });
+
+  async function seedApplication(orgId, uid, docId = 'submitted') {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', orgId, 'application', docId),
+        submission(uid));
+    });
+  }
+
+  test('the owner can submit an application for their own organization', async () => {
+    await assertSucceeds(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER)));
+  });
+
+  test('the owner can read back and correct their own submission', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    await assertSucceeds(getDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted')));
+    // "Request more information" asks them to do exactly this.
+    await assertSucceeds(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { roleExplanation: 'Adding the detail you asked for.' })));
+  });
+
+  test('a platform admin can read it', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    await assertSucceeds(getDoc(
+      doc(as(ADMIN), 'organizations', PENDING_ORG, 'application', 'submitted')));
+  });
+
+  test('an anonymous visitor cannot read it', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    await assertFails(getDoc(
+      doc(anon(), 'organizations', PENDING_ORG, 'application', 'submitted')));
+  });
+
+  test('a signed-in community user cannot read it', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    await assertFails(getDoc(
+      doc(as(STAFF), 'organizations', PENDING_ORG, 'application', 'submitted')));
+  });
+
+  test('another organization’s owner cannot read it', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    await assertFails(getDoc(
+      doc(as(OWNER), 'organizations', PENDING_ORG, 'application', 'submitted')));
+  });
+
+  test('approving the organization does not make the application public', async () => {
+    // The whole reason this data is not a set of fields on the organization
+    // document: that document becomes world-readable on approval.
+    await seedApplication(VERIFIED_ORG, OWNER);
+    await assertSucceeds(getDoc(doc(anon(), 'organizations', VERIFIED_ORG)));
+    await assertFails(getDoc(
+      doc(anon(), 'organizations', VERIFIED_ORG, 'application', 'submitted')));
+  });
+
+  test('non-owner staff of the same organization cannot read it', async () => {
+    // Staff are added by the owner and are not necessarily the applicant.
+    // Their personal contact details are not shared sideways.
+    await seedApplication(VERIFIED_ORG, OWNER);
+    await assertFails(getDoc(
+      doc(as(STAFF), 'organizations', VERIFIED_ORG, 'application', 'submitted')));
+  });
+
+  test('a user cannot file an application against an organization they do not own', async () => {
+    await assertFails(setDoc(
+      doc(as(STAFF), 'organizations', VERIFIED_ORG, 'application', 'submitted'),
+      submission(STAFF)));
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', VERIFIED_ORG, 'application', 'submitted'),
+      submission(OUTSIDER)));
+  });
+
+  test('a submission cannot name someone else as the submitter', async () => {
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OWNER)));
+  });
+
+  test('an unauthorized submission is refused at write time', async () => {
+    // The authorization declaration is the substance of the checkbox, so it
+    // is checked here rather than only in the form.
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { authorized: false })));
+  });
+
+  test('a field nobody defined cannot be smuggled in', async () => {
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { verificationStatus: 'verified' })));
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { trustScore: 100 })));
+  });
+
+  test('a submission without the optional fields is still valid', async () => {
+    await assertSucceeds(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'), {
+        applicantName: 'A Name',
+        applicantRole: 'other',
+        applicantRoleOther: 'Volunteer funeral coordinator',
+        applicantEmail: 'a@example.com',
+        authorized: true,
+        submittedBy: OUTSIDER,
+        submittedAt: Timestamp.now(),
+      }));
+  });
+
+  test('evidence cannot be deleted from a client, by anyone', async () => {
+    await seedApplication(PENDING_ORG, OUTSIDER);
+    for (const db of [as(OUTSIDER), as(ADMIN), as(STAFF), anon()]) {
+      await assertFails(deleteDoc(
+        doc(db, 'organizations', PENDING_ORG, 'application', 'submitted')));
+    }
+  });
+});
+
+describe('internal review notes', () => {
+  test('an admin can write and read them', async () => {
+    await assertSucceeds(setDoc(
+      doc(as(ADMIN), 'organizations', PENDING_ORG, 'application', 'review'),
+      { notes: 'Called the listed office number; spoke to the applicant.',
+        updatedAt: Timestamp.now(), updatedBy: ADMIN }));
+    await assertSucceeds(getDoc(
+      doc(as(ADMIN), 'organizations', PENDING_ORG, 'application', 'review')));
+  });
+
+  test('the applicant cannot read the notes written about them', async () => {
+    // A reviewer has to be able to write frankly.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG, 'application', 'review'),
+        { notes: 'Unable to confirm by phone.', updatedAt: Timestamp.now(), updatedBy: ADMIN });
+    });
+    await assertFails(getDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'review')));
+  });
+
+  test('the applicant cannot write notes about themselves', async () => {
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'review'),
+      { notes: 'Verified, looks good.', updatedAt: Timestamp.now(), updatedBy: ADMIN }));
+  });
+
+  test('a note cannot be attributed to a different admin', async () => {
+    await assertFails(setDoc(
+      doc(as(ADMIN), 'organizations', PENDING_ORG, 'application', 'review'),
+      { notes: 'x', updatedAt: Timestamp.now(), updatedBy: 'some-other-admin' }));
+  });
+});

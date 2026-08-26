@@ -182,6 +182,81 @@ service cloud.firestore {
           && request.resource.data.decidedBy == uid();
         allow delete: if isOrgOwner(orgId) || uid() == requestUid;
       }
+
+      // ---------- verification application ----------
+      //
+      // Everything the platform collects to satisfy itself that the person
+      // registering really represents this organization. It lives here, and
+      // never on the organization document, for one concrete reason: a
+      // verified organization is world-readable (see `allow get` above), so a
+      // field added there becomes public the moment an admin approves it.
+      // The applicant's name, personal address, work email, phone number and
+      // written explanation are none of the public's business, before or
+      // after approval.
+      //
+      // Two documents, with deliberately different audiences:
+      //   application/submitted - written by the applicant, read by admins.
+      //   application/review    - internal admin notes. The applicant cannot
+      //                           read these, so a reviewer can write frankly.
+      //
+      // Nobody else reaches either one: not the community, not other
+      // organizations, not an anonymous visitor, not a non-owner staff member
+      // who was added to the org later.
+
+      function applicationKeys() {
+        return ['applicantName', 'applicantRole', 'applicantRoleOther',
+                'applicantEmail', 'workEmail', 'phone', 'roleExplanation',
+                'authorized', 'verificationMethods', 'staffPageUrl',
+                'documentPath', 'documentName',
+                'submittedAt', 'submittedBy', 'updatedAt'];
+      }
+
+      function validApplicationShape() {
+        return request.resource.data.keys().hasOnly(applicationKeys())
+          && request.resource.data.keys().hasAll(
+               ['applicantName', 'applicantRole', 'applicantEmail',
+                'authorized', 'submittedBy'])
+          && request.resource.data.applicantName is string
+          && request.resource.data.applicantName.size() > 0
+          && request.resource.data.applicantName.size() <= 140
+          && request.resource.data.applicantRole is string
+          && request.resource.data.applicantEmail is string
+          // The authorization declaration is the point of the checkbox. A
+          // submission that does not carry it is not a submission.
+          && request.resource.data.authorized == true
+          && request.resource.data.submittedBy == uid()
+          // Optional fields, read through get() so that leaving one out is
+          // a valid submission rather than a rule evaluation error.
+          && request.resource.data.get('roleExplanation', '').size() <= 2000
+          && request.resource.data.get('verificationMethods', []) is list
+          && request.resource.data.get('verificationMethods', []).size() <= 10;
+      }
+
+      match /application/{docId} {
+        // The applicant sees only their own submission, and only for the
+        // organization they own. Internal review notes are admin-only.
+        allow get: if isPlatformAdmin()
+          || (docId == 'submitted' && isOrgOwner(orgId));
+        allow list: if isPlatformAdmin();
+
+        // The applicant may write their submission and correct it later,
+        // which is what "Request more information" asks them to do. They can
+        // never write the review notes.
+        allow create, update: if docId == 'submitted'
+          && isOrgOwner(orgId)
+          && validApplicationShape();
+
+        // Review notes: admins only, and the author is pinned to the account
+        // making the write for the same reason verifiedBy is.
+        allow create, update: if docId == 'review'
+          && isPlatformAdmin()
+          && request.resource.data.keys().hasOnly(
+               ['notes', 'updatedAt', 'updatedBy'])
+          && request.resource.data.updatedBy == uid();
+
+        // A verification record is evidence. It is not deleted from a client.
+        allow delete: if false;
+      }
     }
 
     // ---------- notices ----------
