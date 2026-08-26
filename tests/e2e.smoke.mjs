@@ -90,22 +90,73 @@ async function grantPlatformAdmin(uid, email) {
  * app would only accept in a test: if normalizeFeature stops reading Photon
  * correctly, this fails.
  */
+const GEOCODER_PLACES = [
+  {
+    match: /vancouver|pacific/i,
+    coordinates: [-123.1207, 49.2827],
+    properties: {
+      housenumber: '1', street: 'Pacific Street', city: 'Vancouver',
+      state: 'BC', postcode: 'V6Z 1A1', country: 'Canada',
+    },
+  },
+  {
+    match: /cemetery/i,
+    coordinates: [-79.4000, 43.7000],
+    properties: {
+      housenumber: '500', street: 'Cemetery Road', city: 'Toronto',
+      state: 'ON', postcode: 'M4N 1A1', country: 'Canada',
+    },
+  },
+  {
+    match: /./,
+    coordinates: [-79.3832, 43.6532],
+    properties: {
+      housenumber: '100', street: 'Example Street', city: 'Toronto',
+      state: 'ON', postcode: 'M5H 2N2', country: 'Canada',
+    },
+  },
+];
+
+/**
+ * The geocoder, answered locally.
+ *
+ * Both organization registration and the notice composer now take their
+ * coordinates from whatever this returns, so the response is deliberately the
+ * real Photon format rather than something the app would only accept in a
+ * test: if normalizeFeature stops reading Photon correctly, this fails.
+ *
+ * It answers by query so the suite can place a Toronto prayer hall, a Toronto
+ * cemetery and a Vancouver prayer hall at genuinely different coordinates,
+ * which is what makes the radius filtering assertions mean anything.
+ */
 async function stubGeocoder(page) {
-  await page.route('**/photon.komoot.io/api/**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [-79.3832, 43.6532] },
-        properties: {
-          housenumber: '100', street: 'Example Street', city: 'Toronto',
-          state: 'ON', postcode: 'M5H 2N2', country: 'Canada',
-        },
-      }],
-    }),
-  }));
+  await page.route('**/photon.komoot.io/api/**', (route) => {
+    const query = new URL(route.request().url()).searchParams.get('q') || '';
+    const place = GEOCODER_PLACES.find((p) => p.match.test(query));
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: place.coordinates },
+          properties: place.properties,
+        }],
+      }),
+    });
+  });
+}
+
+/**
+ * Fill one location on the notice composer: type a name, search the address,
+ * take the suggestion.
+ */
+async function pickPlace(page, prefix, name, query) {
+  await page.locator(`#${prefix}Name`).fill(name);
+  await page.locator(`#${prefix}Search`).fill(query);
+  await page.locator(`#${prefix}-results .address-result`).first().click({ timeout: 10000 });
+  await page.locator(`#${prefix}-results`).waitFor({ state: 'hidden', timeout: 5000 });
 }
 
 async function signUp(page, { email, password }, name, { start } = {}) {
@@ -302,12 +353,20 @@ const run = async () => {
     await coord.locator('#deceasedName').fill('Test Name');
     await coord.locator('input[name="showDeceasedName"]').check();
     await coord.locator('#janazahAt').fill('2026-12-01T13:30');
-    await coord.locator('#prayerName').fill('Main Prayer Hall');
-    await coord.locator('#prayerAddress').fill('100 Example Street, Toronto');
-    await coord.locator('#prayerLat').fill('43.6532');
-    await coord.locator('#prayerLng').fill('-79.3832');
-    await coord.locator('#burialName').fill('Example Cemetery');
-    await coord.locator('#burialAddress').fill('500 Cemetery Road, Toronto');
+    // Both locations are searched, never typed as coordinates: a masjid
+    // office should not be looking up latitude and longitude in Google Maps
+    // to announce a funeral. The composer must have no coordinate fields at
+    // all, so that this cannot quietly come back.
+    for (const gone of ['#prayerLat', '#prayerLng', '#burialLat', '#burialLng']) {
+      assert.equal(await coord.locator(`${gone}:visible`).count(), 0,
+        `${gone} is a visible field again on the notice composer`);
+    }
+    await pickPlace(coord, 'prayer', 'Main Prayer Hall', '100 Example Street');
+    await pickPlace(coord, 'burial', 'Example Cemetery', '500 Cemetery Road');
+    // The address that was picked is confirmed back before publishing.
+    assert.match(await coord.locator('.place-picker').first().innerText(),
+      /Selected location: /,
+      'the chosen prayer address must be confirmed back to the coordinator');
     await coord.locator('#instructions').fill('Parking is available behind the building.');
     await coord.locator('#familyContactPhone').fill('555-0100');
     await coord.locator('#internalNotes').fill('Family prefers no visitors afterwards.');
@@ -400,10 +459,7 @@ const run = async () => {
     await coord.getByRole('button', { name: 'Notices' }).click();
     await coord.getByRole('button', { name: 'New notice' }).click();
     await coord.locator('#janazahAt').fill('2026-12-02T13:30');
-    await coord.locator('#prayerName').fill('Draft Hall');
-    await coord.locator('#prayerAddress').fill('9 Draft Street, Toronto');
-    await coord.locator('#prayerLat').fill('43.66');
-    await coord.locator('#prayerLng').fill('-79.39');
+    await pickPlace(coord, 'prayer', 'Draft Hall', '9 Draft Street');
     await coord.getByRole('button', { name: 'Save as draft' }).click();
     await coord.locator('.notice-card--draft').waitFor({ timeout: 15000 });
 
@@ -472,10 +528,7 @@ const run = async () => {
     await coord.getByRole('button', { name: 'New notice' }).click();
     await coord.locator('#janazahAt').fill('2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
-    await coord.locator('#prayerName').fill('Vancouver Prayer Hall');
-    await coord.locator('#prayerAddress').fill('1 Pacific Street, Vancouver');
-    await coord.locator('#prayerLat').fill('49.2827');
-    await coord.locator('#prayerLng').fill('-123.1207');
+    await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
     await coord.getByRole('button', { name: 'Publish', exact: true }).click();
     await coord.locator('#confirm-check').check();
     await coord.getByRole('button', { name: 'Publish now' }).click();
@@ -488,10 +541,7 @@ const run = async () => {
     await coord.getByRole('button', { name: 'New notice' }).click();
     await coord.locator('#janazahAt').fill('2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
-    await coord.locator('#prayerName').fill('Vancouver Prayer Hall');
-    await coord.locator('#prayerAddress').fill('1 Pacific Street, Vancouver');
-    await coord.locator('#prayerLat').fill('49.2827');
-    await coord.locator('#prayerLng').fill('-123.1207');
+    await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
     await coord.getByRole('button', { name: 'Publish', exact: true }).click();
 
     await coord.locator('.dup-warning').waitFor({ timeout: 15000 });

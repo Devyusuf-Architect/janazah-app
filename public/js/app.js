@@ -8,7 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast, friendlyError } from './ui.js';
 import { isSampleMode } from './sample-mode.js';
-import { revealIn } from './motion.js';
+import { revealIn, pageEnter } from './motion.js';
 import * as store from './store.js';
 
 import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
@@ -28,6 +28,10 @@ const ctx = {
   // Coordinator cards, and consumed once by renderOrgs.
   startIntent: null,
   refresh: async () => { await loadContext(); route(); },
+  // Move between console tabs from inside a view. A verified organization
+  // needs a way to say "now publish a notice" that lands on the composer
+  // rather than telling somebody which tab to find.
+  go: (name) => { ctx.route = name; route(); },
 };
 
 /**
@@ -88,6 +92,7 @@ function route() {
   }
   renderNav();
   target.render(mount(), ctx);
+  pageEnter(mount());
   revealIn(mount());
 }
 

@@ -5,10 +5,10 @@ import {
 } from '../ui.js';
 import {
   validateNoticeForm, buildPublicNotice, buildPrivateDetails, noticeToForm,
-  formatJanazahTime,
+  formatJanazahTime, timeZoneOptions, defaultTimeZone,
 } from '../model.js';
 import { publicNoticeView } from '../notice-view.js';
-import { APP } from '../config.js';
+import { placePicker } from './place-picker.js';
 import * as store from '../store.js';
 
 let unwatch = null;
@@ -68,8 +68,23 @@ export function renderNotices(mount, ctx) {
     unwatch = store.watchOrgNotices(currentOrgId(), (notices) => {
       list.replaceChildren();
       if (!notices.length) {
+        const org = currentOrg();
+        const verified = org.verificationStatus === 'verified';
         list.append(el('div', { class: 'empty' }, [
-          el('p', { text: 'No notices yet for this organization.' }),
+          icon('clock', { size: 30 }),
+          el('h2', { text: 'No notices yet' }),
+          el('p', {
+            text: verified
+              ? `${org.name} is verified and can publish. A notice goes out to `
+                + 'everyone following this masjid and to people nearby who '
+                + 'have turned alerts on.'
+              : `${org.name} cannot publish until a platform administrator `
+                + 'approves it. You can write and save drafts in the meantime.',
+          }),
+          el('button', {
+            class: 'btn btn--primary',
+            onclick: () => openComposer(mount, ctx, org, null),
+          }, verified ? 'Publish the first notice' : 'Write a draft'),
         ]));
         return;
       }
@@ -208,6 +223,17 @@ function fieldGroup(id, label, attrs = {}, hint = null) {
   ]);
 }
 
+/** The zone control. The list and the default live in model.js, which is
+    pure and therefore testable without a browser. */
+function timeZoneSelect(existing) {
+  const options = timeZoneOptions();
+  const chosen = defaultTimeZone(existing, options);
+  return el('select', { class: 'field', id: 'timeZone', name: 'timeZone' },
+    options.map((z) => el('option', {
+      value: z, text: z.replace(/_/g, ' '), selected: z === chosen,
+    })));
+}
+
 async function openComposer(mount, ctx, org, existing) {
   teardownNotices();
   mount.replaceChildren();
@@ -215,6 +241,30 @@ async function openComposer(mount, ctx, org, existing) {
   const editing = !!existing;
   const error = el('p', { class: 'form-error', hidden: true });
   const form = el('form', { class: 'card' });
+
+  // Both locations are searched, never typed as coordinates. See
+  // place-picker.js: these two fields decide whether the notice reaches
+  // people near enough to attend and whether Directions opens the right
+  // building, and both fail silently when they are wrong.
+  const prayer = placePicker({
+    prefix: 'prayer',
+    legend: 'Prayer location',
+    nameLabel: 'Location name',
+    required: true,
+    org,
+    shortcutLabel: `Use ${org.name}’s address`,
+    hint: 'Where Salat al-Janazah will be prayed.',
+  });
+  const burial = placePicker({
+    prefix: 'burial',
+    legend: 'Burial location',
+    nameLabel: 'Cemetery name',
+    required: false,
+    org,
+    hint: 'Optional. Leave blank if the burial is not arranged yet, or is '
+        + 'not open to the public.',
+    nameHint: 'The cemetery as mourners would find it signposted.',
+  });
 
   append(form,
     el('h1', { text: editing ? 'Correct notice' : 'New Janazah notice' }),
@@ -241,10 +291,7 @@ async function openComposer(mount, ctx, org, existing) {
           { type: 'datetime-local', required: true }),
         el('div', { class: 'field-group' }, [
           el('label', { class: 'label', for: 'timeZone', text: 'Time zone' }),
-          el('select', { class: 'field', id: 'timeZone', name: 'timeZone' },
-            ['America/St_Johns', 'America/Halifax', 'America/Toronto',
-             'America/Winnipeg', 'America/Edmonton', 'America/Vancouver']
-              .map((z) => el('option', { value: z, text: z, selected: z === APP.defaultTimeZone }))),
+          timeZoneSelect(existing?.timeZone),
         ]),
       ]),
       fieldGroup('timeLabel', 'Time description (optional)',
@@ -252,21 +299,8 @@ async function openComposer(mount, ctx, org, existing) {
         'Shown alongside the clock time. Use it when the time is announced ' +
         'relative to a prayer rather than as a fixed hour.'),
 
-      el('h3', { text: 'Prayer location' }),
-      fieldGroup('prayerName', 'Location name', { required: true }),
-      fieldGroup('prayerAddress', 'Address', { required: true }),
-      el('div', { class: 'field-row' }, [
-        fieldGroup('prayerLat', 'Latitude', { type: 'number', step: 'any', required: true }),
-        fieldGroup('prayerLng', 'Longitude', { type: 'number', step: 'any', required: true }),
-      ]),
-
-      el('h3', { text: 'Burial location (optional)' }),
-      fieldGroup('burialName', 'Cemetery name'),
-      fieldGroup('burialAddress', 'Address'),
-      el('div', { class: 'field-row' }, [
-        fieldGroup('burialLat', 'Latitude', { type: 'number', step: 'any' }),
-        fieldGroup('burialLng', 'Longitude', { type: 'number', step: 'any' }),
-      ]),
+      prayer.node,
+      burial.node,
 
       el('div', { class: 'field-group' }, [
         el('label', { class: 'label', for: 'instructions', text: 'Public instructions' }),
@@ -318,10 +352,28 @@ async function openComposer(mount, ctx, org, existing) {
     const priv = await store.getNoticePrivate(existing.id);
     fillForm(form, priv);
   }
+  // After fillForm, so a correction opens showing the location the notice
+  // already has rather than an empty search box that reads as data lost.
+  prayer.hydrate();
+  burial.hydrate();
 
   const collect = () => ({ ...readForm(form), orgId: org.id });
 
   const validate = () => {
+    // The pickers name what is missing in the words of the thing they are
+    // missing, and put the cursor there. validateNoticeForm still runs after
+    // them: it is the mirror of firestore.rules and has the final say.
+    for (const picker of [prayer, burial]) {
+      const gap = picker.missing();
+      if (gap) {
+        error.hidden = false;
+        error.replaceChildren(el('p', { text: gap.message }));
+        gap.focus?.focus();
+        gap.focus?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return null;
+      }
+    }
+
     const form_ = collect();
     const errors = validateNoticeForm(form_);
     if (errors.length) {

@@ -319,6 +319,16 @@ export function renderOrgs(mount, ctx) {
         el('dd', { text: `${org.staffUids?.length || 0} authorized` }),
       ]),
       el('div', { class: 'card-actions' }, [
+        // The point of being verified. Without this the screen that tells
+        // somebody they have been approved gives them nothing to do about it,
+        // and they have to work out for themselves that publishing lives
+        // under a different tab.
+        org.verificationStatus === 'verified'
+          ? el('button', {
+            class: 'btn btn--primary',
+            onclick: () => ctx.go?.('notices'),
+          }, 'Publish a Janazah notice')
+          : null,
         org.ownerUid === ctx.user.uid
           ? el('button', { class: 'btn', onclick: () => manageStaff(org, ctx) }, 'Manage staff')
           : null,

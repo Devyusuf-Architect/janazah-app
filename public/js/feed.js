@@ -11,7 +11,7 @@ import { $, el, toast } from './ui.js';
 import { isSampleMode, initSampleMode } from './sample-mode.js';
 import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
-import { revealIn, autoReveal } from './motion.js';
+import { revealIn, autoReveal, pageEnter } from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
@@ -165,6 +165,7 @@ function route() {
   stopReveal();
   renderedFor = user?.uid ?? null;
   renderRoute();
+  pageEnter(mount());
   revealIn(mount());
   stopReveal = autoReveal(mount());
 }

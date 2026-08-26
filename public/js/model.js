@@ -283,3 +283,44 @@ export function formatJanazahTime(notice) {
   }
   return notice.timeLabel ? `${formatted} (${notice.timeLabel})` : formatted;
 }
+
+// ---------------------------------------------------------------- time zones
+//
+// The time zone a prayer time is announced in.
+//
+// Registration accepts organizations in any of the countries in regions.js,
+// so a list of six Canadian zones would leave a masjid outside Canada unable
+// to state its own prayer time correctly. A Janazah announced in the wrong
+// zone is people arriving hours after a burial has finished, and nothing in
+// the system would flag it.
+//
+// Intl.supportedValuesOf gives the full IANA list from the browser itself,
+// with no data to ship and nothing to keep current as zones change. Where it
+// is unavailable the Canadian zones remain, since that is where this launches.
+
+const CANADIAN_ZONES = [
+  'America/St_Johns', 'America/Halifax', 'America/Toronto',
+  'America/Winnipeg', 'America/Edmonton', 'America/Vancouver',
+];
+
+export function timeZoneOptions() {
+  try {
+    const all = Intl.supportedValuesOf?.('timeZone');
+    if (Array.isArray(all) && all.length) return all;
+  } catch { /* older browser */ }
+  return CANADIAN_ZONES;
+}
+
+/**
+ * Which zone to preselect: the one the notice already used, else the one this
+ * device is in, else the launch default. Reopening a correction must never
+ * silently move the prayer time.
+ */
+export function defaultTimeZone(existing, options = timeZoneOptions()) {
+  if (existing && options.includes(existing)) return existing;
+  try {
+    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (here && options.includes(here)) return here;
+  } catch { /* no Intl */ }
+  return options.includes(APP.defaultTimeZone) ? APP.defaultTimeZone : options[0];
+}

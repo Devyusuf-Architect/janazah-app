@@ -686,6 +686,24 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 }
 .address-chosen__label { margin: 0 0 .35rem; font-size: .92rem; color: var(--ink); }
 .address-chosen .hint { margin: .4rem 0 0; }
+.address-chosen .btn { margin-left: .6rem; }
+
+/* One location on the notice composer: a typed name and a searched address. */
+.place-picker {
+  margin: 1.4rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.place-picker__legend {
+  margin: 0 0 .3rem;
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.place-picker__shortcut { margin: .6rem 0 .9rem; }
+.place-picker .field-group + .field-group { margin-top: .9rem; }
 
 /* ---------- verification state ---------- */
 
@@ -1408,6 +1426,17 @@ select.field { cursor: pointer; }
 .reveal:nth-child(2) { transition-delay: .04s; }
 .reveal:nth-child(3) { transition-delay: .08s; }
 .reveal:nth-child(4) { transition-delay: .12s; }
+.reveal:nth-child(5) { transition-delay: .16s; }
+.reveal:nth-child(6) { transition-delay: .20s; }
+
+/* A route change is the same app moving, not a browser reload. 180ms and
+   6px: the most this application should ever do to a page somebody opened to
+   find out when a funeral is. Applied by motion.js, which skips it entirely
+   under reduced motion rather than relying on the media query below. */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.view.is-entering { animation: pageEnter var(--dur) var(--ease); }
 
 /* ---------- interactive polish ---------- */
 
@@ -1496,6 +1525,35 @@ select.field { cursor: pointer; }
   .sidenav, .account__menu, .nav-scrim, .nav-item, .jrow, .qa__item {
     transition: none;
     animation: none;
+  }
+
+  /* Everything in the "reactive controls" section is a response to a hover,
+     a press or a focus. All of it is switched off here rather than being
+     assumed harmless, so this block stays the single place that answers
+     "what moves". */
+  .view.is-entering,
+  .home-results:not([hidden]) { animation: none; }
+
+  .btn--primary:hover:not(:disabled),
+  .btn--primary:active:not(:disabled),
+  .btn--small:active:not(:disabled),
+  .mgrid .mrow:hover,
+  .qa__item:hover .icon,
+  .section-head__link:hover,
+  .home-more:hover,
+  .account__button:hover .account__avatar,
+  .account__button[aria-expanded="true"] .account__caret,
+  .sidenav .nav-item:hover .icon {
+    transform: none;
+  }
+
+  .nav-item::before,
+  .account__caret,
+  .account__avatar,
+  .jrow__go, .jrow__org, .mrow, .qa__item .icon,
+  .section-head__link, .home-more, .finder__locate,
+  .place-picker, .stepper__num, .guide-strip, .check {
+    transition: none;
   }
 }
 
@@ -2179,3 +2237,140 @@ select.field { cursor: pointer; }
   .finder__locate { flex: 1 1 100%; justify-content: center; }
   .prompt, .guide-strip { align-items: stretch; }
 }
+
+/* ---------------------------------------------------------------------------
+   Reactive controls.
+
+   The rule this follows: motion confirms something the person did, or it does
+   not happen. A control that moves on its own, glows, or animates to draw
+   attention has no place on a page about a funeral. Everything below is a
+   response to a hover, a press, or a keyboard focus, and all of it is short.
+   --------------------------------------------------------------------------- */
+
+/* Keyboard focus, everywhere, in one place. Visible enough to follow with the
+   eye and never shown to somebody using a mouse. */
+.btn:focus-visible,
+.nav-item:focus-visible,
+.account__button:focus-visible,
+.account__item:focus-visible,
+.qa__item:focus-visible,
+.jrow__main:focus-visible,
+.mrow__main:focus-visible,
+.section-head__link:focus-visible,
+.tab:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* A press should be felt. Primary actions lift slightly on hover and settle
+   under the finger; the lift is 1px, not a bounce. */
+.btn--primary:hover:not(:disabled) { transform: translateY(-1px); }
+.btn--primary:active:not(:disabled) { transform: translateY(0) scale(.985); }
+.btn--small:active:not(:disabled) { transform: scale(.97); }
+
+/* A control that is working says so by dimming, rather than by staying
+   identical while nothing appears to happen. */
+.btn:disabled { transition: opacity var(--dur) var(--ease); }
+
+/* ---------- home page ---------- */
+
+/* The row itself lifts nothing; the surface behind it warms and its
+   directions button steps forward. A whole row that moves under the cursor
+   makes a list feel unstable to scan. */
+.jrow {
+  transition: background var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.jrow:hover { box-shadow: inset 2px 0 0 var(--accent-line); }
+.jrow__go { transition: background var(--dur-fast) var(--ease),
+                        border-color var(--dur-fast) var(--ease),
+                        transform var(--dur-fast) var(--ease); }
+.jrow:hover .jrow__go {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.jrow__org { transition: color var(--dur-fast) var(--ease); }
+.jrow:hover .jrow__org { color: var(--accent); }
+
+.mrow { transition: background var(--dur-fast) var(--ease),
+                    border-color var(--dur-fast) var(--ease),
+                    transform var(--dur) var(--ease); }
+.mgrid .mrow:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+
+/* The icon leads the eye into the action. Two pixels. */
+.qa__item .icon { transition: color var(--dur-fast) var(--ease),
+                              transform var(--dur) var(--ease); }
+.qa__item:hover .icon { transform: translateX(2px); }
+
+.section-head__link {
+  transition: color var(--dur-fast) var(--ease), transform var(--dur) var(--ease);
+}
+.section-head__link:hover { transform: translateX(2px); }
+
+.home-more { transition: color var(--dur-fast) var(--ease), transform var(--dur) var(--ease); }
+.home-more:hover { transform: translateX(2px); }
+
+.finder__locate { transition: background var(--dur-fast) var(--ease),
+                              border-color var(--dur-fast) var(--ease),
+                              transform var(--dur-fast) var(--ease); }
+.finder__locate:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.guide-strip { transition: border-color var(--dur) var(--ease); }
+.guide-strip:hover { border-color: var(--accent); }
+
+/* Search results replacing the page should arrive, not blink into place. */
+.home-results:not([hidden]) { animation: pageEnter var(--dur) var(--ease); }
+
+/* ---------- sidebar ---------- */
+
+/* The active section is marked by a bar that grows from nothing rather than
+   a background that snaps on. */
+.nav-item { position: relative; }
+.nav-item::before {
+  content: "";
+  position: absolute;
+  left: .18rem;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateY(-50%);
+  transition: height var(--dur) var(--ease);
+}
+.nav-item--active::before { height: 1.1rem; }
+.sidenav .nav-item:hover::before { height: .7rem; background: var(--line-strong); }
+.sidenav .nav-item--active:hover::before { height: 1.1rem; background: var(--accent); }
+/* The console's horizontal bar has no room for a left rule. */
+.nav .nav-item::before { display: none; }
+
+.nav-item .icon { transition: transform var(--dur) var(--ease); }
+.sidenav .nav-item:hover .icon { transform: translateX(1px); }
+
+/* ---------- account menu ---------- */
+
+.account__avatar { transition: background var(--dur-fast) var(--ease),
+                               transform var(--dur-fast) var(--ease); }
+.account__button:hover .account__avatar { transform: scale(1.04); }
+.account__caret { transition: transform var(--dur) var(--ease); }
+.account__button[aria-expanded="true"] .account__caret { transform: rotate(180deg); }
+
+/* ---------- forms and the composer ---------- */
+
+.place-picker { transition: border-color var(--dur) var(--ease); }
+.place-picker:focus-within { border-color: var(--accent-line); }
+
+.check { transition: color var(--dur-fast) var(--ease); }
+.check:hover { color: var(--ink); }
+
+/* The stepper's completed marks fill in rather than appearing. */
+.stepper__num { transition: background var(--dur) var(--ease),
+                            border-color var(--dur) var(--ease),
+                            color var(--dur) var(--ease); }

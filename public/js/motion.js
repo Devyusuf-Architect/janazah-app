@@ -71,6 +71,27 @@ export function revealIn(root = document) {
 }
 
 /**
+ * Play the page-entry animation on a route change.
+ *
+ * A whole page swapping instantly reads as a browser reload; a short rise
+ * reads as the same app moving. It is 180ms and it moves 6px, which is the
+ * most this application should ever do to a page somebody opened to find out
+ * when a funeral is.
+ *
+ * The class is removed and re-added across a forced reflow because the same
+ * element is reused for every route: without that, the animation only ever
+ * plays once.
+ */
+export function pageEnter(node) {
+  if (!node || REDUCED()) return;
+  node.classList.remove('is-entering');
+  // Reading offsetWidth flushes the removal so the class re-add restarts the
+  // animation rather than being coalesced into a no-op.
+  void node.offsetWidth;
+  node.classList.add('is-entering');
+}
+
+/**
  * Watch a container and reveal anything added to it later.
  *
  * The feed, the dashboard and an organization's notice list all repaint from
