@@ -698,18 +698,65 @@ const run = async () => {
     // ---- the home page, and the nav that ties the site together -------------
     const guest = await newPage();
     await guest.goto(BASE);
-    await guest.locator('.hero').waitFor({ timeout: 15000 });
+    await guest.locator('.home-head').waitFor({ timeout: 15000 });
+
+    // The first screen is content, not an argument. A visitor who has just
+    // been told a Janazah is today must see one without scrolling past copy.
+    await guest.locator('.jrow').first().waitFor({ timeout: 15000 });
+    const firstRow = await guest.locator('.jrow').first().innerText();
+    assert.match(firstRow, /Verified/, 'each Janazah must show it came from a verified masjid');
+    await guest.locator('.jrow').first().getByRole('link', { name: 'Directions' })
+      .waitFor({ timeout: 5000 });
+    const headBox = await guest.locator('.home-head').boundingBox();
+    assert.ok(headBox.height < 320,
+      `the top of the home page must stay compact, was ${headBox?.height}px`);
+    log('home page opens on actual Janazahs, each verified and with directions');
+
     const homeText = await guest.locator('#view').innerText();
     assert.match(homeText, /verified masjids/i, 'home page must state who publishes');
     assert.match(homeText, /optional/i, 'home page must state location alerts are optional');
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Following', 'Sign in']) {
-      await guest.getByRole('link', { name: label, exact: true }).first().waitFor({ timeout: 5000 });
+    assert.match(homeText, /Upcoming Janazahs/i);
+    assert.match(homeText, /Near you/i);
+    assert.match(homeText, /Masjids you follow/i);
+    assert.match(homeText, /How to perform Janazah/i);
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Following', 'Janazah Guide']) {
+      await guest.locator('#nav').getByRole('link', { name: label, exact: true })
+        .first().waitFor({ timeout: 5000 });
     }
-    log('home page explains the product and links to every major section');
+    // Account actions live in the top right, not spread through the sections.
+    await guest.locator('#account').getByRole('link', { name: 'Sign in', exact: true })
+      .waitFor({ timeout: 5000 });
+    log('home page carries every section, and account actions sit apart from them');
 
-    await guest.getByRole('link', { name: 'View Janazahs' }).click();
+    // Searching by masjid, city or postal code, over one box. By this point
+    // the suite has published a Toronto notice and a Vancouver one, which is
+    // what makes a city search worth asserting on.
+    await guest.locator('#home-search').fill('Vancouver');
+    await guest.locator('.home-results .jrow').first().waitFor({ timeout: 5000 });
+    const cityResults = await guest.locator('.home-results').innerText();
+    assert.match(cityResults, /Vancouver Prayer Hall/,
+      'search must match on the city inside a prayer address');
+    assert.ok(!/Main Prayer Hall/.test(cityResults),
+      'search must exclude what does not match');
+
+    await guest.locator('#home-search').fill('Test Masjid');
+    await guest.locator('.home-results .jrow').first().waitFor({ timeout: 5000 });
+    assert.match(await guest.locator('.home-results').innerText(), /Test Masjid/,
+      'search must find notices by the masjid that published them');
+
+    await guest.locator('#home-search').fill('zzzz-no-such-place');
+    await guest.locator('.home-results .home-empty').waitFor({ timeout: 5000 });
+    assert.match(await guest.locator('.home-results').innerText(), /Nothing matches/,
+      'a search with no results must say so rather than showing an empty page');
+
+    await guest.locator('#home-search').fill('');
+    assert.ok(await guest.locator('.home-results').isHidden(),
+      'clearing the box must restore the ordinary page');
+    log('one search box covers masjid name, city and address');
+
+    await guest.locator('.section-head__link').first().click();
     await guest.locator('.notice-card').first().waitFor({ timeout: 15000 });
-    assert.match(guest.url(), /\/janazahs$/, 'expected /janazahs after "View Janazahs"');
+    assert.match(guest.url(), /\/janazahs$/, 'expected /janazahs after "View all"');
     assert.equal(
       await guest.locator('#nav .nav-item--active').first().innerText(), 'Janazahs',
       'the nav must show which section you are in');
@@ -717,9 +764,31 @@ const run = async () => {
 
     // The name in the corner is the way home from anywhere.
     await guest.locator('.brand').click();
-    await guest.locator('.hero').waitFor({ timeout: 10000 });
+    await guest.locator('.home-head').waitFor({ timeout: 10000 });
     assert.match(guest.url(), /\/$/, 'the brand must return to the public home page');
     log('the Ta’ziyah brand returns to the home page');
+
+    // ---- the sidebar on a phone -------------------------------------------
+    // A drawer, not a squeezed sidebar: it must be out of the way until asked
+    // for, and reachable without hunting.
+    const phone = await newPage({ viewport: { width: 390, height: 844 } });
+    await phone.goto(BASE);
+    await phone.locator('.home-head').waitFor({ timeout: 15000 });
+    assert.ok(!(await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
+      .first().isVisible()), 'the sidebar must be closed on a phone until opened');
+    await phone.locator('#nav-toggle').click();
+    await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
+      .first().waitFor({ state: 'visible', timeout: 5000 });
+    // To the right of the drawer, which is where somebody dismissing it taps.
+    // The scrim spans the viewport, so its centre is under the drawer itself.
+    await phone.locator('#nav-scrim').click({ position: { x: 360, y: 400 } });
+    await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
+      .first().waitFor({ state: 'hidden', timeout: 5000 });
+    // The page under it is still the useful one, at a readable width.
+    const phoneRow = await phone.locator('.jrow').first().boundingBox();
+    assert.ok(phoneRow.width <= 390, 'the page must not scroll sideways on a phone');
+    log('the sidebar is a drawer on a phone, and closes on the scrim');
+    await phone.close();
 
     // ---- the Janazah prayer guide, with no account -------------------------
     await guest.goto(`${BASE}/janazah-guide`);
@@ -787,7 +856,28 @@ const run = async () => {
     }
     log('community sign-up lands on a dashboard reusing the existing sections');
 
-    await member.getByRole('button', { name: 'Sign out' }).click();
+    // ---- the account menu --------------------------------------------------
+    // Everything about the person is behind one control in the top right,
+    // rather than their name, Dashboard and Sign out competing with the
+    // sections of the site. That makes the menu the only way out, so it has
+    // to open, and closing it must not require finding the same button again.
+    assert.equal(await member.locator('.account__menu:visible').count(), 0,
+      'the account menu must start closed');
+    await member.locator('.account__button').click();
+    const menu = member.locator('.account__menu');
+    await menu.waitFor({ state: 'visible', timeout: 5000 });
+    const menuText = await menu.innerText();
+    for (const item of ['Dashboard', 'Account and settings', 'Sign out']) {
+      assert.match(menuText, new RegExp(item), `account menu is missing: ${item}`);
+    }
+    assert.ok(!/Settings\n/.test(menuText),
+      'Account and Settings must not be two items pointing at the same page');
+    await member.keyboard.press('Escape');
+    await menu.waitFor({ state: 'hidden', timeout: 5000 });
+    log('the account menu holds the personal items, and Escape closes it');
+
+    await member.locator('.account__button').click();
+    await menu.getByRole('menuitem', { name: 'Sign out' }).click();
     await member.locator('form.card--narrow').waitFor({ timeout: 15000 });
     assert.match(member.url(), /\/signin$/, 'signing out of the dashboard must return to sign-in');
     log('signing out of the community dashboard returns to sign-in');
@@ -902,7 +992,7 @@ const run = async () => {
       'the console brand must go to the public home page, not /console');
     await coord.getByRole('link', { name: 'Public site' }).first().waitFor({ timeout: 5000 });
     await coord.locator('.brand').click();
-    await coord.locator('.hero').waitFor({ timeout: 15000 });
+    await coord.locator('.home-head').waitFor({ timeout: 15000 });
     assert.match(coord.url(), /\/$/, 'the console brand did not reach the home page');
     log('the console brand and nav both lead back to the public site');
 

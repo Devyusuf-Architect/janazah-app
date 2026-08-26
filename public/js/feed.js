@@ -12,7 +12,7 @@ import { isSampleMode, initSampleMode } from './sample-mode.js';
 import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { revealIn, autoReveal } from './motion.js';
-import { renderHome } from './views/home.js';
+import { renderHome, teardownHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
 import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
@@ -41,6 +41,7 @@ let renderedFor = null;
 let isAdmin = false;
 
 function teardownAll() {
+  teardownHome();
   teardownFeed();
   teardownDashboard();
   teardownOrgPage();

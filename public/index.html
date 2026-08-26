@@ -41,24 +41,32 @@
   </p>
 
   <header class="masthead">
-    <a class="brand" href="/">
-      <span class="brand__mark" aria-hidden="true">◆</span>
-      <span>Ta'ziyah</span>
-    </a>
     <button id="nav-toggle" class="nav-toggle" type="button"
             aria-label="Menu" aria-expanded="false" aria-controls="nav">
       <span class="nav-toggle__bar"></span>
       <span class="nav-toggle__bar"></span>
       <span class="nav-toggle__bar"></span>
     </button>
-    <nav id="nav" class="nav"></nav>
+    <a class="brand" href="/">
+      <span class="brand__mark" aria-hidden="true">◆</span>
+      <span>Ta'ziyah</span>
+    </a>
+    <div class="masthead__spacer"></div>
+    <div id="account" class="account"></div>
   </header>
 
-  <main id="view" class="view">
-    <p class="muted">Loading…</p>
-  </main>
+  <div class="app-body">
+    <!-- The sidebar keeps id="nav" so the toggle's aria-controls, the mobile
+         drawer and everything already addressing it keep working. -->
+    <nav id="nav" class="sidenav" aria-label="Sections"></nav>
+    <div id="nav-scrim" class="nav-scrim" hidden></div>
 
-  <footer class="footer">
+    <div class="app-main">
+      <main id="view" class="view">
+        <p class="muted">Loading…</p>
+      </main>
+
+      <footer class="footer">
     <p>
       Notices are published by masjids and funeral coordinators verified by a
       platform administrator. If something looks wrong, use “Report a problem”
@@ -72,7 +80,9 @@
       <a class="link" href="/privacy">How your information is handled</a> ·
       <a class="link" href="/terms">Terms of service</a>.
     </p>
-  </footer>
+      </footer>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

@@ -11,7 +11,7 @@
     "deploy": "firebase deploy",
     "test:e2e": "firebase emulators:exec --only auth,firestore,functions --project demo-janazah \"node tests/e2e.smoke.mjs\"",
     "test": "npm run test:unit && npm run test:rules && npm run test:e2e",
-    "test:unit": "node --test \"tests/nearby.test.js\" \"tests/duplicates.test.js\" \"tests/public-surface.test.js\" \"tests/sample-data.test.js\" \"tests/takedown.test.js\" \"tests/error-copy.test.js\" \"tests/geocode.test.js\" \"tests/motion.test.js\" \"tests/sample-mode.test.js\" \"tests/janazah-guide.test.js\" \"tests/verification.test.js\" \"tests/upload.test.js\" \"functions/test/*.test.js\"",
+    "test:unit": "node --test \"tests/nearby.test.js\" \"tests/duplicates.test.js\" \"tests/public-surface.test.js\" \"tests/sample-data.test.js\" \"tests/takedown.test.js\" \"tests/error-copy.test.js\" \"tests/geocode.test.js\" \"tests/motion.test.js\" \"tests/sample-mode.test.js\" \"tests/janazah-guide.test.js\" \"tests/verification.test.js\" \"tests/upload.test.js\" \"tests/home.test.js\" \"functions/test/*.test.js\"",
     "deploy:functions": "firebase deploy --only functions",
     "screenshots": "firebase emulators:exec --only auth,firestore,functions --project demo-janazah \"node scripts/screenshots.mjs\"",
     "demo": "firebase emulators:exec --only auth,firestore,functions,hosting --project demo-janazah \"node scripts/seed-demo.mjs --hold\"",

@@ -169,23 +169,24 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .masthead {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 40;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding: .8rem clamp(1rem, 4vw, 2rem);
+  gap: .75rem;
+  height: 3.5rem;
+  padding: 0 clamp(.75rem, 3vw, 1.25rem);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(12px);
   border-bottom: 1px solid var(--line);
 }
+.masthead__spacer { flex: 1; }
 
 .brand {
   display: flex;
   align-items: center;
   gap: .55rem;
   font-family: var(--serif);
-  font-size: 1.08rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--ink);
   text-decoration: none;
@@ -200,53 +201,246 @@ a { color: var(--accent); text-underline-offset: 2px; }
   background: var(--accent);
   color: var(--accent-ink);
   font-size: .7rem;
-  transform: rotate(0deg);
 }
 .brand__sub { font-weight: 400; color: var(--ink-3); font-size: .8em; }
 
-.nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .2rem;
-  flex: 1;
-  flex-wrap: wrap;
-}
-.nav-spacer { flex: 1; }
-.nav-user { color: var(--ink-3); font-size: .82rem; padding: 0 .3rem; }
+/* ---------- application shell ---------- */
+/* A sidebar of sections and one scrolling column beside it. The nav does not
+   move with the page: on a site people open in a hurry, the way to every
+   other section should not require scrolling back to the top first. */
 
-.nav-links { display: flex; align-items: center; gap: .2rem; flex-wrap: wrap; }
-.nav-links--end { margin-left: auto; }
+.app-body {
+  display: grid;
+  grid-template-columns: var(--sidenav, 15rem) minmax(0, 1fr);
+  align-items: start;
+}
+body.is-nav-collapsed .app-body { --sidenav: 3.75rem; }
+
+.app-main { min-width: 0; }
+
+.sidenav {
+  position: sticky;
+  top: 3.5rem;
+  height: calc(100dvh - 3.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  padding: 1rem .6rem;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunk);
+  transition: width var(--dur) var(--ease);
+}
+
+.sidenav__group { display: flex; flex-direction: column; gap: .1rem; }
+.sidenav__rule {
+  height: 1px;
+  margin: .7rem .5rem;
+  background: var(--line);
+}
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
   border: 0;
   background: none;
   cursor: pointer;
-  padding: .42rem .75rem;
-  border-radius: 999px;
+  padding: .52rem .7rem;
+  border-radius: 9px;
   color: var(--ink-2);
   font: inherit;
   font-size: .9rem;
   font-weight: 500;
   text-decoration: none;
-  transition: background .15s ease, color .15s ease;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
+.nav-item .icon { flex: none; opacity: .75; }
 .nav-item:hover { background: var(--surface-2); color: var(--ink); }
-.nav-item--active { background: var(--accent-soft); color: var(--accent); }
-.nav-item--cta { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.nav-item--cta:hover { background: var(--accent-hover); color: var(--accent-ink); }
-.nav-item--ghost { color: var(--ink-3); }
-
-/* Leads somewhere most signed-in people cannot go, so it is marked out
-   without shouting: an outline rather than another filled button competing
-   with the primary action beside it. */
-.nav-item--admin {
-  color: var(--gold);
-  border: 1px solid var(--gold-line);
-  background: var(--gold-soft);
+.nav-item--active {
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 600;
 }
-.nav-item--admin:hover { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); }
+.nav-item--active .icon { opacity: 1; }
+.nav-item--quiet { color: var(--ink-3); }
+
+/* Leads somewhere most signed-in people cannot go, so it is marked out
+   without shouting: a tint rather than another filled button. */
+.nav-item--admin { color: var(--gold); }
+.nav-item--admin:hover { background: var(--gold-soft); color: var(--gold); }
+
+.sidenav__collapse {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-top: auto;
+  padding: .52rem .7rem;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.sidenav__collapse:hover { background: var(--surface-2); color: var(--ink-2); }
+
+/* Drawer only; the desktop sidebar has nothing to close. */
+.sidenav__close {
+  display: none;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .5rem;
+  padding: .52rem .7rem;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: .86rem;
+  cursor: pointer;
+}
+.sidenav__close:hover { background: var(--surface-2); color: var(--ink-2); }
+
+body.is-nav-collapsed .sidenav { padding-inline: .5rem; }
+body.is-nav-collapsed .nav-item,
+body.is-nav-collapsed .sidenav__collapse { justify-content: center; padding-inline: .4rem; }
+/* Kept in the DOM, out of sight: the label is still the accessible name. */
+body.is-nav-collapsed .nav-item__label {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
+
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(0, 0, 0, .4);
+  backdrop-filter: blur(1px);
+}
+
+/* ---------- the console's own nav ----------
+   console.html keeps a horizontal bar in the masthead rather than a sidebar:
+   it has five routes, all of them tools, and a coordinator is there to do one
+   task at a time. Same .nav-item, laid out differently. */
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.nav .nav-item { gap: 0; }
+.nav-spacer { flex: 1; }
+.nav-user { color: var(--ink-3); font-size: .82rem; padding: 0 .3rem; }
+.nav-item--ghost { color: var(--ink-3); }
+
+/* The console masthead carries its whole nav, so it sizes to it rather than
+   holding the public site's fixed bar height. */
+.masthead--console { height: auto; min-height: 3.5rem; flex-wrap: wrap; gap: 1.25rem; }
+
+@media (max-width: 720px) {
+  .masthead--console { padding-block: .6rem; }
+  .nav { order: 3; width: 100%; }
+}
+
+/* ---------- account menu ---------- */
+
+.account { display: flex; align-items: center; gap: .5rem; }
+.account__wrap { position: relative; }
+
+.account__button {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .3rem .55rem .3rem .3rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: .86rem;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.account__button:hover { background: var(--surface-2); border-color: var(--line); }
+
+.account__avatar {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.account__name {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account__caret {
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: .6;
+}
+
+.account__menu {
+  position: absolute;
+  top: calc(100% + .45rem);
+  right: 0;
+  z-index: 50;
+  min-width: 13rem;
+  padding: .35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.account__who {
+  padding: .5rem .6rem .55rem;
+  margin: 0 0 .25rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+.account__who-name { font-size: .88rem; font-weight: 600; color: var(--ink); }
+.account__who-mail { font-size: .78rem; color: var(--ink-3); overflow-wrap: anywhere; }
+
+.account__item {
+  display: block;
+  width: 100%;
+  padding: .5rem .6rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: .88rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.account__item:hover { background: var(--surface-2); color: var(--ink); }
+.account__item--danger { color: var(--danger); }
+.account__item--danger:hover { background: var(--danger-soft); color: var(--danger); }
 
 /* Hidden by default; only meaningful once the media query below shows it. */
 .nav-toggle {
@@ -256,6 +450,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   gap: .3rem;
   width: 2.2rem;
   height: 2.2rem;
+  flex: none;
   border: 0;
   border-radius: 8px;
   background: none;
@@ -273,21 +468,54 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .nav-toggle[aria-expanded="true"] .nav-toggle__bar:nth-child(2) { opacity: 0; }
 .nav-toggle[aria-expanded="true"] .nav-toggle__bar:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
+  /* The sidebar becomes a drawer. Not a compressed sidebar: on a phone the
+     nav is somewhere you visit and leave, so it gets out of the way entirely
+     rather than taking a permanent slice of a small screen. */
   .nav-toggle { display: flex; }
-  .nav {
-    display: none;
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    order: 3;
-    padding-top: .6rem;
-    gap: .1rem;
+  .app-body { grid-template-columns: minmax(0, 1fr); }
+  .sidenav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    /* Above the masthead, not below it. The masthead sits under one or two
+       banners depending on the deployment, so a drawer anchored to a guessed
+       offset lands over the banner on some pages and short of it on others. */
+    z-index: 45;
+    width: min(17rem, 82vw);
+    transform: translateX(-102%);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    /* visibility, not only transform: a drawer that is merely translated off
+       screen is still in the tab order, so a keyboard user tabs into links
+       they cannot see. It stays visible for the length of the slide out. */
+    visibility: hidden;
+    transition: transform var(--dur) var(--ease), visibility var(--dur);
   }
-  .nav.is-open { display: flex; }
-  .nav-links, .nav-links--end { flex-direction: column; align-items: stretch; margin-left: 0; }
-  .nav-item { text-align: left; }
-  .nav-user { padding: .5rem .75rem 0; }
+  .sidenav.is-open { transform: translateX(0); visibility: visible; }
+  .sidenav__close { display: flex; }
+  .sidenav__collapse { display: none; }
+  body.is-drawer-open { overflow: hidden; }
+  body.is-nav-collapsed .nav-item,
+  body.is-nav-collapsed .sidenav__collapse { justify-content: flex-start; padding-inline: .7rem; }
+  body.is-nav-collapsed .nav-item__label {
+    position: static; width: auto; height: auto; clip-path: none;
+  }
+  .account__name { display: none; }
+  .account__button { padding: .3rem; }
+}
+
+@media (max-width: 460px) {
+  /* Two controls plus the brand does not fit. Sign in is the one that stays:
+     somebody returning needs it more often than a first-time visitor needs
+     the other, and /signin offers account creation on arrival anyway. */
+  .account .btn--primary { display: none; }
+  .account .nav-item--quiet {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: .38rem .8rem;
+  }
 }
 
 .view {
@@ -390,8 +618,6 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .cta-card h2 { margin: 0 0 .4rem; font-size: 1.15rem; }
 .cta-card__actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1.1rem; }
-
-.home-footnote { padding-top: 1rem; border-top: 1px solid var(--line); }
 
 .hero--compact { padding-bottom: 2rem; }
 
@@ -1240,9 +1466,11 @@ select.field { cursor: pointer; }
 
 @keyframes menuIn { from { opacity: 0; transform: translateY(-6px); } }
 
-@media (max-width: 720px) {
-  .nav.is-open { animation: menuIn var(--dur) var(--ease); }
-}
+/* The drawer slides rather than fading; that transform lives with the layout
+   rule so the open and closed states cannot drift apart. */
+.account__menu:not([hidden]) { animation: menuIn var(--dur-fast) var(--ease); }
+.nav-scrim:not([hidden]) { animation: scrimIn var(--dur) var(--ease); }
+@keyframes scrimIn { from { opacity: 0; } }
 
 .address-results { animation: menuIn var(--dur-fast) var(--ease); }
 
@@ -1262,6 +1490,12 @@ select.field { cursor: pointer; }
     opacity: 1;
     transform: none;
     transition: none;
+  }
+  /* The drawer and the account menu still open and close; they just arrive
+     rather than travelling. Removing the transition, not the state. */
+  .sidenav, .account__menu, .nav-scrim, .nav-item, .jrow, .qa__item {
+    transition: none;
+    animation: none;
   }
 }
 
@@ -1613,3 +1847,335 @@ select.field { cursor: pointer; }
 .signal--unknown { border-left-color: var(--line); }
 
 .hint--error { color: var(--error, #b3261e); }
+
+/* ---------------------------------------------------------------------------
+   The home page.
+
+   An index, not a pitch. Somebody opening this has usually just been told a
+   Janazah is happening, often today, often while driving somewhere. So the
+   first screen carries content rather than an argument: a search box, then
+   the actual notices. The explanation of what this service is lives on
+   /about, where somebody who wants it will go looking.
+
+   Everything below is built from rows, rules and small chips instead of a
+   grid of cards. Rows scan in a hurry; a page of rounded boxes does not.
+   --------------------------------------------------------------------------- */
+
+.home-head {
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.6rem;
+}
+
+.home-head__title {
+  font-family: var(--serif);
+  /* Restrained on purpose. The old headline was the size of the screen, which
+     put the actual notices below the fold on every phone. */
+  font-size: clamp(1.5rem, 3.4vw, 1.95rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 .35rem;
+}
+
+.home-head__sub {
+  margin: 0 0 1.1rem;
+  color: var(--ink-3);
+  font-size: .92rem;
+  max-width: 34rem;
+}
+
+.finder {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.finder__field {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+  padding: 0 .8rem;
+  height: 2.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.finder__field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.finder__field .icon { flex: none; color: var(--ink-3); }
+
+.finder__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: .94rem;
+  outline: none;
+}
+.finder__input::placeholder { color: var(--ink-3); }
+.finder__input::-webkit-search-cancel-button { filter: grayscale(1) opacity(.6); }
+
+.finder__locate { flex: none; height: 2.7rem; }
+
+.home-section { margin-bottom: 2.2rem; }
+.home-results:not([hidden]) { margin-bottom: 2.2rem; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .75rem;
+}
+.section-head__title {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.section-head__link {
+  font-size: .84rem;
+  color: var(--ink-3);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.section-head__link:hover { color: var(--accent); text-decoration: underline; }
+
+/* ---------- a Janazah, as a row ---------- */
+
+.jlist, .mlist, .mgrid, .qa {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.jlist { border-top: 1px solid var(--line); }
+
+.jrow {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .85rem .25rem;
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px;
+  transition: background var(--dur-fast) var(--ease);
+}
+.jrow:hover { background: var(--surface-2); }
+.jrow--cancelled { opacity: .68; }
+
+.jrow__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  padding: 0 .5rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.jrow__top { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.jrow__org {
+  font-weight: 600;
+  font-size: .96rem;
+  color: var(--ink);
+}
+
+.jrow__time,
+.jrow__where {
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  margin: 0;
+  font-size: .875rem;
+  color: var(--ink-2);
+}
+.jrow__time .icon,
+.jrow__where .icon { flex: none; margin-top: .12rem; color: var(--ink-3); }
+.jrow__time span { font-variant-numeric: tabular-nums; }
+
+.jrow__place { display: block; }
+.jrow__addr { display: block; color: var(--ink-3); font-size: .84rem; }
+.jrow__burial { margin: 0; font-size: .82rem; color: var(--ink-3); }
+
+.jrow__go { flex: none; }
+
+/* ---------- chips ---------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .22rem;
+  padding: .1rem .45rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.chip--verified {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.chip--danger {
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------- masjids ---------- */
+
+.mlist { border-top: 1px solid var(--line); }
+.mlist .mrow { border-bottom: 1px solid var(--line); }
+
+.mgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: .5rem;
+}
+.mgrid .mrow {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.mrow { transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.mrow:hover { background: var(--surface-2); }
+.mgrid .mrow:hover { border-color: var(--line-strong); }
+
+.mrow__main {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  padding: .7rem .75rem;
+  color: inherit;
+  text-decoration: none;
+}
+.mrow__name { font-weight: 600; font-size: .92rem; color: var(--ink); }
+.mrow__meta {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin: .1rem 0 .15rem;
+  font-size: .82rem;
+  color: var(--ink-3);
+}
+.mrow__next { margin: 0; font-size: .84rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.mrow__next--none { color: var(--ink-3); }
+
+/* ---------- prompts and empties ---------- */
+/* A prompt asks for something (location, a follow). An empty reports a fact.
+   They look different so that "nothing here yet" is not mistaken for
+   "you have to do something". */
+
+.prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: .95rem 1.05rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.prompt__body { flex: 1 1 18rem; min-width: 0; }
+.prompt__lede { margin: 0 0 .2rem; font-size: .92rem; color: var(--ink); }
+.prompt__note { margin: 0; font-size: .8rem; color: var(--ink-3); }
+
+.home-empty {
+  padding: .9rem 0;
+  border-top: 1px solid var(--line);
+  font-size: .9rem;
+  color: var(--ink-2);
+}
+.home-empty p { margin: 0 0 .25rem; }
+.home-empty p:last-child { margin-bottom: 0; }
+
+.home-note {
+  margin: 0 0 .6rem;
+  font-size: .82rem;
+  color: var(--ink-3);
+}
+
+.home-more {
+  display: inline-block;
+  margin-top: .6rem;
+  font-size: .84rem;
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.home-more:hover { color: var(--accent); text-decoration: underline; }
+
+/* ---------- quick actions ---------- */
+
+.qa {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: .4rem;
+}
+.qa__item {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .65rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-2);
+  font-size: .88rem;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.qa__item .icon { color: var(--ink-3); flex: none; }
+.qa__item:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.qa__item:hover .icon { color: var(--accent); }
+
+/* ---------- the guide ---------- */
+
+.guide-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+.guide-strip__title {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  margin: 0 0 .2rem;
+  color: var(--ink);
+}
+.guide-strip__sub { margin: 0; font-size: .86rem; color: var(--ink-2); }
+
+@media (max-width: 560px) {
+  /* Stacked, not squeezed: the directions button keeps a full tap target
+     instead of becoming a sliver beside the text. */
+  .jrow { align-items: stretch; flex-direction: column; gap: .5rem; }
+  .jrow__go { align-self: flex-start; margin-left: .5rem; }
+  .finder__locate { flex: 1 1 100%; justify-content: center; }
+  .prompt, .guide-strip { align-items: stretch; }
+}
