@@ -107,6 +107,12 @@ describe('classifyOrgChange', () => {
     const cases = [
       ['pending', 'verified', ACTIONS.ORG_VERIFIED],
       ['verified', 'rejected', ACTIONS.ORG_REJECTED],
+      // Asking for more information is a decision like any other and is
+      // recorded as one: it is the moment an application stopped moving, and
+      // an applicant who says nobody ever came back to them deserves a
+      // record that says otherwise.
+      ['pending', 'needs_information', ACTIONS.ORG_INFO_REQUESTED],
+      ['needs_information', 'verified', ACTIONS.ORG_VERIFIED],
       ['verified', 'suspended', ACTIONS.ORG_SUSPENDED],
       ['suspended', 'pending', ACTIONS.ORG_REINSTATED],
     ];

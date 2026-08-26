@@ -8,7 +8,7 @@ import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   updateProfile, sendPasswordResetEmail, getMultiFactorResolver,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  TotpMultiFactorGenerator,
+  TotpMultiFactorGenerator, sendEmailVerification,
 } from 'firebase/auth';
 import { auth } from '../firebase.js';
 import { el, toast, friendlyError } from '../ui.js';
@@ -268,6 +268,20 @@ export function renderAuth(mount, { variant = 'coordinator', initialMode = 'sign
 }
 
 export const signOutUser = () => signOut(auth);
+
+/**
+ * Send the applicant the Firebase confirmation link for their sign-in address.
+ *
+ * This confirms one thing only: that they can read that inbox. It is not
+ * organization verification, does not move an application forward on its own,
+ * and the wording everywhere it appears says so. It is offered because it is
+ * one fewer open question on the reviewer's screen, not because it proves
+ * anything about a masjid.
+ */
+export async function sendSignInEmailConfirmation() {
+  if (!auth.currentUser) throw new Error('Not signed in.');
+  await sendEmailVerification(auth.currentUser);
+}
 
 /** The four-colour "G", inline so sign-in needs no icon font or network request. */
 function googleMark() {

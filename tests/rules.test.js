@@ -878,6 +878,7 @@ describe('the verification application is private', () => {
     phone: '+1 416 555 0100',
     roleExplanation: 'I lead the daily prayers and handle funeral arrangements.',
     authorized: true,
+    emailVerifiedAtSubmit: false,
     verificationMethods: ['listed_on_website', 'work_email'],
     submittedBy: uid,
     submittedAt: Timestamp.now(),
@@ -988,9 +989,40 @@ describe('the verification application is private', () => {
         applicantRoleOther: 'Volunteer funeral coordinator',
         applicantEmail: 'a@example.com',
         authorized: true,
+        emailVerifiedAtSubmit: false,
         submittedBy: OUTSIDER,
         submittedAt: Timestamp.now(),
       }));
+  });
+
+  test('the confirmed-email signal is pinned to the auth token', async () => {
+    // The reviewer's panel reads this as "sign-in email confirmed". A value
+    // the browser could simply set to true would be worth nothing, so the
+    // rule compares it against the token rather than trusting the document.
+    await assertFails(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { emailVerifiedAtSubmit: true })));
+
+    // With a genuinely confirmed token, true is accepted and false is not.
+    const verified = env.authenticatedContext(OUTSIDER, { email_verified: true }).firestore();
+    await assertSucceeds(setDoc(
+      doc(verified, 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { emailVerifiedAtSubmit: true })));
+    await assertFails(setDoc(
+      doc(verified, 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { emailVerifiedAtSubmit: false })));
+  });
+
+  test('confirming an inbox does not verify the organization', async () => {
+    // Section 4 of the requirement, enforced rather than described: a
+    // confirmed sign-in email must not shortcut anything. The organization
+    // is still pending, still unable to publish.
+    const verified = env.authenticatedContext(OUTSIDER, { email_verified: true }).firestore();
+    await assertSucceeds(setDoc(
+      doc(verified, 'organizations', PENDING_ORG, 'application', 'submitted'),
+      submission(OUTSIDER, { emailVerifiedAtSubmit: true })));
+    await assertFails(updateDoc(
+      doc(verified, 'organizations', PENDING_ORG), { verificationStatus: 'verified' }));
   });
 
   test('evidence cannot be deleted from a client, by anyone', async () => {
@@ -1032,5 +1064,75 @@ describe('internal review notes', () => {
     await assertFails(setDoc(
       doc(as(ADMIN), 'organizations', PENDING_ORG, 'application', 'review'),
       { notes: 'x', updatedAt: Timestamp.now(), updatedBy: 'some-other-admin' }));
+  });
+});
+
+describe('needs_information is an administrator-only status', () => {
+  // The middle option between approving on insufficient evidence and
+  // declining a masjid that has done nothing wrong. It must behave exactly
+  // like pending as far as a client is concerned.
+
+  test('an administrator can ask for more information', async () => {
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG), {
+      verificationStatus: 'needs_information',
+      statusReason: 'Please tell us who on the board asked you to register this.',
+    }));
+  });
+
+  test('an owner cannot move their own organization out of it', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG),
+        { verificationStatus: 'needs_information' });
+    });
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG),
+      { verificationStatus: 'verified' }));
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG),
+      { verificationStatus: 'pending' }));
+    // Nor can they quietly erase the administrator's question.
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG),
+      { statusReason: '' }));
+  });
+
+  test('an organization in this state still cannot publish', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG),
+        { verificationStatus: 'needs_information' });
+    });
+    await assertFails(addDoc(collection(as(OUTSIDER), 'notices'),
+      noticeDoc({ orgId: PENDING_ORG, createdBy: OUTSIDER })));
+  });
+
+  test('a registration cannot be created directly in this state', async () => {
+    // Otherwise an applicant could land themselves somewhere that looks
+    // reviewed without anyone having reviewed it.
+    await assertFails(addDoc(collection(as(OUTSIDER), 'organizations'), {
+      name: 'Sideways Masjid', type: 'masjid',
+      address: '1 St', city: 'Toronto', province: 'ON',
+      lat: 43.6, lng: -79.4, cell: 'dpz83',
+      verificationStatus: 'needs_information',
+      ownerUid: OUTSIDER, staffUids: [OUTSIDER],
+      createdAt: Timestamp.now(), createdBy: OUTSIDER,
+    }));
+  });
+
+  test('the applicant can still correct their application while in it', async () => {
+    // The whole point of the status: there is something for them to do.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG),
+        { verificationStatus: 'needs_information' });
+    });
+    await assertSucceeds(setDoc(
+      doc(as(OUTSIDER), 'organizations', PENDING_ORG, 'application', 'submitted'), {
+        applicantName: 'A Name', applicantRole: 'imam',
+        applicantEmail: 'a@example.com', authorized: true,
+        emailVerifiedAtSubmit: false, submittedBy: OUTSIDER,
+        roleExplanation: 'The detail the administrator asked for.',
+        submittedAt: Timestamp.now(),
+      }));
+  });
+
+  test('a made-up status is still refused', async () => {
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG),
+      { verificationStatus: 'super_verified' }));
   });
 });

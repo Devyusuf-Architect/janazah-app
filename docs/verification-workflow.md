@@ -15,9 +15,18 @@ by `validOrgShape()` in `firestore.rules`:
 | Status | Can publish | Meaning |
 | --- | --- | --- |
 | `pending` | no | Registered, waiting for a platform administrator |
+| `needs_information` | no | Reviewed; the administrator asked the applicant for something |
 | `verified` | **yes** | Approved. The only status that can publish |
 | `rejected` | no | Reviewed and declined |
 | `suspended` | no | Was verified; publishing stopped pending review |
+
+`needs_information` exists so that a reviewer holding an application they
+cannot yet confirm has a third move. Without it the only options are
+approving on insufficient evidence or declining a masjid that has done
+nothing wrong, and both are worse than asking. To a client it behaves exactly
+like `pending`: still unverified, still unable to publish. Only a platform
+administrator can set it, and the applicant can correct their application
+while in it.
 
 Publishing is gated by `isOrgVerified(orgId)` on **both** notice create and
 notice update. A pending, rejected or suspended organization cannot create a
@@ -157,3 +166,121 @@ merely *containing* `sample-` is not enough.
   "resubmit" button that moves `rejected` back to `pending`; only an
   administrator can. That is intentional until there is a reason to
   automate it.
+
+---
+
+## The application: what is collected, and where it lives
+
+Everything gathered to satisfy the platform that the applicant really speaks
+for the organization is stored at
+`organizations/{orgId}/application/submitted` — **not** on the organization
+document.
+
+That split is the whole point, and it is not stylistic. A verified
+organization is world-readable:
+
+```
+allow get: if resource.data.verificationStatus == 'verified' || ...
+```
+
+An applicant's name, personal address, work email, phone number and written
+explanation put on the organization document would become public the moment
+an administrator approved it. In the subcollection they are readable by
+platform administrators and by the applicant alone, before and after
+approval. Not the community, not other organizations, not other staff of the
+same organization, not anonymously, not through a public query. There are
+rules tests for each of those.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `applicantName` | yes | |
+| `applicantRole` | yes | From `APPLICANT_ROLES` in `public/js/verification.js` |
+| `applicantRoleOther` | no | Free text, only when the role is `other` |
+| `applicantEmail` | yes | The sign-in address |
+| `emailVerifiedAtSubmit` | yes | **Pinned by rules to `request.auth.token.email_verified`** |
+| `workEmail` | no | Used for the domain comparison |
+| `phone` | no | |
+| `roleExplanation` | no | Max 2000 characters |
+| `authorized` | yes | Must be `true`; enforced at write time, not only in the form |
+| `verificationMethods` | no | Max 10, from `VERIFICATION_METHODS` |
+| `staffPageUrl` | no | |
+| `documentPath` / `documentName` | no | Cloud Storage path, never a download URL |
+
+`organizations/{orgId}/application/review` holds internal reviewer notes.
+Administrators only — the applicant cannot read them, so a reviewer can write
+frankly. Nothing in either document may be deleted from a client.
+
+## Signals, not a score
+
+`verificationSignals()` in `public/js/verification.js` builds what the
+reviewer reads. Three rules govern it:
+
+1. **Computed at read time**, from the organization's stored `website` and the
+   application's stored `workEmail`. Nothing about a verification verdict is
+   stored as a client-written field, because a boolean the browser wrote is
+   forgeable by anyone willing to edit JavaScript.
+2. **No combined score.** A number invites a reviewer to stop reading, and the
+   failure this guards against is a stranger publishing a funeral notice for
+   someone else's family.
+3. **Never automatic.** No signal approves or declines anything. In
+   particular a consumer mailbox (`gmail.com` and friends) is flagged as
+   "Public email provider. Manual verification recommended" and explicitly is
+   *not* a reason to decline: plenty of real masjids run on a donated
+   account, and refusing them would push exactly the communities this is
+   built for off the platform.
+
+`emailVerifiedAtSubmit` is carried as its own signal whose wording says
+outright that confirming an inbox proves nothing about running a masjid.
+Firebase email verification and organization verification are separate
+things and are never conflated.
+
+## Supporting documents
+
+Optional, and it stays optional. Government identification is never asked
+for. A registration is never held up or declined for the want of a document.
+
+Uploads go to `organizations/{orgId}/verification/{file}` in Cloud Storage,
+governed by `storage.rules`:
+
+- **Read: platform administrators only.** Not the applicant, not other staff,
+  not the community, not anonymously.
+- **Create: the organization's owner**, PDF or image, under 10 MB.
+- **Update: nobody.** Replacing a document in place would let the version an
+  administrator read be swapped afterwards; a correction is a new upload.
+- **Delete: the owner or an administrator**, which is also how sensitive
+  material stops being kept once it has served its purpose.
+- Everything else in the bucket is closed by default.
+
+Ownership and admin status are read from Firestore via cross-service rules
+(`firestore.get`), so there is one record of who is who rather than two that
+can drift. The client stores the storage *path*, never a download URL: a URL
+would work for anyone holding it.
+
+## Duplicate detection
+
+`findPossibleDuplicates()` warns when a registration looks like an
+organization that already exists, and offers "Request access to this
+organization" instead. It only ever warns — a genuinely new masjid with a
+similar name in the same city must still be able to register.
+
+It compares only against **verified** organizations, because `firestore.rules`
+correctly hides pending ones from everyone but their own staff. A duplicate
+of something still in the queue is caught by the administrator reviewing it,
+not by this.
+
+## Audit trail
+
+Every status change is written server-side by `onOrgAuditWritten`, from
+`classifyOrgChange()` in `functions/lib/audit-log.js`. Asking for more
+information is recorded like any other decision (`org.info_requested`): it is
+the moment an application stopped moving, and an applicant who says nobody
+ever came back to them deserves a record that says otherwise.
+
+## What a deployment needs
+
+- `npm run deploy:rules` now deploys **`storage.rules` as well as**
+  `firestore.rules` and the indexes.
+- Cloud Storage must be enabled once for the project in the Firebase console
+  (Build → Storage → Get started) before document upload works. Everything
+  else in verification works without it; an upload simply fails and the
+  applicant is told the registration went through anyway.

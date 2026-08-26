@@ -1473,3 +1473,143 @@ select.field { cursor: pointer; }
   .recite__arabic { padding: .9rem .8rem; }
   .guide-invite .btn { width: 100%; }
 }
+
+/* ---------------------------------------------------------------------------
+   Multi-step organization registration.
+
+   Four short passes instead of one intimidating page. The stepper exists so
+   somebody halfway through knows how much is left; a form of this length with
+   no end in sight gets abandoned, and an abandoned registration means a masjid
+   that cannot publish a Janazah notice.
+   --------------------------------------------------------------------------- */
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  list-style: none;
+  margin: 0 0 1.6rem;
+  padding: 0;
+}
+
+.stepper__item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .86rem;
+  color: var(--muted);
+}
+
+.stepper__num {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper__item.is-current { color: var(--text); font-weight: 600; }
+.stepper__item.is-current .stepper__num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.stepper__item.is-done .stepper__num {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* A tick rather than the number, so completed steps read at a glance. */
+.stepper__item.is-done .stepper__num { font-size: 0; }
+.stepper__item.is-done .stepper__num::after { content: "✓"; font-size: .8rem; }
+
+@media (max-width: 30rem) {
+  /* On a narrow screen the labels wrap into an unreadable stack; the numbers
+     alone still answer "how much is left". */
+  .stepper__label { display: none; }
+  .stepper { gap: .5rem; }
+}
+
+.step > h2 { margin-top: 0; }
+.step + .step { margin-top: 0; }
+
+/* A read-only value that should still line up with the real fields. */
+.field--static {
+  margin: 0;
+  padding: .55rem .7rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--muted);
+}
+
+.check-list {
+  display: grid;
+  gap: .2rem;
+  margin-bottom: 1.2rem;
+}
+
+.check--consent {
+  margin-top: 1.2rem;
+  padding: .9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-2, transparent);
+}
+
+.review-summary h3 {
+  margin: 1.4rem 0 .5rem;
+  font-size: .82rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.review-summary dl { margin: 0; }
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 30%) 1fr;
+  gap: .3rem 1rem;
+  padding: .45rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.review-row dt { color: var(--muted); font-size: .88rem; }
+.review-row dd { margin: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 30rem) {
+  .review-row { grid-template-columns: 1fr; gap: .1rem; }
+}
+
+.review-list { margin: .2rem 0 0; padding-left: 1.1rem; }
+.review-list li { margin: .2rem 0; }
+
+/* Verification signals in the admin portal.
+
+   Colour carries emphasis, never a verdict: an amber signal means "check
+   this", not "reject this". There is deliberately no green-means-approve
+   treatment, because a reviewer who reads the colour instead of the sentence
+   is the failure mode this whole panel exists to prevent. */
+
+.signal-list { list-style: none; margin: 0 0 1.4rem; padding: 0; display: grid; gap: .6rem; }
+
+.signal {
+  padding: .7rem .9rem;
+  border-left: 3px solid var(--line);
+  background: var(--surface-2, transparent);
+  border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
+}
+
+.signal strong { display: block; font-size: .92rem; }
+.signal p { margin: .25rem 0 0; font-size: .86rem; }
+
+.signal--match { border-left-color: var(--ok, #2f7d4f); }
+.signal--public,
+.signal--mismatch { border-left-color: var(--warn, #b7791f); }
+.signal--unknown { border-left-color: var(--line); }
+
+.hint--error { color: var(--error, #b3261e); }

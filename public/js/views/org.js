@@ -5,15 +5,27 @@ import { searchAddresses } from '../geocode.js';
 import {
   COUNTRIES, subdivisionsFor, regionLabelFor, countryName, centreFor,
 } from '../regions.js';
-import { ORG_TYPES } from '../model.js';
+import { ORG_TYPES, VERIFICATION_STATUS_LABEL } from '../model.js';
+import {
+  APPLICANT_ROLES, VERIFICATION_METHODS, roleLabel, methodLabel,
+  findPossibleDuplicates,
+} from '../verification.js';
 import * as store from '../store.js';
 import { auditForOrg } from '../audit.js';
+import { sendSignInEmailConfirmation } from './auth.js';
+import { documentProblem, uploadVerificationDocument } from '../upload.js';
 
 const STATUS_COPY = {
   pending: {
     tone: 'warn',
     text: 'Awaiting verification by a platform administrator. You can prepare ' +
           'drafts, but you cannot publish until this is approved.',
+  },
+  needs_information: {
+    tone: 'warn',
+    text: 'A platform administrator has asked for something more before ' +
+          'this can be verified. Their question is below. Answering it is ' +
+          'the only thing holding this up.',
   },
   verified: { tone: 'ok', text: 'Verified. This organization can publish Janazah notices.' },
   rejected: { tone: 'error', text: 'Verification was declined.' },
@@ -25,7 +37,10 @@ const STATUS_COPY = {
 
 export function statusBadge(status) {
   const copy = STATUS_COPY[status] || { tone: 'muted' };
-  return el('span', { class: `badge badge--${copy.tone}`, text: status });
+  return el('span', {
+    class: `badge badge--${copy.tone}`,
+    text: VERIFICATION_STATUS_LABEL[status] || status,
+  });
 }
 
 /**
@@ -38,7 +53,7 @@ export function statusBadge(status) {
  * Publishing is blocked by firestore.rules (isOrgVerified on every notice
  * create and update), not by this screen. This only explains it.
  */
-function verificationStateScreen(org, ctx) {
+function verificationStateScreen(org, ctx, mount) {
   const submitted = org.createdAt?.toDate
     ? org.createdAt.toDate().toLocaleDateString('en-CA',
         { year: 'numeric', month: 'long', day: 'numeric' })
@@ -57,6 +72,19 @@ function verificationStateScreen(org, ctx) {
         'When it is approved, publishing unlocks here with no further action from you.',
       ],
       nextHeading: 'What happens next',
+    },
+    needs_information: {
+      tone: 'warn',
+      heading: 'More information needed',
+      lede: 'A platform administrator has looked at this registration and '
+          + 'needs something more before approving it. Their question is '
+          + 'below. Nothing else is holding this up.',
+      next: [
+        'Read the administrator’s note above and answer what it asks.',
+        'Update your application with the missing detail, then let the administrator know.',
+        'Publishing unlocks here as soon as it is approved.',
+      ],
+      nextHeading: 'What you can do',
     },
     rejected: {
       tone: 'error',
@@ -112,13 +140,50 @@ function verificationStateScreen(org, ctx) {
       el('dt', { text: 'Submitted' }),
       el('dd', { text: submitted || '—' }),
       el('dt', { text: 'Status' }),
-      el('dd', { text: org.verificationStatus }),
+      el('dd', { text: VERIFICATION_STATUS_LABEL[org.verificationStatus] || org.verificationStatus }),
     ]),
 
     el('h2', { text: STATE.nextHeading }),
     el('ol', { class: 'list' }, STATE.next.map((t) => el('li', { text: t }))),
 
+    // Offered, not demanded. Confirming an inbox proves the applicant can
+    // read that address and nothing else; it does not verify the
+    // organization and does not move this application along by itself. It is
+    // here because it is one fewer open question on the reviewer's screen.
+    ctx.user && ctx.user.emailVerified === false
+      ? el('div', { class: 'notice-strip' }, [
+        el('strong', { text: 'Confirm your email address' }),
+        el('p', {
+          text: `We can send a confirmation link to ${ctx.user.email}. This `
+              + 'only confirms you can read that inbox. It is separate from '
+              + 'verifying the organization, and it does not approve '
+              + 'anything on its own.',
+        }),
+        el('button', {
+          class: 'btn btn--small',
+          onclick: async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+              await sendSignInEmailConfirmation();
+              toast('Confirmation link sent. Check your inbox.');
+            } catch (err) {
+              console.error('sendEmailVerification', err);
+              toast(friendlyError(err), 'error');
+              button.disabled = false;
+            }
+          },
+        }, 'Send the link'),
+      ])
+      : null,
+
     el('div', { class: 'card-actions' }, [
+      org.ownerUid === ctx.user.uid && org.verificationStatus === 'needs_information'
+        ? el('button', {
+          class: 'btn btn--primary',
+          onclick: () => renderApplicationEdit(mount, org, ctx),
+        }, 'Update my application')
+        : null,
       org.ownerUid === ctx.user.uid
         ? el('button', { class: 'btn', onclick: () => manageStaff(org, ctx) }, 'Manage staff')
         : null,
@@ -207,7 +272,7 @@ export function renderOrgs(mount, ctx) {
   // list of one. With more than one organization the list is the right view,
   // since the statuses may differ.
   if (orgs.length === 1 && orgs[0].verificationStatus !== 'verified') {
-    const screen = verificationStateScreen(orgs[0], ctx);
+    const screen = verificationStateScreen(orgs[0], ctx, mount);
     if (screen) {
       mount.append(screen);
       mount.append(el('button', {
@@ -531,20 +596,55 @@ function addressPicker() {
   };
 }
 
+// The registration form, asked in four passes rather than one long page.
+//
+// Section order is deliberate. Somebody registers the organization first,
+// because that is the thing they came to do and it is all public information
+// they already know. Only then are they asked about themselves, and only
+// after that for evidence. Front-loading "prove who you are" on a bereavement
+// service reads as suspicion of the person, and the people filling this in
+// are usually doing it in the middle of arranging a funeral.
+const REGISTER_STEPS = [
+  { key: 'org', title: 'Organization' },
+  { key: 'you', title: 'Your information' },
+  { key: 'proof', title: 'Verification' },
+  { key: 'review', title: 'Review' },
+];
+
+function stepper(current) {
+  return el('ol', { class: 'stepper' }, REGISTER_STEPS.map((step, i) => el('li', {
+    class: `stepper__item${i === current ? ' is-current' : ''}${i < current ? ' is-done' : ''}`,
+    'aria-current': i === current ? 'step' : null,
+  }, [
+    el('span', { class: 'stepper__num', text: String(i + 1) }),
+    el('span', { class: 'stepper__label', text: step.title }),
+  ])));
+}
+
+function textField(id, label, attrs = {}, hint = null) {
+  return el('div', { class: 'field-group' }, [
+    el('label', { class: 'label', for: id, text: label }),
+    el('textarea', { class: 'field', id, name: id, ...attrs }),
+    hint ? el('p', { class: 'hint', text: hint }) : null,
+  ]);
+}
+
 function renderRegisterForm(mount, ctx) {
   mount.replaceChildren();
   const error = el('p', { class: 'form-error', hidden: true });
-  const form = el('form', { class: 'card card--narrow' });
+  const form = el('form', { class: 'card card--narrow', novalidate: true });
   const picker = addressPicker();
+  const account = ctx.user || {};
 
-  form.append(
-    el('h1', { text: 'Register an organization' }),
+  // --- step 1: the organization -------------------------------------------
+
+  const orgStep = el('section', { class: 'step' }, [
+    el('h2', { text: 'About the organization' }),
     el('p', {
       class: 'muted',
-      text: 'Submitting this does not grant publishing. The organization is ' +
-            'saved as pending until a platform administrator approves it, and ' +
-            'there is no way to approve your own. Give details that make ' +
-            'verification straightforward.',
+      text: 'All of this appears on the organization’s public page once ' +
+            'it is verified, so use the details a family would find in a ' +
+            'directory.',
     }),
     field('name', 'Organization name', { required: true, maxlength: 140 }),
     el('div', { class: 'field-group' }, [
@@ -553,45 +653,356 @@ function renderRegisterForm(mount, ctx) {
         ORG_TYPES.map((t) => el('option', { value: t.value, text: t.label }))),
     ]),
     picker.node,
-    // Required: it is how an administrator reaches the applicant during
-    // review, and the only contact they have that is not a raw account id.
-    // Note what this hint does not claim: the organization record becomes
-    // publicly readable once verified (firestore.rules, /organizations get),
-    // so promising this address stays administrator-only would be false. It
-    // is kept off the notice itself, which is what actually holds.
-    field('contactEmail', 'Contact email for verification',
-      { type: 'email', required: true },
-      'How a platform administrator reaches you about this application. Not ' +
-      'shown on published notices. Use an address belonging to the ' +
-      'organization where you can.'),
-    field('website', 'Website', { type: 'url' }),
+    field('phone', 'Organization phone number', { type: 'tel', required: true },
+      'The public number a family would call. An administrator may ring it ' +
+      'and ask for you by name, which is one of the simplest ways to confirm ' +
+      'a registration.'),
+    field('website', 'Website', { type: 'url' },
+      'Optional, but it makes verification considerably faster.'),
+  ]);
+
+  // --- step 2: the person filling this in ---------------------------------
+
+  const roleOther = field('applicantRoleOther', 'Describe your role',
+    { maxlength: 120 });
+  roleOther.hidden = true;
+
+  const roleSelect = el('select',
+    { class: 'field', id: 'applicantRole', name: 'applicantRole' },
+    APPLICANT_ROLES.map((r) => el('option', { value: r.value, text: r.label })));
+  roleSelect.addEventListener('change', () => {
+    roleOther.hidden = roleSelect.value !== 'other';
+  });
+
+  const youStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'About you' }),
+    el('p', {
+      class: 'muted',
+      text: 'This part is private. It is read by platform administrators ' +
+            'reviewing this registration and by nobody else — not the ' +
+            'community, not other organizations, and not visitors to the ' +
+            'public page after approval.',
+    }),
+    field('applicantName', 'Your full name', { required: true, maxlength: 140 }),
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', for: 'applicantRole', text: 'Your role' }),
+      roleSelect,
+    ]),
+    roleOther,
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', text: 'Your account email' }),
+      el('p', { class: 'field field--static', text: account.email || 'Not signed in' }),
+      el('input', { type: 'hidden', name: 'applicantEmail', value: account.email || '' }),
+      el('p', {
+        class: 'hint',
+        text: 'The address you signed in with. Confirming it proves you own ' +
+              'this inbox; it is separate from verifying the organization.',
+      }),
+    ]),
+    field('workEmail', 'Your email at the organization', { type: 'email' },
+      'Optional. An address at the organization’s own domain is the ' +
+      'quickest evidence there is. A personal address is fine too and is not ' +
+      'held against the application.'),
+    field('applicantPhone', 'A number you can be reached on', { type: 'tel' },
+      'Optional. Private to administrators.'),
+    textField('roleExplanation', 'How are you involved with this organization?',
+      { rows: 4, maxlength: 2000 },
+      'A sentence or two. What you do there, and who asked you to register it.'),
+  ]);
+
+  // --- step 3: what would prove it ----------------------------------------
+
+  const methodBoxes = VERIFICATION_METHODS.map((m) => {
+    const box = el('input', { type: 'checkbox', 'data-method': m.value, id: `m-${m.value}` });
+    return el('label', { class: 'check', for: `m-${m.value}` }, [box, el('span', { text: m.label })]);
+  });
+  const readMethods = () => Array.from(
+    form.querySelectorAll('input[data-method]:checked'), (b) => b.dataset.method);
+
+  const authorized = el('input', { type: 'checkbox', id: 'authorized', name: 'authorized' });
+
+  // Optional, and it stays optional. A registration is never held up for the
+  // want of a document, and government identification is never asked for.
+  // The upload happens after the organization exists, because storage.rules
+  // decides who may write here by looking up that organization's owner.
+  const documentInput = el('input', {
+    class: 'field', type: 'file', id: 'supportingDocument',
+    accept: '.pdf,image/jpeg,image/png,image/heic,image/webp',
+  });
+  const documentNote = el('p', { class: 'hint' });
+  documentInput.addEventListener('change', () => {
+    const problem = documentProblem(documentInput.files?.[0]);
+    documentNote.textContent = problem || '';
+    documentNote.classList.toggle('hint--error', !!problem);
+    if (problem) documentInput.value = '';
+  });
+  const documentField = el('div', { class: 'field-group' }, [
+    el('label', { class: 'label', for: 'supportingDocument', text: 'Supporting document' }),
+    documentInput,
+    el('p', {
+      class: 'hint',
+      text: 'Optional. A letter on the organization’s letterhead, or a photo '
+          + 'of one. PDF or image, up to 10 MB. It is readable by platform '
+          + 'administrators only, never appears on any public page, and no '
+          + 'registration is refused for not having one.',
+    }),
+    documentNote,
+  ]);
+
+  const proofStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'How can we verify you represent this organization?' }),
+    el('p', {
+      class: 'muted',
+      text: 'Pick whatever is true. None of these is required, and a ' +
+            'registration is never approved or declined automatically — ' +
+            'a person reads every one of these.',
+    }),
+    el('div', { class: 'check-list' }, methodBoxes),
+    field('staffPageUrl', 'Link to a staff or contact page', { type: 'url' },
+      'Optional. A page on the organization’s own site that names you.'),
+    documentField,
+    el('label', { class: 'check check--consent', for: 'authorized' }, [
+      authorized,
+      el('span', {
+        text: 'I confirm I am authorized to register this organization and to ' +
+              'publish Janazah notices on its behalf.',
+      }),
+    ]),
+    el('p', {
+      class: 'hint',
+      text: 'We do not ask for government identification, and never will.',
+    }),
+  ]);
+
+  // --- step 4: read it back -----------------------------------------------
+
+  const summary = el('div', { class: 'review-summary' });
+  const duplicates = el('div', { hidden: true });
+  const reviewStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'Check this over' }),
+    el('p', {
+      class: 'muted',
+      text: 'Submitting saves the organization as pending. It does not grant ' +
+            'publishing, and there is no way to approve your own ' +
+            'registration.',
+    }),
+    duplicates,
+    summary,
+  ]);
+
+  /**
+   * Warn if this masjid appears to be registered already.
+   *
+   * A warning, never a block. A genuinely new organization with a similar
+   * name in the same city is entirely possible, and refusing it would leave
+   * a real masjid unable to register at all. What this offers instead is the
+   * thing they probably wanted: joining the record that already exists.
+   *
+   * Only verified organizations are visible here, because firestore.rules
+   * hides pending ones from everyone but their own staff. A duplicate of
+   * something still in the queue is caught by the administrator reviewing it.
+   */
+  async function paintDuplicates() {
+    duplicates.hidden = true;
+    duplicates.replaceChildren();
+    let hits = [];
+    try {
+      hits = findPossibleDuplicates(
+        { ...readForm(form), ...(picker.selected() || {}) },
+        await store.verifiedOrganizations());
+    } catch (err) {
+      // A directory read that fails must not stop somebody registering.
+      console.error('duplicate check', err);
+      return;
+    }
+    if (!hits.length) return;
+    duplicates.hidden = false;
+    duplicates.append(el('div', { class: 'notice-strip notice-strip--warn' }, [
+      el('strong', {
+        text: hits.length === 1
+          ? 'This may already be registered'
+          : 'These may already be registered',
+      }),
+      el('ul', { class: 'review-list' }, hits.map((o) => el('li', {
+        text: `${o.name} — ${o.address}, ${o.city}`,
+      }))),
+      el('p', {
+        text: 'If that is the same organization, ask its existing '
+            + 'coordinators to add you instead of registering it twice. Two '
+            + 'records means families follow one and the notices appear on '
+            + 'the other.',
+      }),
+      el('button', {
+        class: 'btn btn--small',
+        type: 'button',
+        onclick: () => renderJoinForm(mount, ctx),
+      }, 'Request access to this organization'),
+      el('p', {
+        class: 'hint',
+        text: 'If it really is a different organization, carry on and submit. '
+            + 'An administrator will see this note too.',
+      }),
+    ]));
+  }
+
+  const line = (label, value) => (value
+    ? el('div', { class: 'review-row' }, [
+      el('dt', { text: label }), el('dd', { text: value }),
+    ])
+    : null);
+
+  function paintSummary() {
+    const v = readForm(form);
+    const chosen = picker.selected();
+    const methods = readMethods();
+    summary.replaceChildren(
+      el('h3', { text: 'Organization' }),
+      el('dl', {}, [
+        line('Name', v.name),
+        line('Type', ORG_TYPES.find((t) => t.value === v.type)?.label),
+        line('Address', chosen?.label),
+        line('Phone', v.phone),
+        line('Website', v.website),
+      ].filter(Boolean)),
+      el('h3', { text: 'You' }),
+      el('dl', {}, [
+        line('Name', v.applicantName),
+        line('Role', roleLabel(v.applicantRole, v.applicantRoleOther)),
+        line('Account email', v.applicantEmail),
+        line('Work email', v.workEmail),
+        line('Phone', v.applicantPhone),
+        line('Involvement', v.roleExplanation),
+      ].filter(Boolean)),
+      el('h3', { text: 'Verification' }),
+      methods.length
+        ? el('ul', { class: 'review-list' },
+          methods.map((m) => el('li', { text: methodLabel(m) })))
+        : el('p', { class: 'muted', text: 'No verification routes selected.' }),
+      v.staffPageUrl ? el('p', { class: 'muted', text: v.staffPageUrl }) : null,
+      el('p', {
+        class: 'hint',
+        text: 'Your name, emails, phone number and explanation stay private ' +
+              'to platform administrators. The organization details above ' +
+              'become public once verified.',
+      }),
+    );
+  }
+
+  // --- movement between steps ---------------------------------------------
+
+  const steps = [orgStep, youStep, proofStep, reviewStep];
+  const head = el('div');
+  const back = el('button', { class: 'btn', type: 'button' }, 'Back');
+  const next = el('button', { class: 'btn btn--primary', type: 'button' }, 'Continue');
+  const submit = el('button', { class: 'btn btn--primary', type: 'submit', hidden: true },
+    'Submit for verification');
+  let at = 0;
+
+  function show(index) {
+    at = index;
+    steps.forEach((s, i) => { s.hidden = i !== index; });
+    head.replaceChildren(stepper(index));
+    back.hidden = index === 0;
+    next.hidden = index === steps.length - 1;
+    submit.hidden = index !== steps.length - 1;
+    error.hidden = true;
+    if (index === steps.length - 1) { paintSummary(); paintDuplicates(); }
+    // A step change is a page change as far as the reader is concerned.
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Name the one thing stopping this step, rather than failing at the end. */
+  function gapIn(index) {
+    if (index === 0) {
+      const bad = orgStep.querySelector(':invalid');
+      if (bad) {
+        return {
+          message: bad.validity.valueMissing
+            ? `${bad.previousElementSibling?.textContent || 'This field'} is required.`
+            : 'Check the highlighted field.',
+          focus: bad,
+        };
+      }
+      return picker.missing();
+    }
+    if (index === 1) {
+      const name = form.elements.applicantName;
+      if (!name.value.trim()) {
+        return { message: 'Enter your full name, so an administrator knows who they are speaking to.', focus: name };
+      }
+      if (roleSelect.value === 'other' && !form.elements.applicantRoleOther.value.trim()) {
+        return { message: 'Describe your role in a few words.', focus: form.elements.applicantRoleOther };
+      }
+      return null;
+    }
+    if (index === 2 && !authorized.checked) {
+      return {
+        message: 'Confirm you are authorized to register this organization.',
+        focus: authorized,
+      };
+    }
+    return null;
+  }
+
+  function stop(gap) {
+    error.hidden = false;
+    error.textContent = gap.message;
+    gap.focus?.focus();
+  }
+
+  next.addEventListener('click', () => {
+    const gap = gapIn(at);
+    if (gap) return stop(gap);
+    show(at + 1);
+  });
+  back.addEventListener('click', () => show(at - 1));
+
+  form.append(
+    el('h1', { text: 'Register an organization' }),
+    head,
+    ...steps,
     error,
     el('div', { class: 'form-actions' }, [
-      el('button', { class: 'btn btn--primary', type: 'submit' }, 'Submit for verification'),
-      el('button', { class: 'btn', type: 'button', onclick: () => ctx.refresh() }, 'Cancel'),
+      back, next, submit,
+      el('button', { class: 'btn btn--link', type: 'button', onclick: () => ctx.refresh() }, 'Cancel'),
     ]),
   );
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     error.hidden = true;
-    const submit = form.querySelector('button[type=submit]');
-    submit.disabled = true;
-    // Country, then region, then an address actually chosen from the
-    // suggestions. Coordinates never come from typed text: without them the
-    // organization is invisible to every nearby search and area alert, which
-    // is most of the point of registering.
-    const gap = picker.missing();
-    if (gap) {
-      error.hidden = false;
-      error.textContent = gap.message;
-      gap.focus?.focus();
-      submit.disabled = false;
-      return;
+    // Re-check every step, not just the last one. Nothing here relies on a
+    // button being hidden: the same checks run again, and firestore.rules
+    // rejects a submission missing the authorization declaration regardless
+    // of what the browser sends.
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const gap = gapIn(i);
+      if (gap) { show(i); return stop(gap); }
     }
-
+    submit.disabled = true;
     try {
-      await store.registerOrganization(readForm(form));
+      // The picker's hidden inputs already carry lat, lng, address, city,
+      // postalCode and country into readForm. Spreading the chosen place on
+      // top would overwrite `name` with the geocoder's label for the
+      // building, which is not the organization's name.
+      const orgId = await store.registerOrganization({
+        ...readForm(form),
+        verificationMethods: readMethods(),
+      });
+      const document = documentInput.files?.[0];
+      if (document) {
+        // A failed upload must not lose a completed registration. The
+        // organization exists and is in the queue either way; the applicant
+        // is told plainly that the attachment did not go with it.
+        try {
+          const stored = await uploadVerificationDocument(orgId, document);
+          await store.attachApplicationDocument(orgId, stored);
+        } catch (uploadErr) {
+          console.error('uploadVerificationDocument', uploadErr);
+          toast('Registered, but the document did not upload. You can add it '
+              + 'from your application later.', 'error');
+        }
+      }
       toast('Submitted. A platform administrator will review it.');
       await ctx.refresh();
     } catch (err) {
@@ -606,7 +1017,127 @@ function renderRegisterForm(mount, ctx) {
     }
   });
 
+  show(0);
   mount.append(form);
+}
+
+/**
+ * Correcting an application after "Request more information".
+ *
+ * The status itself is untouchable here, and not because this screen chooses
+ * not to offer it: firestore.rules forbids an owner from changing
+ * verificationStatus, verifiedAt, verifiedBy or statusReason at all. Somebody
+ * editing this file in their browser gets a permission error, not a
+ * verification.
+ */
+async function renderApplicationEdit(mount, org, ctx) {
+  mount.replaceChildren(el('p', { class: 'muted', text: 'Loading your application…' }));
+
+  let existing = null;
+  try {
+    existing = await store.getApplication(org.id);
+  } catch (err) {
+    console.error('getApplication', err);
+  }
+
+  const error = el('p', { class: 'form-error', hidden: true });
+  const form = el('form', { class: 'card card--narrow', novalidate: true });
+
+  const roleOther = field('applicantRoleOther', 'Describe your role', { maxlength: 120 });
+  const roleSelect = el('select',
+    { class: 'field', id: 'applicantRole', name: 'applicantRole' },
+    APPLICANT_ROLES.map((r) => el('option', {
+      value: r.value, text: r.label,
+      selected: r.value === existing?.applicantRole ? true : null,
+    })));
+  roleOther.hidden = roleSelect.value !== 'other';
+  roleSelect.addEventListener('change', () => {
+    roleOther.hidden = roleSelect.value !== 'other';
+  });
+
+  const methodBoxes = VERIFICATION_METHODS.map((m) => {
+    const on = (existing?.verificationMethods || []).includes(m.value);
+    const box = el('input', {
+      type: 'checkbox', 'data-method': m.value, id: `m-${m.value}`,
+      checked: on ? true : null,
+    });
+    return el('label', { class: 'check', for: `m-${m.value}` },
+      [box, el('span', { text: m.label })]);
+  });
+  const readMethods = () => Array.from(
+    form.querySelectorAll('input[data-method]:checked'), (b) => b.dataset.method);
+
+  form.append(
+    el('h1', { text: 'Update your application' }),
+    org.statusReason
+      ? el('div', { class: 'notice-strip notice-strip--warn' }, [
+        el('strong', { text: 'What the administrator asked for' }),
+        el('p', { text: org.statusReason }),
+      ])
+      : null,
+    el('p', {
+      class: 'muted',
+      text: 'This stays private to platform administrators, as before.',
+    }),
+    field('applicantName', 'Your full name',
+      { required: true, maxlength: 140, value: existing?.applicantName || '' }),
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', for: 'applicantRole', text: 'Your role' }),
+      roleSelect,
+    ]),
+    roleOther,
+    field('workEmail', 'Your email at the organization',
+      { type: 'email', value: existing?.workEmail || '' }),
+    field('applicantPhone', 'A number you can be reached on',
+      { type: 'tel', value: existing?.phone || '' }),
+    textField('roleExplanation', 'How are you involved with this organization?',
+      { rows: 4, maxlength: 2000 }),
+    el('h2', { text: 'How can we verify you represent this organization?' }),
+    el('div', { class: 'check-list' }, methodBoxes),
+    field('staffPageUrl', 'Link to a staff or contact page',
+      { type: 'url', value: existing?.staffPageUrl || '' }),
+    error,
+    el('div', { class: 'form-actions' }, [
+      el('button', { class: 'btn btn--primary', type: 'submit' }, 'Send the update'),
+      el('button', { class: 'btn', type: 'button', onclick: () => ctx.refresh() }, 'Cancel'),
+    ]),
+  );
+
+  if (existing?.applicantRoleOther) {
+    form.elements.applicantRoleOther.value = existing.applicantRoleOther;
+  }
+  // A textarea's value is not an attribute, so it is set after construction.
+  form.elements.roleExplanation.value = existing?.roleExplanation || '';
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    error.hidden = true;
+    const submit = form.querySelector('button[type=submit]');
+    if (!form.elements.applicantName.value.trim()) {
+      error.hidden = false;
+      error.textContent = 'Enter your full name.';
+      form.elements.applicantName.focus();
+      return;
+    }
+    submit.disabled = true;
+    try {
+      await store.saveApplication(org.id, {
+        ...readForm(form),
+        applicantEmail: existing?.applicantEmail || ctx.user?.email || '',
+        verificationMethods: readMethods(),
+      });
+      toast('Sent. An administrator will take another look.');
+      await ctx.refresh();
+    } catch (err) {
+      console.error('saveApplication', err);
+      error.hidden = false;
+      error.textContent = friendlyError(err, 'register');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  mount.replaceChildren(form);
 }
 
 async function renderJoinForm(mount, ctx) {

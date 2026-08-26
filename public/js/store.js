@@ -203,10 +203,98 @@ export async function registerOrganization(form) {
   // Set by the address picker from the chosen result, not typed.
   if (form.country?.trim()) payload.country = form.country.trim();
   if (form.contactEmail?.trim()) payload.contactEmail = form.contactEmail.trim();
+  if (form.phone?.trim()) payload.phone = form.phone.trim();
   if (form.website?.trim()) payload.website = form.website.trim();
 
   const ref = await addDoc(collection(db, 'organizations'), payload);
+
+  // The application is a second write, not part of the same batch, and that
+  // is forced by the rules rather than an oversight: writing it requires
+  // isOrgOwner(orgId), and inside a batch every write is evaluated against
+  // the state before the batch, where the organization does not yet exist.
+  //
+  // If this write fails the organization still exists as pending with no
+  // application attached, which a reviewer sees plainly and can ask about.
+  // That is a better failure than losing the registration entirely.
+  if (form.applicantName) await saveApplication(ref.id, form);
   return ref.id;
+}
+
+// ------------------------------------------------- verification application
+//
+// organizations/{id}/application/submitted is private: the owner and platform
+// administrators, nobody else, before or after approval (firestore.rules).
+// None of it belongs on the organization document, which becomes world
+// readable the moment an administrator approves it.
+
+/** Write or correct the applicant's own submission. */
+export async function saveApplication(orgId, form) {
+  const user = auth.currentUser;
+  const payload = {
+    applicantName: form.applicantName.trim(),
+    applicantRole: form.applicantRole,
+    applicantEmail: (form.applicantEmail || user.email || '').trim(),
+    authorized: true,
+    // Sent, but not trusted: firestore.rules pins this to the auth token, so
+    // a browser claiming true here is rejected rather than believed.
+    emailVerifiedAtSubmit: !!user.emailVerified,
+    submittedBy: user.uid,
+    submittedAt: serverTimestamp(),
+  };
+  const optional = {
+    applicantRoleOther: form.applicantRoleOther,
+    workEmail: form.workEmail,
+    phone: form.applicantPhone,
+    roleExplanation: form.roleExplanation,
+    staffPageUrl: form.staffPageUrl,
+  };
+  for (const [key, value] of Object.entries(optional)) {
+    if (value?.trim()) payload[key] = value.trim();
+  }
+  if (Array.isArray(form.verificationMethods) && form.verificationMethods.length) {
+    payload.verificationMethods = form.verificationMethods;
+  }
+  await setDoc(doc(db, 'organizations', orgId, 'application', 'submitted'), payload);
+}
+
+/**
+ * Record an uploaded supporting document against the application.
+ *
+ * A merge rather than a rewrite: the upload finishes after the submission is
+ * already stored, and re-sending the whole application would race with an
+ * applicant who has meanwhile corrected it.
+ */
+export async function attachApplicationDocument(orgId, { path, name }) {
+  await setDoc(
+    doc(db, 'organizations', orgId, 'application', 'submitted'),
+    { documentPath: path, documentName: name, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+
+/** The applicant's submission. Null when there is none, or none readable. */
+export async function getApplication(orgId) {
+  const snap = await getDoc(doc(db, 'organizations', orgId, 'application', 'submitted'));
+  return snap.exists() ? snap.data() : null;
+}
+
+/** Internal reviewer notes. Administrators only; the applicant never sees these. */
+export async function getReviewNotes(orgId) {
+  try {
+    const snap = await getDoc(doc(db, 'organizations', orgId, 'application', 'review'));
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveReviewNotes(orgId, notes) {
+  const user = auth.currentUser;
+  await setDoc(doc(db, 'organizations', orgId, 'application', 'review'), {
+    notes: String(notes || ''),
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
+  });
 }
 
 export async function getOrganization(orgId) {

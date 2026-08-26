@@ -21,6 +21,7 @@ export const ACTIONS = {
   ORG_UPDATED: 'org.updated',
   ORG_VERIFIED: 'org.verified',
   ORG_REJECTED: 'org.rejected',
+  ORG_INFO_REQUESTED: 'org.info_requested',
   ORG_SUSPENDED: 'org.suspended',
   ORG_REINSTATED: 'org.reinstated',
   ORG_DELETED: 'org.deleted',
@@ -42,6 +43,7 @@ const ORG_STATUS_ACTION = {
   verified: ACTIONS.ORG_VERIFIED,
   rejected: ACTIONS.ORG_REJECTED,
   suspended: ACTIONS.ORG_SUSPENDED,
+  needs_information: ACTIONS.ORG_INFO_REQUESTED,
   pending: ACTIONS.ORG_REINSTATED,
 };
 

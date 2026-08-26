@@ -73,7 +73,7 @@ service cloud.firestore {
     function orgKeys() {
       return ['name', 'type', 'address', 'city', 'province', 'postalCode',
               'country',
-              'lat', 'lng', 'cell', 'contactEmail', 'website',
+              'lat', 'lng', 'cell', 'contactEmail', 'phone', 'website',
               'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
               'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt'];
     }
@@ -91,8 +91,13 @@ service cloud.firestore {
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 140
         && request.resource.data.type in ['masjid', 'funeral_home', 'other']
+        // needs_information sits alongside pending: still unverified, still
+        // unable to publish, but distinguishable so an applicant is told
+        // there is something for them to do rather than being left to
+        // assume nobody has looked.
         && request.resource.data.verificationStatus
-             in ['pending', 'verified', 'rejected', 'suspended']
+             in ['pending', 'needs_information', 'verified', 'rejected',
+                 'suspended']
         && request.resource.data.lat is number
         && request.resource.data.lng is number
         && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
@@ -207,7 +212,7 @@ service cloud.firestore {
         return ['applicantName', 'applicantRole', 'applicantRoleOther',
                 'applicantEmail', 'workEmail', 'phone', 'roleExplanation',
                 'authorized', 'verificationMethods', 'staffPageUrl',
-                'documentPath', 'documentName',
+                'documentPath', 'documentName', 'emailVerifiedAtSubmit',
                 'submittedAt', 'submittedBy', 'updatedAt'];
       }
 
@@ -215,7 +220,7 @@ service cloud.firestore {
         return request.resource.data.keys().hasOnly(applicationKeys())
           && request.resource.data.keys().hasAll(
                ['applicantName', 'applicantRole', 'applicantEmail',
-                'authorized', 'submittedBy'])
+                'authorized', 'submittedBy', 'emailVerifiedAtSubmit'])
           && request.resource.data.applicantName is string
           && request.resource.data.applicantName.size() > 0
           && request.resource.data.applicantName.size() <= 140
@@ -225,6 +230,13 @@ service cloud.firestore {
           // submission that does not carry it is not a submission.
           && request.resource.data.authorized == true
           && request.resource.data.submittedBy == uid()
+          // Pinned to the token rather than trusted from the browser. The
+          // reviewer's panel shows "sign-in email confirmed" from this, and a
+          // signal a client could set to true itself would be worth nothing.
+          // It is also kept deliberately separate from organization
+          // verification: owning an inbox says nothing about running a masjid.
+          && request.resource.data.emailVerifiedAtSubmit
+               == request.auth.token.get('email_verified', false)
           // Optional fields, read through get() so that leaving one out is
           // a valid submission rather than a rule evaluation error.
           && request.resource.data.get('roleExplanation', '').size() <= 2000

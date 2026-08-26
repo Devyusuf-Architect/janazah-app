@@ -201,10 +201,41 @@ const run = async () => {
     assert.equal(await coord.locator('#province').inputValue(), 'Ontario');
     assert.equal(await coord.locator('#country').inputValue(), 'Canada');
 
-    await coord.locator('#contactEmail').fill('office@example.com');
+    await coord.locator('#phone').fill('+1 416 555 0100');
+    await coord.locator('#website').fill('https://example.com');
+
+    // ---- step 2: who is filling this in ------------------------------------
+    // Nothing about the applicant is asked until the organization itself has
+    // been described. Front-loading "prove who you are" on a bereavement
+    // service reads as suspicion of the person filling it in.
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.locator('#applicantName').waitFor({ timeout: 5000 });
+    await coord.locator('#applicantName').fill('Test Coordinator');
+    await coord.locator('#applicantRole').selectOption('imam');
+    await coord.locator('#workEmail').fill('imam@example.com');
+    await coord.locator('#roleExplanation').fill('I lead prayers and arrange Janazah here.');
+
+    // ---- step 3: evidence, and the authorization declaration ----------------
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.locator('#authorized').waitFor({ timeout: 5000 });
+    // The declaration is not optional, and skipping it must say so rather
+    // than failing later at Firestore.
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    assert.match(await coord.locator('.form-error').innerText(), /authorized/i,
+      'continuing without the authorization declaration must be refused here');
+    await coord.locator('#m-work_email').check();
+    await coord.locator('#authorized').check();
+
+    // ---- step 4: read it back ----------------------------------------------
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    const review = await coord.locator('.review-summary').innerText();
+    assert.match(review, /Test Coordinator/, 'the review step must show what was entered');
+    assert.match(review, /stay private/i,
+      'the review step must say which parts stay private');
+
     await coord.getByRole('button', { name: 'Submit for verification' }).click();
     await coord.locator('.verify-state').waitFor({ timeout: 15000 });
-    log('organization registered as pending');
+    log('organization registered as pending through the four-step form');
 
     // ---- the verification-pending state ------------------------------------
     // Submitting must land on something that says plainly what happened and

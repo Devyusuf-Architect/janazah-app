@@ -7,12 +7,17 @@ import { db } from '../firebase.js';
 import { el, toast, friendlyError, askReason, showModal } from '../ui.js';
 import { statusBadge, renderAuditTable } from './org.js';
 import { publicNoticeView } from '../notice-view.js';
-import { ORG_TYPES } from '../model.js';
+import { ORG_TYPES, VERIFICATION_STATUS_LABEL } from '../model.js';
+import {
+  verificationSignals, roleLabel, methodLabel,
+} from '../verification.js';
+import { verificationDocumentUrl } from '../upload.js';
 import { renderAdminSample } from './admin-sample.js';
 import * as store from '../store.js';
 
 const EMPTY_COPY = {
   pending: 'No registrations are waiting for review.',
+  needs_information: 'Nobody has been asked for more information.',
   verified: 'No verified masjids or funeral coordinators yet.',
   rejected: 'No declined registrations.',
   suspended: 'No suspended organizations.',
@@ -39,6 +44,7 @@ export function renderAdmin(mount, ctx) {
 
   const views = {
     'Verification requests': () => queueView(panel, 'pending', ctx),
+    'Awaiting information': () => queueView(panel, 'needs_information', ctx),
     'Verified masjids': () => queueView(panel, 'verified', ctx),
     'Declined': () => queueView(panel, 'rejected', ctx),
     'Suspended': () => queueView(panel, 'suspended', ctx),
@@ -104,7 +110,24 @@ function orgReviewCard(org) {
       }),
     }, org.verificationStatus === 'pending' ? 'Approve' : 'Verify'));
   }
-  if (org.verificationStatus === 'pending') {
+  if (org.verificationStatus === 'pending' || org.verificationStatus === 'needs_information') {
+    // The middle option, and the one that should be reached for most often.
+    // Without it a reviewer holding an application they cannot yet confirm
+    // has only two moves: approve on insufficient evidence, or decline a
+    // masjid that has done nothing wrong. Both are worse than asking.
+    actions.push(el('button', {
+      class: 'btn btn--small',
+      onclick: () => decide('needs_information', {
+        title: 'Ask for more information?',
+        body: `${org.name} stays unverified and cannot publish. Your question `
+            + 'below is shown to the applicant, who can then update their '
+            + 'application.',
+        label: 'What do you need from them?',
+        confirmText: 'Send the request',
+      }),
+    }, 'Request more information'));
+  }
+  if (org.verificationStatus === 'pending' || org.verificationStatus === 'needs_information') {
     actions.push(el('button', {
       class: 'btn btn--small',
       onclick: () => decide('rejected', {
@@ -137,6 +160,13 @@ function orgReviewCard(org) {
       }),
     }, 'Reinstate'));
   }
+  if (org.verificationStatus === 'pending' || org.verificationStatus === 'needs_information'
+      || org.verificationStatus === 'verified') {
+    actions.push(el('button', {
+      class: 'btn btn--small',
+      onclick: () => reviewApplication(org),
+    }, 'Verification details'));
+  }
   actions.push(el('button', {
     class: 'btn btn--small',
     onclick: () => reviewNotices(org),
@@ -153,8 +183,8 @@ function orgReviewCard(org) {
     el('dl', { class: 'kv' }, [
       el('dt', { text: 'Type' }),
       el('dd', { text: ORG_TYPES.find((t) => t.value === org.type)?.label || org.type }),
-      el('dt', { text: 'Contact' }),
-      el('dd', { text: org.contactEmail || 'not given' }),
+      el('dt', { text: 'Phone' }),
+      el('dd', { text: org.phone || org.contactEmail || 'not given' }),
       el('dt', { text: 'Website' }),
       el('dd', {}, org.website
         ? el('a', { class: 'link', href: org.website, target: '_blank', rel: 'noopener noreferrer' }, org.website)
@@ -165,10 +195,158 @@ function orgReviewCard(org) {
       el('dd', { class: 'mono', text: org.ownerUid }),
       el('dt', { text: 'Submitted' }),
       el('dd', { text: org.createdAt?.toDate ? org.createdAt.toDate().toLocaleString('en-CA') : '—' }),
+      el('dt', { text: 'Status' }),
+      el('dd', { text: VERIFICATION_STATUS_LABEL[org.verificationStatus] || org.verificationStatus }),
     ]),
     org.statusReason ? el('p', { class: 'muted', text: `Last note: ${org.statusReason}` }) : null,
     el('div', { class: 'card-actions' }, actions),
   ]);
+}
+
+/**
+ * Everything held about one registration, in one place, for a human to read.
+ *
+ * Deliberately not a score. There is no number here, no traffic light that
+ * resolves to a verdict, and no automatic action: every signal is a sentence
+ * saying what was found and what still needs checking. The failure this
+ * guards against is a stranger publishing a funeral notice in a real masjid's
+ * name, and a reviewer who has stopped reading because a badge said 92% is
+ * exactly how that happens.
+ *
+ * The applicant's details shown here come from the private application
+ * subcollection, which firestore.rules makes readable by platform
+ * administrators and the applicant alone. Nothing in this modal is reachable
+ * from the organization's public page.
+ */
+async function reviewApplication(org) {
+  const body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+  showModal(`Verification: ${org.name}`, body, { wide: true });
+
+  let application = null;
+  let review = null;
+  try {
+    [application, review] = await Promise.all([
+      store.getApplication(org.id), store.getReviewNotes(org.id),
+    ]);
+  } catch (err) {
+    body.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err, 'orgLoad') }));
+    return;
+  }
+
+  if (!application) {
+    body.replaceChildren(el('p', {
+      class: 'muted',
+      text: 'No application was recorded for this organization. It may have '
+          + 'been registered before applications were collected, or the '
+          + 'second write failed. Ask the owner to complete one before '
+          + 'approving.',
+    }));
+    return;
+  }
+
+  const signals = verificationSignals(org, application);
+
+  const row = (label, value) => (value
+    ? el('div', { class: 'review-row' }, [
+      el('dt', { text: label }), el('dd', { text: value }),
+    ])
+    : null);
+
+  const notes = el('textarea', {
+    class: 'field', rows: 4, id: 'reviewNotes',
+    placeholder: 'What you checked, who you spoke to, what is still open.',
+  });
+  notes.value = review?.notes || '';
+
+  const saveNotes = el('button', { class: 'btn btn--small' }, 'Save notes');
+  saveNotes.addEventListener('click', async () => {
+    saveNotes.disabled = true;
+    try {
+      await store.saveReviewNotes(org.id, notes.value);
+      toast('Notes saved.');
+    } catch (err) {
+      toast(friendlyError(err), 'error');
+    } finally {
+      saveNotes.disabled = false;
+    }
+  });
+
+  body.replaceChildren(
+    el('h3', { text: 'Signals' }),
+    el('p', {
+      class: 'hint',
+      text: 'Evidence to read, not a verdict. Nothing here approves or '
+          + 'declines anything on its own.',
+    }),
+    el('ul', { class: 'signal-list' }, signals.map((s) => el('li', {
+      class: `signal signal--${s.level}`,
+    }, [
+      el('strong', { text: s.label }),
+      el('p', { class: 'muted', text: s.detail }),
+    ]))),
+
+    el('h3', { text: 'The applicant' }),
+    el('p', {
+      class: 'hint',
+      text: 'Private to platform administrators. Not on the public page, '
+          + 'before or after approval.',
+    }),
+    el('dl', {}, [
+      row('Name', application.applicantName),
+      row('Role', roleLabel(application.applicantRole, application.applicantRoleOther)),
+      row('Account email', application.applicantEmail),
+      row('Work email', application.workEmail),
+      row('Phone', application.phone),
+      row('Involvement', application.roleExplanation),
+      row('Staff page', application.staffPageUrl),
+      row('Submitted', application.submittedAt?.toDate
+        ? application.submittedAt.toDate().toLocaleString('en-CA') : null),
+    ].filter(Boolean)),
+
+    // Opened on demand, and never rendered as a link on the page. The URL is
+    // short-lived and only an administrator can obtain one: storage.rules
+    // refuses the read to everyone else, so a copied link is not a way to
+    // hand this document to anybody.
+    application.documentPath
+      ? el('div', {}, [
+        el('h3', { text: 'Supporting document' }),
+        el('p', { class: 'hint', text: application.documentName || 'Attached file' }),
+        el('button', {
+          class: 'btn btn--small',
+          onclick: async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+              window.open(await verificationDocumentUrl(application.documentPath),
+                '_blank', 'noopener,noreferrer');
+            } catch (err) {
+              console.error('verificationDocumentUrl', err);
+              toast(friendlyError(err), 'error');
+            } finally {
+              button.disabled = false;
+            }
+          },
+        }, 'Open the document'),
+      ])
+      : null,
+
+    application.verificationMethods?.length
+      ? el('div', {}, [
+        el('h3', { text: 'Routes they offered' }),
+        el('ul', { class: 'review-list' },
+          application.verificationMethods.map((m) => el('li', { text: methodLabel(m) }))),
+      ])
+      : null,
+
+    el('h3', { text: 'Internal notes' }),
+    el('p', {
+      class: 'hint',
+      text: 'Administrators only. The applicant cannot read these, enforced '
+          + 'by firestore.rules rather than by this screen.',
+    }),
+    notes,
+    el('div', { class: 'card-actions' }, [saveNotes]),
+  );
 }
 
 async function reviewNotices(org) {

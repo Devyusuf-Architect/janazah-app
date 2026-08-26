@@ -149,7 +149,7 @@ export function verificationSignals(org = {}, application = {}) {
     website: org.website, workEmail: application.workEmail,
   })];
 
-  signals.push(application.emailVerified
+  signals.push(application.emailVerifiedAtSubmit
     ? {
       level: 'match',
       label: 'Sign-in email confirmed',
@@ -187,4 +187,80 @@ export function verificationSignals(org = {}, application = {}) {
     });
   }
   return signals;
+}
+
+// --------------------------------------------------------------- duplicates
+//
+// Two records for the same masjid is not a cosmetic problem. Families follow
+// one of them, the notices get published on the other, and the alert never
+// arrives. It is also the shape a bad registration takes: somebody standing
+// up a second "Masjid Al-Noor" they have nothing to do with.
+//
+// This only ever warns. It cannot block, and it must not: a genuinely new
+// organization with a similar name in the same city is entirely possible, and
+// refusing it would leave a real masjid unable to register at all.
+//
+// A limit worth being honest about: this compares against *verified*
+// organizations only, because firestore.rules correctly hides pending ones
+// from everybody but their own staff. A duplicate of a registration that is
+// still in the queue is caught by the administrator reviewing it, not here.
+
+/** Strip the words almost every masjid name contains, so the rest can be compared. */
+const NAME_NOISE = new Set([
+  'the', 'of', 'and', 'al', 'ul', 'e', 'masjid', 'mosque', 'jamia', 'jame',
+  'jamiah', 'musalla', 'musallah', 'islamic', 'islam', 'muslim', 'centre',
+  'center', 'society', 'association', 'community', 'institute',
+  'foundation', 'organization', 'organisation', 'inc', 'incorporated',
+  'trust', 'council', 'funeral', 'home', 'services', 'service',
+]);
+
+export function nameTokens(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/['’`]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word && !NAME_NOISE.has(word));
+}
+
+/**
+ * Do two organization names share their distinguishing words?
+ *
+ * "Masjid Al-Noor" and "Al Noor Islamic Centre" both reduce to {noor}, which
+ * is the case worth catching. "Masjid Al-Noor" and "Masjid Al-Huda" reduce to
+ * {noor} and {huda} and are correctly left alone.
+ */
+export function namesLookAlike(a, b) {
+  const left = nameTokens(a);
+  const right = nameTokens(b);
+  if (!left.length || !right.length) return false;
+  const shared = left.filter((word) => right.includes(word));
+  // Every distinguishing word of the shorter name appears in the longer one.
+  return shared.length === Math.min(left.length, right.length);
+}
+
+/**
+ * Existing organizations that might already be the one being registered.
+ *
+ * Matched on name, or on being close enough on the map that two separate
+ * organizations at that distance would be surprising. Same city is required
+ * for a name match so that "Al-Noor" in Toronto does not flag "Al-Noor" in
+ * Vancouver, which really are different masjids.
+ *
+ * @returns {Array<object>} Possible matches, never a decision about them.
+ */
+export function findPossibleDuplicates(candidate, organizations = []) {
+  const city = String(candidate.city || '').trim().toLowerCase();
+  const { lat, lng } = candidate;
+  return organizations.filter((org) => {
+    if (!org || org.id === candidate.id) return false;
+    const sameCity = city && String(org.city || '').trim().toLowerCase() === city;
+    if (sameCity && namesLookAlike(candidate.name, org.name)) return true;
+    if (Number.isFinite(lat) && Number.isFinite(lng)
+        && Number.isFinite(org.lat) && Number.isFinite(org.lng)) {
+      // Roughly 250 m, compared without trigonometry because precision here
+      // is not worth a dependency: this is a prompt to look, not a test.
+      return Math.abs(org.lat - lat) < 0.0025 && Math.abs(org.lng - lng) < 0.0035;
+    }
+    return false;
+  });
 }

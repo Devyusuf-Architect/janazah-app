@@ -13,6 +13,7 @@ const SERVICES = {
   firestore: 'firebase/firestore',
   messaging: 'firebase/messaging',
   functions: 'firebase/functions',
+  storage: 'firebase/storage',
 };
 
 export async function buildTestApp() {
@@ -61,7 +62,8 @@ export async function buildTestApp() {
       "firebase/auth": "/vendor/firebase-auth.js",
       "firebase/firestore": "/vendor/firebase-firestore.js",
       "firebase/messaging": "/vendor/firebase-messaging.js",
-      "firebase/functions": "/vendor/firebase-functions.js"
+      "firebase/functions": "/vendor/firebase-functions.js",
+      "firebase/storage": "/vendor/firebase-storage.js"
     }
   }
   </script>`;

@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// Verification documents.
+//
+// The only thing this project stores in Cloud Storage, and the only reason it
+// uses Cloud Storage at all: a masjid may optionally attach a letter on its
+// own letterhead confirming that the person registering speaks for it.
+//
+// Optional is load-bearing. A registration is never held up for the want of a
+// document, and government identification is never asked for, here or
+// anywhere else in this application. Most applications will have nothing in
+// this bucket.
+//
+// Access is deliberately one-directional. The organization's owner may upload
+// a document. Only platform administrators may read one back. Nobody else can
+// do either: not the community, not other organizations, not other staff of
+// the same organization, and not an anonymous request. There is no public
+// path, no download URL handed to a client, and nothing here is linked from
+// an organization's public page.
+//
+// Cross-service rules (firestore.get / firestore.exists) are what let this
+// reuse the same admin list and the same ownership record as firestore.rules,
+// rather than maintaining a second, drifting copy of who is who.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOrgOwner(orgId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/organizations/$(orgId))
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId))
+             .data.ownerUid == request.auth.uid;
+    }
+
+    match /organizations/{orgId}/verification/{fileName} {
+      allow read: if isPlatformAdmin();
+
+      // A letter, a scanned page, or a photograph of one. Ten megabytes is
+      // generous for that and small enough that a mistaken upload of
+      // something else is refused rather than stored.
+      allow create: if isOrgOwner(orgId)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|image/(jpeg|png|heic|webp)');
+
+      // Replacing a document in place would let the version an administrator
+      // read be swapped for another afterwards. A correction is a new upload.
+      allow update: if false;
+
+      // The applicant may withdraw something they uploaded by mistake; an
+      // administrator may remove a document once it has served its purpose,
+      // which is also how the "avoid keeping sensitive material" part of this
+      // is honoured in practice.
+      allow delete: if isPlatformAdmin() || isOrgOwner(orgId);
+    }
+
+    // Nothing else belongs in this bucket.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

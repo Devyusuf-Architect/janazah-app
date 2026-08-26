@@ -154,9 +154,12 @@ collection not explicitly matched, so one cannot appear by accident.
 
 ## 5b. Organization verification
 
-A masjid or funeral coordinator registers, lands as `pending`, and cannot
-publish until a platform administrator approves it. The four states
-(`pending`, `verified`, `rejected`, `suspended`), the fields, and the rules
+A masjid or funeral coordinator registers through a four-step form
+(organization, then the applicant, then evidence, then a review pass), lands
+as `pending`, and cannot publish until a platform administrator approves it.
+The five states (`pending`, `needs_information`, `verified`, `rejected`,
+`suspended`), the private `application` subcollection that holds everything
+about the applicant, the read-time verification signals, and the rules
 that stop anyone approving themselves are documented in
 [`docs/verification-workflow.md`](verification-workflow.md), which is also
 the contract the Admin Portal is being built against.

@@ -103,8 +103,17 @@ describe('the registration form no longer asks for coordinates', () => {
     // text that was never resolved still has no coordinates.
     assert.match(org, /if \(!selected\) \{/,
       'a location that was never chosen must still block submission');
-    assert.match(org, /const gap = picker\.missing\(\);[\s\S]{0,200}if \(gap\)/,
-      'the form must refuse to submit while anything is missing');
+    assert.match(org, /return picker\.missing\(\);/,
+      'the address gate must still be consulted');
+  });
+
+  test('the multi-step form re-checks every step on submit', () => {
+    // The address gate lives on step one. If submit only validated the step
+    // the person happens to be looking at, a location that was never chosen
+    // would reach Firestore, and the organization would register at no
+    // coordinates at all.
+    assert.match(org, /for \(let i = 0; i < steps\.length - 1; i \+= 1\) \{[\s\S]{0,160}gapIn\(i\)/,
+      'submit must re-run the gate for every step, not just the visible one');
   });
 
   test('the chosen location is confirmed back to the person', () => {

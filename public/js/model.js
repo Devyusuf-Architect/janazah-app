@@ -13,7 +13,19 @@ export const ORG_TYPES = [
   { value: 'other', label: 'Other Muslim organization' },
 ];
 
-export const VERIFICATION_STATUSES = ['pending', 'verified', 'rejected', 'suspended'];
+// Mirror of the enum in validOrgShape() in firestore.rules.
+export const VERIFICATION_STATUSES = [
+  'pending', 'needs_information', 'verified', 'rejected', 'suspended',
+];
+
+/** Human wording for a status, used wherever one is shown to a person. */
+export const VERIFICATION_STATUS_LABEL = {
+  pending: 'Pending',
+  needs_information: 'More information needed',
+  verified: 'Verified',
+  rejected: 'Declined',
+  suspended: 'Suspended',
+};
 
 // Mirror of noticePublicKeys() in firestore.rules.
 export const NOTICE_PUBLIC_KEYS = [

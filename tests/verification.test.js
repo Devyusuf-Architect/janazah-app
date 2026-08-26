@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import {
   emailDomain, websiteDomain, isPublicEmailProvider, domainSignal,
   verificationSignals, roleLabel, methodLabel, APPLICANT_ROLES,
+  findPossibleDuplicates, namesLookAlike, nameTokens,
 } from '../public/js/verification.js';
 
 describe('reading domains', () => {
@@ -105,7 +106,7 @@ describe('the full signal panel', () => {
   test('Firebase email confirmation is kept separate from organization verification', () => {
     // Section 4 of the requirement: confirming you own an inbox is not
     // evidence you run a masjid, and the reviewer must not read it that way.
-    const signals = verificationSignals({}, { emailVerified: true });
+    const signals = verificationSignals({}, { emailVerifiedAtSubmit: true });
     const s = signals.find((x) => /Sign-in email confirmed/.test(x.label));
     assert.match(s.detail, /says nothing about the organization/i);
   });
@@ -169,5 +170,66 @@ describe('the signals are computed, not stored', () => {
     for (const forged of ['Status', 'Score', 'approved', 'trust']) {
       assert.ok(!keys.includes(forged), `applicationKeys must not contain ${forged}`);
     }
+  });
+});
+
+describe('spotting an organization that is already registered', () => {
+  const existing = [
+    { id: 'a', name: 'Al-Noor Islamic Centre', city: 'Toronto', lat: 43.6532, lng: -79.3832 },
+    { id: 'b', name: 'Masjid Al-Huda', city: 'Toronto', lat: 43.7000, lng: -79.4000 },
+    { id: 'c', name: 'Al-Noor Masjid', city: 'Vancouver', lat: 49.2827, lng: -123.1207 },
+  ];
+
+  test('the same masjid under a differently arranged name is flagged', () => {
+    // Two records for one masjid means families follow the wrong one and the
+    // alert never arrives.
+    const hits = findPossibleDuplicates(
+      { name: 'Masjid Al-Noor', city: 'Toronto' }, existing);
+    assert.deepEqual(hits.map((o) => o.id), ['a']);
+  });
+
+  test('a genuinely different masjid in the same city is left alone', () => {
+    assert.equal(findPossibleDuplicates(
+      { name: 'Masjid Ar-Rahma', city: 'Toronto' }, existing).length, 0);
+  });
+
+  test('the same name in another city is not a duplicate', () => {
+    // Al-Noor in Toronto and Al-Noor in Vancouver really are different masjids.
+    const hits = findPossibleDuplicates(
+      { name: 'Masjid Al-Noor', city: 'Toronto' }, existing);
+    assert.ok(!hits.some((o) => o.id === 'c'));
+  });
+
+  test('an address at effectively the same spot is flagged whatever it is called', () => {
+    const hits = findPossibleDuplicates(
+      { name: 'Something Else Entirely', city: 'Etobicoke', lat: 43.6533, lng: -79.3833 },
+      existing);
+    assert.deepEqual(hits.map((o) => o.id), ['a']);
+  });
+
+  test('an organization does not flag itself when its own details are edited', () => {
+    assert.equal(findPossibleDuplicates(
+      { id: 'a', name: 'Al-Noor Islamic Centre', city: 'Toronto', lat: 43.6532, lng: -79.3832 },
+      existing).length, 0);
+  });
+
+  test('the generic half of a name is not what gets compared', () => {
+    // Nearly every masjid is an "Islamic Centre" somewhere. Matching on that
+    // would flag every registration in the city and the warning would be
+    // ignored, which is worse than not having one.
+    assert.deepEqual(nameTokens('The Islamic Centre of Greater Toronto'),
+      ['greater', 'toronto']);
+    assert.equal(namesLookAlike('Islamic Centre of Toronto', 'Islamic Society of Ottawa'), false);
+  });
+
+  test('a name of nothing but generic words never matches anything', () => {
+    assert.equal(namesLookAlike('Islamic Centre', 'Masjid'), false);
+  });
+
+  test('nothing here decides anything', () => {
+    // The requirement is a warning with a route to "request access", never a
+    // block: a real masjid with a similar name must still be able to register.
+    const hits = findPossibleDuplicates({ name: 'Masjid Al-Noor', city: 'Toronto' }, existing);
+    assert.ok(Array.isArray(hits), 'the result is a list to show, not a verdict');
   });
 });
