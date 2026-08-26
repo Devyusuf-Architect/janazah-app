@@ -8,7 +8,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast } from './ui.js';
-import { isSampleMode } from './sample-mode.js';
+import { isSampleMode, initSampleMode } from './sample-mode.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { revealIn, autoReveal } from './motion.js';
 import { renderHome } from './views/home.js';
@@ -170,9 +170,25 @@ window.addEventListener('popstate', route);
 const navToggle = $('#nav-toggle');
 if (navToggle) wireNavToggle(navToggle, nav());
 
+/** Banner and page reflect whatever sample mode currently is. */
+function paintSampleMode() {
+  const banner = $('#sample-banner');
+  if (banner) banner.hidden = !isSampleMode();
+}
+
 // Fictional notices are on screen, so say so, on every page, without a
 // dismiss control. See APP.sampleData in config.js.
-if (isSampleMode()) $('#sample-banner')?.removeAttribute('hidden');
+paintSampleMode();
+
+// An administrator may have flipped this from the admin portal since the
+// build. Reading it is deliberately not awaited: the feed must paint at once,
+// and the stored setting agrees with the built-in default on the common path,
+// so a repaint is only needed when it does not.
+initSampleMode((enabled) => {
+  console.info(`Sample data ${enabled ? 'on' : 'off'} by platform setting.`);
+  paintSampleMode();
+  route();
+}).catch((err) => console.error('initSampleMode', err));
 
 if (usingEmulator) $('#env-banner')?.removeAttribute('hidden');
 

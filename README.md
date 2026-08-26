@@ -84,10 +84,20 @@ tells you what to do; it runs automatically before `npm run demo` and
 deployed site shows fictional notices and masjids alongside anything real,
 and a banner on every page says they are examples.
 
-**To remove it before going public, set that one flag to `false`.** That is
-the entire process: nothing is written to the database, so there is nothing
-to clean up. `tests/sample-mode.test.js` pins that turning it off leaves no
-path by which a sample record can reach a reader.
+**A platform administrator turns it off from the admin portal**, under
+**Admin → Sample data**, with no redeploy: the switch is stored in
+`/platformSettings/sampleData`, so flipping it changes what every visitor
+sees. `APP.sampleData` in `public/js/config.js` remains the starting
+position, and the answer whenever that setting cannot be read (which
+includes before the security rules are deployed).
+
+The same screen writes the examples into the database as real documents and
+removes them again. Once written they are ordinary records, so **customising
+what testers see is done with the existing Notices and Organizations tabs**
+rather than a second editor. Every sample document has a `sample-` id, which
+is what `firestore.rules` keys its delete permission on: a real published
+notice stays undeletable and a real masjid stays undeletable, by anyone,
+including an administrator.
 
 The data is `public/js/sample-data.js`, which `tests/sample-data.test.js`
 pins as unmistakably fake: every organization is named "Sample ...", every

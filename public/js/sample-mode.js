@@ -21,7 +21,45 @@ import { SAMPLE_ORGS, SAMPLE_NOTICES } from './sample-data.js';
 
 const PREFIX = 'sample-';
 
-export const isSampleMode = () => APP.sampleData === true;
+// Two switches, one of which a platform administrator can reach.
+//
+//   APP.sampleData         build-time, in config.js. The starting position,
+//                          and the answer whenever the database cannot be
+//                          read, which includes before the rules are
+//                          deployed.
+//   /platformSettings/     runtime, flipped from the admin portal. Overrides
+//     sampleData           the flag above once it has ever been set.
+//
+// isSampleMode() stays synchronous because it is called from inside store
+// reads and at bootstrap. The override is fetched once by initSampleMode()
+// and cached here, rather than making every caller async.
+let override = null;
+
+export const isSampleMode = () => (override === null ? APP.sampleData === true : override);
+
+/**
+ * Read the administrator's setting, if there is one.
+ *
+ * @param {(enabled: boolean) => void} [onChange] Called only when the stored
+ *   setting disagrees with what the page has already rendered, so the caller
+ *   can repaint. Never called on the common path where they agree.
+ */
+export async function initSampleMode(onChange) {
+  // Imported lazily: sample-mode is imported by store.js, so importing store
+  // at the top of this file would be a cycle.
+  const { readSampleDataSetting } = await import('./store.js');
+  const stored = await readSampleDataSetting();
+  if (stored === null) return;
+
+  const before = isSampleMode();
+  override = stored;
+  if (before !== stored && onChange) onChange(stored);
+}
+
+/** Used by the admin portal after it flips the setting. */
+export function setSampleModeOverride(enabled) {
+  override = enabled;
+}
 
 const id = (raw) => `${PREFIX}${raw}`;
 

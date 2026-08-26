@@ -4,6 +4,7 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, getDoc, getDocs,
   query, where, orderBy, limit, serverTimestamp, onSnapshot, increment,
+  documentId,
 } from 'firebase/firestore';
 
 import { signInAnonymously } from 'firebase/auth';
@@ -33,6 +34,147 @@ export async function isPlatformAdmin(uid) {
     // Rules allow reading only your own admin document; a denial means no.
     return false;
   }
+}
+
+// ----------------------------------------------------- platform settings
+
+/** Whether the app is showing sample data, or null if it has never been set. */
+export async function readSampleDataSetting() {
+  try {
+    const snap = await getDoc(doc(db, 'platformSettings', 'sampleData'));
+    if (!snap.exists()) return null;
+    const value = snap.data()?.enabled;
+    return typeof value === 'boolean' ? value : null;
+  } catch {
+    // Unreadable, usually because the rules are not deployed yet. The caller
+    // falls back to the build-time flag in config.js rather than failing.
+    return null;
+  }
+}
+
+/** Platform administrators only; the rules enforce that, not this function. */
+export async function writeSampleDataSetting(enabled) {
+  await setDoc(doc(db, 'platformSettings', 'sampleData'), {
+    enabled,
+    updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser.uid,
+  });
+}
+
+// --------------------------------------------------------------- sample data
+//
+// Written and removed by a platform administrator from the admin portal. Every
+// document uses a `sample-` id, which is what lets firestore.rules permit
+// deleting these and nothing else: a real notice is never deletable once
+// published, and a real organization is never deletable at all.
+//
+// Deliberately built on the same rules everything else goes through. An
+// organization is created `pending` and then verified in a second step,
+// exactly as a real registration is, because the create rule allows nothing
+// else. Nothing here is a special server-side path.
+
+const SAMPLE_PREFIX = 'sample-';
+const sampleId = (raw) => `${SAMPLE_PREFIX}${raw}`;
+
+export async function seedSampleData(orgs, notices) {
+  const uid = auth.currentUser.uid;
+
+  for (const { id: rawId, ...org } of orgs) {
+    const ref = doc(db, 'organizations', sampleId(rawId));
+    // Step one: a registration, in the only shape the create rule accepts.
+    await setDoc(ref, {
+      ...org,
+      verificationStatus: 'pending',
+      ownerUid: uid,
+      staffUids: [uid],
+      createdAt: serverTimestamp(),
+      createdBy: uid,
+    });
+    // Step two: the administrator verifies it, the same call the admin
+    // portal's Approve button makes.
+    await updateDoc(ref, {
+      verificationStatus: 'verified',
+      verifiedAt: serverTimestamp(),
+      verifiedBy: uid,
+      statusReason: 'Sample data. Not a real organization.',
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  for (const sample of notices) {
+    const {
+      id: rawId, orgId, janazahAt, status, version,
+      cancelReason, cancelledAt, correctionNote, ...notice
+    } = sample;
+    const ref = doc(db, 'notices', sampleId(rawId));
+
+    // Created the only way the rules allow anyone to create a notice:
+    // version 1, and either a draft or published. A sample that is meant to
+    // end up cancelled or corrected gets there the same way a real one does,
+    // through a second write, rather than by being written into a state no
+    // coordinator could have produced.
+    await setDoc(ref, {
+      ...notice,
+      orgId: sampleId(orgId),
+      status: status === 'draft' ? 'draft' : 'published',
+      janazahAt: janazahAt instanceof Date ? janazahAt : new Date(janazahAt),
+      version: 1,
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+      publishedAt: serverTimestamp(),
+    });
+
+    if (status === 'cancelled') {
+      await updateDoc(ref, {
+        status: 'cancelled',
+        cancelReason: cancelReason || '',
+        cancelledAt: serverTimestamp(),
+        version: 2,
+        lastEditedBy: uid,
+        updatedAt: serverTimestamp(),
+      });
+    } else if (correctionNote) {
+      await updateDoc(ref, {
+        correctionNote,
+        version: 2,
+        lastEditedBy: uid,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  }
+}
+
+/** Everything this platform ever wrote as sample data, found by id prefix. */
+async function samplePrefixed(collectionName) {
+  const col = collection(db, collectionName);
+  // The upper bound is the prefix with its last character incremented, so the
+  // range covers every id starting with it and nothing else.
+  const end = SAMPLE_PREFIX.slice(0, -1)
+    + String.fromCharCode(SAMPLE_PREFIX.charCodeAt(SAMPLE_PREFIX.length - 1) + 1);
+  const snap = await getDocs(query(col,
+    where(documentId(), '>=', SAMPLE_PREFIX),
+    where(documentId(), '<', end)));
+  return snap.docs.filter((d) => d.id.startsWith(SAMPLE_PREFIX));
+}
+
+/** @returns {Promise<number>} how many documents were removed. */
+export async function removeSampleData() {
+  let removed = 0;
+  for (const name of ['notices', 'organizations']) {
+    for (const d of await samplePrefixed(name)) {
+      await deleteDoc(d.ref);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+/** How much sample data is currently stored, for the admin portal to show. */
+export async function countSampleData() {
+  const [notices, orgs] = await Promise.all([
+    samplePrefixed('notices'), samplePrefixed('organizations'),
+  ]);
+  return { notices: notices.length, orgs: orgs.length };
 }
 
 // --------------------------------------------------------- organizations

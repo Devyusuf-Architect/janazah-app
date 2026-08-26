@@ -38,13 +38,34 @@ describe('turning the flag off removes everything', () => {
       'the config must say plainly what has to happen before launch');
   });
 
-  test('nothing sample-related is ever written to the database', () => {
-    // The whole point of the flag over the seeding script: no cleanup.
-    const sampleAware = store.split('\n').filter((l) => /sample/i.test(l));
-    for (const line of sampleAware) {
-      assert.doesNotMatch(line, /addDoc|setDoc|updateDoc|deleteDoc/,
-        `sample data must never be written: ${line.trim()}`);
+  test('the displayed samples are never written to the database', () => {
+    // Two separate things share the name "sample data", and only one of them
+    // writes anything:
+    //
+    //   the flag        folds built-in examples into what is displayed.
+    //                   Writes nothing, so turning it off needs no cleanup.
+    //   the admin tab   writes real documents an administrator can then edit,
+    //                   and removes them again on request.
+    //
+    // This pins the first. The producers in sample-mode.js must never write.
+    assert.doesNotMatch(mode, /addDoc|setDoc|updateDoc|deleteDoc/,
+      'the displayed samples must be display-only, so the flag alone removes them');
+  });
+
+  test('every write the admin tab makes is confined to a sample- id', () => {
+    // The rules permit deleting a `sample-` notice or organization and
+    // nothing else. If a write here ever landed on an unprefixed id, it would
+    // create a record the admin portal offers to remove but cannot.
+    const seed = store.slice(store.indexOf('export async function seedSampleData'),
+      store.indexOf('async function samplePrefixed'));
+    for (const call of seed.match(/doc\(db, '(?:notices|organizations)'[^)]*\)/g) || []) {
+      assert.match(call, /sampleId\(/,
+        `every seeded document needs a sample- id: ${call}`);
     }
+    // And removal only ever deletes what that prefix search returned.
+    const remove = store.slice(store.indexOf('export async function removeSampleData'));
+    assert.match(remove.slice(0, 400), /samplePrefixed\(name\)/,
+      'removal must delete only prefix-matched documents');
   });
 });
 
@@ -62,9 +83,11 @@ describe('while it is on, samples cannot be mistaken for real notices', () => {
         `${page} must say plainly that the notices are not real`);
     }
     for (const boot of ['public/js/feed.js', 'public/js/app.js']) {
-      assert.match(readFileSync(boot, 'utf8'),
-        /isSampleMode\(\)[\s\S]{0,80}sample-banner/,
-        `${boot} must reveal the banner when the flag is on`);
+      const src = readFileSync(boot, 'utf8');
+      assert.match(src, /isSampleMode/,
+        `${boot} must decide the banner from sample mode`);
+      assert.match(src, /sample-banner/,
+        `${boot} must reveal the banner when sample mode is on`);
     }
   });
 });

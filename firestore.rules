@@ -153,7 +153,12 @@ service cloud.firestore {
                      'createdBy']);
 
       // Organizations are suspended, never deleted: the audit trail must keep
-      // pointing at something.
+      // pointing at something. The one exception is sample data, which a
+      // platform administrator adds and removes from the admin portal. The
+      // `sample-` id prefix is what makes the exception safe: it can only
+      // ever match a record this platform created for testing, never a real
+      // masjid, whose id is a Firestore-generated one.
+      allow delete: if isPlatformAdmin() && orgId.matches('^sample-.*');
       allow delete: if false;
 
       // ---------- staff join requests ----------
@@ -287,6 +292,10 @@ service cloud.firestore {
 
       // Never hard-delete a published notice; cancel it. Deleting would break
       // the audit trail and leave shared links dead instead of corrected.
+      // Sample notices are the exception, for the same reason as sample
+      // organizations above: the `sample-` prefix cannot match a real notice,
+      // and testing data has to be removable in full.
+      allow delete: if isPlatformAdmin() && noticeId.matches('^sample-.*');
       allow delete: if isOrgStaff(resource.data.orgId)
         && resource.data.status == 'draft';
 
@@ -351,6 +360,22 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.status in ['open', 'resolved', 'dismissed']
         && request.resource.data.resolvedBy == uid();
+      allow delete: if false;
+    }
+
+    // ---------- platform settings ----------
+    //
+    // Small operational switches a platform administrator flips from the
+    // admin portal. Publicly readable because the app has to know, before
+    // anyone signs in, whether it is showing sample data; there is nothing
+    // here worth hiding, and nothing about any person.
+    match /platformSettings/{key} {
+      allow get: if true;
+      allow list: if isPlatformAdmin();
+      allow create, update: if isPlatformAdmin()
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.updatedBy == uid();
       allow delete: if false;
     }
 

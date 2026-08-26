@@ -273,6 +273,96 @@ describe('corrections and cancellation', () => {
   });
 });
 
+describe('sample data is removable, and nothing else becomes removable with it', () => {
+  // The admin portal adds and removes testing data. That needs a delete
+  // permission on two collections that otherwise allow none, so the exception
+  // has to be provably narrow: it is keyed on a `sample-` id prefix, which a
+  // Firestore-generated id can never have.
+
+  const sampleOrg = async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'organizations', 'sample-masjid'), {
+        name: 'Sample Masjid', type: 'masjid', address: '1 Example St',
+        city: 'Toronto', province: 'ON', lat: 43.65, lng: -79.38, cell: 'dpz83',
+        verificationStatus: 'verified', ownerUid: ADMIN, staffUids: [ADMIN],
+        createdAt: Timestamp.now(), createdBy: ADMIN,
+      });
+    });
+  };
+
+  test('an admin can delete a sample organization', async () => {
+    await sampleOrg();
+    await assertSucceeds(deleteDoc(doc(as(ADMIN), 'organizations', 'sample-masjid')));
+  });
+
+  test('an admin still cannot delete a real organization', async () => {
+    // The whole point of the prefix. VERIFIED_ORG has an ordinary id.
+    await assertFails(deleteDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG)));
+    await assertFails(deleteDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG)));
+  });
+
+  test('nobody but an admin can delete a sample organization', async () => {
+    await sampleOrg();
+    for (const who of [OWNER, STAFF, OUTSIDER]) {
+      await assertFails(deleteDoc(doc(as(who), 'organizations', 'sample-masjid')));
+    }
+    await assertFails(deleteDoc(doc(anon(), 'organizations', 'sample-masjid')));
+  });
+
+  test('an admin can delete a published sample notice', async () => {
+    await seedNotice('sample-notice', { status: 'published', isPublic: true });
+    await assertSucceeds(deleteDoc(doc(as(ADMIN), 'notices', 'sample-notice')));
+  });
+
+  test('a real published notice still cannot be deleted by anyone', async () => {
+    // It is cancelled, never deleted: a shared link must explain itself
+    // rather than go dead, and the audit trail has to keep pointing at
+    // something.
+    await seedNotice('real-notice', { status: 'published', isPublic: true });
+    for (const who of [ADMIN, OWNER, STAFF, OUTSIDER]) {
+      await assertFails(deleteDoc(doc(as(who), 'notices', 'real-notice')));
+    }
+  });
+
+  test('an id that merely contains "sample-" is not enough', async () => {
+    await seedNotice('not-a-sample-notice', { status: 'published', isPublic: true });
+    await assertFails(deleteDoc(doc(as(ADMIN), 'notices', 'not-a-sample-notice')));
+  });
+});
+
+describe('platform settings', () => {
+  test('anyone may read a setting, since the app needs it before sign-in', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'platformSettings', 'sampleData'), {
+        enabled: true, updatedAt: Timestamp.now(), updatedBy: ADMIN,
+      });
+    });
+    await assertSucceeds(getDoc(doc(anon(), 'platformSettings', 'sampleData')));
+  });
+
+  test('only a platform admin may change one', async () => {
+    const value = { enabled: false, updatedAt: serverTimestamp(), updatedBy: OUTSIDER };
+    await assertFails(setDoc(doc(as(OUTSIDER), 'platformSettings', 'sampleData'), value));
+    await assertFails(setDoc(doc(as(OWNER), 'platformSettings', 'sampleData'),
+      { ...value, updatedBy: OWNER }));
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'platformSettings', 'sampleData'),
+      { enabled: false, updatedAt: serverTimestamp(), updatedBy: ADMIN }));
+  });
+
+  test('an admin cannot attribute a change to someone else, or smuggle in fields', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'sampleData'),
+      { enabled: false, updatedAt: serverTimestamp(), updatedBy: OWNER }));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'sampleData'),
+      { enabled: false, updatedAt: serverTimestamp(), updatedBy: ADMIN, extra: 'x' }));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'sampleData'),
+      { enabled: 'yes', updatedAt: serverTimestamp(), updatedBy: ADMIN }));
+  });
+
+  test('settings are never deleted, only flipped', async () => {
+    await assertFails(deleteDoc(doc(as(ADMIN), 'platformSettings', 'sampleData')));
+  });
+});
+
 describe('following is a community action, not a coordinator one', () => {
   // Following is stored on the device (public/js/follows.js) and writes
   // nothing, so the only thing it needs from the backend is the ability to

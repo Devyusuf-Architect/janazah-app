@@ -731,6 +731,65 @@ const run = async () => {
     assert.match(member.url(), /\/signin$/, 'signing out of the dashboard must return to sign-in');
     log('signing out of the community dashboard returns to sign-in');
 
+    // ---- the admin portal manages sample data ------------------------------
+    // The switch, the records, and the guarantee that removing the records
+    // cannot take a real notice with them.
+    await admin.getByRole('button', { name: 'Admin' }).click();
+    await admin.getByRole('button', { name: 'Sample data' }).click();
+    await admin.getByRole('button', { name: 'Add the built-in examples' })
+      .waitFor({ timeout: 15000 });
+    await admin.getByRole('button', { name: 'Add the built-in examples' }).click();
+    await admin.getByRole('button', { name: 'Remove all sample records' })
+      .waitFor({ timeout: 20000 });
+    log('an administrator can add sample records from the admin portal');
+
+    const seeded = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/notices`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    const sampleIds = (seeded.documents || [])
+      .map((d) => d.name.split('/').pop())
+      .filter((docId) => docId.startsWith('sample-'));
+    assert.ok(sampleIds.length > 0, 'no sample notices were written');
+    log(`${sampleIds.length} sample notices written, all with a sample- id`);
+
+    // The switch is stored, so it reaches every visitor rather than living in
+    // one browser. Driven in both directions, from whichever state the build
+    // started in.
+    const storedSetting = async () => {
+      const res = await fetch(
+        `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/platformSettings/sampleData`,
+        { headers: { Authorization: 'Bearer owner' } });
+      return (await res.json())?.fields?.enabled?.booleanValue;
+    };
+
+    for (const [click, expect, back] of [
+      ['Turn sample data on', true, 'Turn sample data off'],
+      ['Turn sample data off', false, 'Turn sample data on'],
+    ]) {
+      await admin.getByRole('button', { name: click }).click();
+      await admin.getByRole('button', { name: back }).waitFor({ timeout: 15000 });
+      assert.equal(await storedSetting(), expect,
+        `"${click}" must store enabled=${expect}, not just change this browser`);
+    }
+    log('the sample-data switch is stored where every visitor reads it');
+
+    // Removing sample records must not touch a real one.
+    await admin.getByRole('button', { name: 'Remove all sample records' }).click();
+    await admin.locator('#reason-input').fill('done testing');
+    await admin.getByRole('button', { name: 'Remove them' }).click();
+    await admin.getByRole('button', { name: 'Add the built-in examples' })
+      .waitFor({ timeout: 20000 });
+
+    const after = await (await fetch(
+      `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/notices`,
+      { headers: { Authorization: 'Bearer owner' } })).json();
+    const remaining = (after.documents || []).map((d) => d.name.split('/').pop());
+    assert.ok(!remaining.some((docId) => docId.startsWith('sample-')),
+      'sample notices survived removal');
+    assert.ok(remaining.length > 0,
+      'removing sample data deleted the real notices too, which must never happen');
+    log('sample records removed in full, real notices untouched');
+
     // ---- the console is not a trap -----------------------------------------
     // The brand in the corner must leave the console for the public site,
     // not point at the console's own root, and there must be a way out in

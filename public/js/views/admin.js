@@ -8,6 +8,7 @@ import { el, toast, friendlyError, askReason, showModal } from '../ui.js';
 import { statusBadge, renderAuditTable } from './org.js';
 import { publicNoticeView } from '../notice-view.js';
 import { ORG_TYPES } from '../model.js';
+import { renderAdminSample } from './admin-sample.js';
 import * as store from '../store.js';
 
 const EMPTY_COPY = {
@@ -43,6 +44,7 @@ export function renderAdmin(mount, ctx) {
     'Suspended': () => queueView(panel, 'suspended', ctx),
     'Reports': () => reportsView(panel),
     'Audit log': () => auditView(panel),
+    'Sample data': () => renderAdminSample(panel, ctx),
   };
 
   let active = 'Verification requests';

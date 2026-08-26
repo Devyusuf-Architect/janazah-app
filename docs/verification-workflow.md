@@ -114,6 +114,37 @@ Every one of those writes is audited server-side by the `onOrgAuditWritten`
 Cloud Functions trigger (`functions/lib/audit-log.js`), not by the browser,
 so an administrator cannot make a decision without it being recorded.
 
+## Sample data, from the admin portal
+
+**Admin → Sample data** carries two separate controls:
+
+- **The switch.** `/platformSettings/sampleData` holds `{ enabled }`. It is
+  publicly readable, because the app has to know before anyone signs in
+  whether it is showing samples, and writable only by a platform
+  administrator (`isPlatformAdmin()`, with `updatedBy` pinned to their own
+  uid and no other fields permitted). `APP.sampleData` in config.js is the
+  fallback whenever the document is missing or unreadable.
+- **The records.** The built-in examples can be written into the database as
+  real documents and removed again. Seeding walks the same lifecycle a real
+  coordinator does, because the rules allow nothing else: an organization is
+  created `pending` and then verified in a second write, and a notice is
+  created at version 1 as a draft or published, then cancelled or corrected
+  by a second write if the sample calls for it.
+
+Every sample document is written at a `sample-` id. That prefix is what the
+delete permission is keyed on:
+
+```
+allow delete: if isPlatformAdmin() && orgId.matches('^sample-.*');
+allow delete: if isPlatformAdmin() && noticeId.matches('^sample-.*');
+```
+
+Both are additive exceptions to rules that otherwise permit no deletion at
+all. A Firestore-generated id can never match the prefix, so a real masjid
+and a real published notice remain undeletable by everyone, administrators
+included. `tests/rules.test.js` proves both directions, including that an id
+merely *containing* `sample-` is not enough.
+
 ## What is deliberately not built yet
 
 - **The submitter's account email.** The queue shows `contactEmail` and the
