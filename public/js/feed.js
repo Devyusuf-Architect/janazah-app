@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast } from './ui.js';
 import { isSampleMode, initSampleMode } from './sample-mode.js';
+import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { revealIn, autoReveal } from './motion.js';
 import { renderHome } from './views/home.js';
@@ -29,6 +30,9 @@ const nav = () => $('#nav');
 
 let user = null;
 let authReady = false;
+// Resolved asynchronously after sign-in. False until then, so the nav simply
+// has no Admin link for a moment rather than flickering one in and out.
+let isAdmin = false;
 
 function teardownAll() {
   teardownFeed();
@@ -38,7 +42,7 @@ function teardownAll() {
 
 /** Redraws the nav for the current path and sign-in state. */
 function paintNav() {
-  renderNav(nav(), { path: location.pathname, user });
+  renderNav(nav(), { path: location.pathname, user, isAdmin });
 }
 
 function renderRoute() {
@@ -205,6 +209,19 @@ completeRedirectSignIn((message) => toast(message, 'error'));
 onAuthStateChanged(auth, (nextUser) => {
   user = nextUser;
   authReady = true;
+  isAdmin = false;
   if (/^\/(signin|dashboard|account)\/?$/.test(location.pathname)) route();
   else paintNav();
+
+  // Whether to offer the admin route. Not awaited, and never allowed to break
+  // the page: the rules let a signed-in account read only its own /admins
+  // document, so a denial here simply means "not an administrator".
+  if (!nextUser) return;
+  store.isPlatformAdmin(nextUser.uid)
+    .then((admin) => {
+      if (user !== nextUser || admin === isAdmin) return;
+      isAdmin = admin;
+      paintNav();
+    })
+    .catch((err) => console.error('isPlatformAdmin', err));
 });

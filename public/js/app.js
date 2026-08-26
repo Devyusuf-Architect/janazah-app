@@ -47,6 +47,26 @@ function takeStartIntent() {
   return start;
 }
 
+/**
+ * Which console tab to open, from ?tab=. Used by the public site's Admin
+ * link, so an administrator lands in the portal rather than on whichever tab
+ * happens to be the default for their account.
+ *
+ * Stripped from the URL like ?start=, for the same reason: it is a one-time
+ * instruction, not a place. Honoured only if the tab exists and the person is
+ * allowed there; route() re-checks adminOnly against the real admin record
+ * regardless of what the URL asked for.
+ */
+function takeTabIntent() {
+  const params = new URLSearchParams(location.search);
+  const tab = params.get('tab');
+  if (!tab) return null;
+  params.delete('tab');
+  const query = params.toString();
+  history.replaceState(null, '', location.pathname + (query ? `?${query}` : ''));
+  return tab;
+}
+
 const ROUTES = {
   notices: { label: 'Notices', render: renderNotices },
   organizations: { label: 'Organizations', render: renderOrgs },
@@ -121,6 +141,7 @@ async function loadContext() {
 // public site may still have to sign in or create an account first, and the
 // intent has to survive that round trip to be worth anything.
 ctx.startIntent = takeStartIntent();
+const tabIntent = takeTabIntent();
 
 // See feed.js: the return leg of a Google redirect sign-in has to be claimed
 // or it silently drops the person back on the sign-in form.
@@ -144,6 +165,19 @@ onAuthStateChanged(auth, async (user) => {
   // Straight to whichever form they chose on the public site, rather than a
   // list of nothing with a button that repeats the choice they already made.
   if (ctx.startIntent) { ctx.route = 'organizations'; route(); return; }
+
+  // An explicit destination from the public site's Admin link. A tab the
+  // person is not entitled to is ignored rather than obeyed-then-bounced:
+  // route() would send them to Notices, skipping the landing logic below that
+  // knows a coordinator with nothing published belongs on Organizations. The
+  // check here is UX only; route() enforces adminOnly regardless, and the
+  // rules enforce it again on every read and write.
+  const wanted = tabIntent && ROUTES[tabIntent];
+  if (wanted && !(wanted.adminOnly && !ctx.isAdmin)) {
+    ctx.route = tabIntent;
+    route();
+    return;
+  }
 
   // A coordinator with nothing publishable has nothing to do on the notices
   // screen, so start them where the work is: registering, or reading why

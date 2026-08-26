@@ -233,6 +233,17 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .nav-item--cta:hover { background: var(--accent-hover); color: var(--accent-ink); }
 .nav-item--ghost { color: var(--ink-3); }
 
+/* Leads somewhere most signed-in people cannot go, so it is marked out
+   without shouting: an outline rather than another filled button competing
+   with the primary action beside it. */
+.nav-item--admin {
+  color: var(--gold);
+  border: 1px solid var(--gold-line);
+  background: var(--gold-soft);
+  font-weight: 600;
+}
+.nav-item--admin:hover { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); }
+
 /* Hidden by default; only meaningful once the media query below shows it. */
 .nav-toggle {
   display: none;

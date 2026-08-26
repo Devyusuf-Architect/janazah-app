@@ -35,9 +35,15 @@ function isActive(href, path) {
 
 /**
  * @param {HTMLElement} nav
- * @param {{ path: string, user: import('firebase/auth').User | null }} state
+ * @param {object} state
+ * @param {string} state.path
+ * @param {import('firebase/auth').User | null} state.user
+ * @param {boolean} [state.isAdmin] Whether to offer a route into the admin
+ *   portal. Presentation only: what an administrator may actually do is
+ *   decided by firestore.rules on every read and write, so hiding or showing
+ *   this link changes nobody's permissions.
  */
-export function renderNav(nav, { path, user }) {
+export function renderNav(nav, { path, user, isAdmin = false }) {
   nav.replaceChildren();
 
   const links = el('div', { class: 'nav-links' },
@@ -48,6 +54,19 @@ export function renderNav(nav, { path, user }) {
     })));
 
   const account = el('div', { class: 'nav-links nav-links--end' });
+
+  // A platform administrator reading the public feed had no way through to
+  // the portal except by knowing the /console URL. The link is deliberately
+  // distinct from the ordinary items: it leads somewhere most people signed
+  // in here cannot go.
+  if (isAdmin) {
+    account.append(el('a', {
+      class: 'nav-item nav-item--admin',
+      href: '/console?tab=admin',
+      text: 'Admin',
+    }));
+  }
+
   if (user) {
     account.append(
       el('a', {

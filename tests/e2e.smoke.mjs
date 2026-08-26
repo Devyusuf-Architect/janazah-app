@@ -790,6 +790,48 @@ const run = async () => {
       'removing sample data deleted the real notices too, which must never happen');
     log('sample records removed in full, real notices untouched');
 
+    // ---- an administrator can reach the portal from the public site --------
+    // Previously the only way through was knowing the /console URL.
+    const adminPublic = await newPage();
+    await adminPublic.goto(`${BASE}/signin`);
+    await adminPublic.locator('#email').fill(ADMIN.email);
+    await adminPublic.locator('#password').fill(ADMIN.password);
+    await adminPublic.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await adminPublic.locator('#nav').getByRole('link', { name: 'Admin', exact: true })
+      .waitFor({ timeout: 15000 });
+    await adminPublic.locator('#nav').getByRole('link', { name: 'Admin', exact: true }).click();
+    await adminPublic.getByRole('button', { name: 'Verification requests' })
+      .waitFor({ timeout: 20000 });
+    assert.ok(!adminPublic.url().includes('tab='),
+      `?tab= should be consumed and stripped; got ${adminPublic.url()}`);
+    log('an administrator reaches the admin portal from the public site nav');
+
+    // ---- and nobody else gets one, or can type their way in ----------------
+    const plain = await newPage();
+    await plain.goto(`${BASE}/signin`);
+    await plain.locator('#email').fill('member@example.com');
+    await plain.locator('#password').fill('test-password-3');
+    await plain.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await plain.locator('#view').getByRole('heading', { name: /^Welcome/ })
+      .waitFor({ timeout: 15000 });
+    await plain.waitForTimeout(1500);
+    assert.equal(
+      await plain.locator('#nav').getByRole('link', { name: 'Admin', exact: true }).count(), 0,
+      'a community member must not be offered the admin portal');
+
+    // The link is presentation only. Asking for the tab directly must not
+    // grant it; the console re-checks against the real admin record, and an
+    // unentitled tab is ignored rather than obeyed, so the person still lands
+    // where a coordinator with no organization belongs.
+    await plain.goto(`${BASE}/console?tab=admin`);
+    await plain.getByRole('button', { name: 'Register a new masjid' })
+      .first().waitFor({ timeout: 20000 });
+    const plainNav = await plain.locator('#nav').innerText();
+    assert.ok(!/Admin/.test(plainNav),
+      'hand-typing ?tab=admin must not produce an Admin tab');
+    assert.ok(!plain.url().includes('tab='), 'the tab intent should be consumed');
+    log('a community member gets no admin link, and cannot type their way in');
+
     // ---- the console is not a trap -----------------------------------------
     // The brand in the corner must leave the console for the public site,
     // not point at the console's own root, and there must be a way out in
