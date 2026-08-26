@@ -2,6 +2,9 @@
 
 import { el, toast, readForm, friendlyError, showModal } from '../ui.js';
 import { searchAddresses } from '../geocode.js';
+import {
+  COUNTRIES, subdivisionsFor, regionLabelFor, countryName, centreFor,
+} from '../regions.js';
 import { ORG_TYPES } from '../model.js';
 import * as store from '../store.js';
 import { auditForOrg } from '../audit.js';
@@ -297,11 +300,20 @@ function addressPicker() {
   let controller = null;
   let debounce = null;
 
+  // Asked before the address, and used to scope the search. See regions.js
+  // for why the order matters rather than being tidiness.
+  const country = el('select', { class: 'field', id: 'countryCode', name: 'countryCode' }, [
+    el('option', { value: '', text: 'Select a country…' }),
+    ...COUNTRIES.map((c) => el('option', { value: c.code, text: c.name })),
+  ]);
+
+  const regionWrap = el('div', { class: 'field-group' });
+
   const input = el('input', {
-    class: 'field', id: 'addressSearch', type: 'text',
+    class: 'field', id: 'addressSearch', type: 'text', disabled: true,
     autocomplete: 'off', role: 'combobox', 'aria-expanded': 'false',
     'aria-controls': 'address-results', 'aria-autocomplete': 'list',
-    placeholder: 'Start typing the masjid’s name or street address',
+    placeholder: 'Choose a country first',
   });
   const results = el('ul', { class: 'address-results', id: 'address-results', role: 'listbox', hidden: true });
   const status = el('p', { class: 'hint', role: 'status', 'aria-live': 'polite' });
@@ -312,7 +324,6 @@ function addressPicker() {
   const lngInput = el('input', { type: 'hidden', name: 'lng', id: 'lng' });
   const addressInput = el('input', { type: 'hidden', name: 'address', id: 'address' });
   const cityInput = el('input', { type: 'hidden', name: 'city', id: 'city' });
-  const provinceInput = el('input', { type: 'hidden', name: 'province', id: 'province' });
   const postalInput = el('input', { type: 'hidden', name: 'postalCode', id: 'postalCode' });
   const countryInput = el('input', { type: 'hidden', name: 'country', id: 'country' });
 
@@ -322,15 +333,78 @@ function addressPicker() {
     input.setAttribute('aria-expanded', 'false');
   };
 
+  /** Whatever the region control currently holds, list or free text. */
+  const regionValue = () => regionWrap.querySelector('#province')?.value.trim() || '';
+
+  /**
+   * Rebuild the region control for the chosen country.
+   *
+   * Canada and the United States get their real subdivisions; everywhere else
+   * gets a text box, because a half-remembered list of another country's
+   * regions is worse than letting someone type the right answer.
+   */
+  const paintRegion = () => {
+    const code = country.value;
+    const list = subdivisionsFor(code);
+    const label = el('label', { class: 'label', for: 'province', text: regionLabelFor(code) });
+
+    if (!code) {
+      regionWrap.replaceChildren(
+        label,
+        el('input', { class: 'field', id: 'province', name: 'province', disabled: true, placeholder: 'Choose a country first' }),
+      );
+      return;
+    }
+
+    regionWrap.replaceChildren(label, list
+      ? el('select', { class: 'field', id: 'province', name: 'province', required: true }, [
+          el('option', { value: '', text: `Select a ${regionLabelFor(code).toLowerCase()}…` }),
+          ...list.map((name) => el('option', { value: name, text: name })),
+        ])
+      : el('input', {
+          class: 'field', id: 'province', name: 'province', required: true, maxlength: 40,
+          placeholder: 'The state, province or region this masjid is in',
+        }));
+
+    regionWrap.querySelector('#province').addEventListener('change', reset);
+    regionWrap.querySelector('#province').addEventListener('input', reset);
+  };
+
+  /** Any change above the address invalidates an address chosen under the old one. */
+  const reset = () => {
+    selected = null;
+    chosen.hidden = true;
+    latInput.value = '';
+    lngInput.value = '';
+    clearResults();
+    status.textContent = '';
+
+    const ready = Boolean(country.value);
+    input.disabled = !ready;
+    input.placeholder = ready
+      ? 'Start typing the masjid’s name or street address'
+      : 'Choose a country first';
+    if (!ready) input.value = '';
+  };
+
+  country.addEventListener('change', () => {
+    paintRegion();
+    reset();
+  });
+  paintRegion();
+
   const choose = (place) => {
     selected = place;
     latInput.value = String(place.lat);
     lngInput.value = String(place.lng);
     addressInput.value = place.address || place.label;
     cityInput.value = place.city;
-    provinceInput.value = place.province;
     postalInput.value = place.postalCode;
-    countryInput.value = place.country;
+    // The country the registrant chose wins over what the geocoder inferred.
+    // They know where their masjid is; the geocoder is guessing from a
+    // string, and that guess is what asking first exists to correct. The
+    // province is the region control's own value and needs no copying.
+    countryInput.value = countryName(country.value) || place.country;
 
     input.value = place.label;
     clearResults();
@@ -360,7 +434,12 @@ function addressPicker() {
     controller = new AbortController();
     status.textContent = 'Searching…';
     try {
-      const places = await searchAddresses(query, { signal: controller.signal });
+      const places = await searchAddresses(query, {
+        signal: controller.signal,
+        country: countryName(country.value),
+        region: regionValue(),
+        centre: centreFor(country.value),
+      });
       if (!places.length) {
         clearResults();
         status.textContent = 'No matching address found. Try the street address on its own.';
@@ -391,14 +470,13 @@ function addressPicker() {
     // Typing invalidates a previous choice: the box no longer shows what was
     // actually selected, so treating it as still selected would submit
     // coordinates that do not match the text on screen.
-    selected = null;
-    chosen.hidden = true;
-    latInput.value = '';
-    lngInput.value = '';
+    const typed = input.value;
+    reset();
+    input.value = typed;
 
     clearTimeout(debounce);
-    const query = input.value.trim();
-    if (query.length < 3) { clearResults(); status.textContent = ''; return; }
+    const query = typed.trim();
+    if (query.length < 3) return;
     debounce = setTimeout(() => search(query), 300);
   });
 
@@ -408,20 +486,49 @@ function addressPicker() {
     if (e.key === 'Enter') { e.preventDefault(); results.firstChild?.focus(); }
   });
 
-  const node = el('div', { class: 'field-group address-picker' }, [
-    el('label', { class: 'label', for: 'addressSearch', text: 'Address' }),
-    input,
-    el('p', { class: 'hint' },
-      'Start typing and choose the right result. The exact location is taken ' +
-      'from your choice, so nearby alerts and directions point at the right ' +
-      'building.'),
-    results,
-    status,
-    chosen,
-    latInput, lngInput, addressInput, cityInput, provinceInput, postalInput, countryInput,
+  const node = el('div', { class: 'location-fields' }, [
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', for: 'countryCode', text: 'Country' }),
+      country,
+    ]),
+    regionWrap,
+    el('div', { class: 'field-group address-picker' }, [
+      el('label', { class: 'label', for: 'addressSearch', text: 'Address' }),
+      input,
+      el('p', { class: 'hint' },
+        'Start typing and choose the right result. Searching inside the ' +
+        'country and region you picked is what keeps a masjid from landing on ' +
+        'a same-named street somewhere else, which nothing later would catch.'),
+      results,
+      status,
+      chosen,
+    ]),
+    latInput, lngInput, addressInput, cityInput, postalInput, countryInput,
   ]);
 
-  return { node, selected: () => selected, focusInput: () => input.focus() };
+  return {
+    node,
+    selected: () => selected,
+    focusInput: () => input.focus(),
+    /** What is still missing, in the order the form asks for it. */
+    missing: () => {
+      if (!country.value) return { message: 'Choose the country this masjid is in.', focus: country };
+      if (!regionValue()) {
+        return {
+          message: `Choose the ${regionLabelFor(country.value).toLowerCase()}.`,
+          focus: regionWrap.querySelector('#province'),
+        };
+      }
+      if (!selected) {
+        return {
+          message: 'Choose your address from the suggestions, so the exact '
+                 + 'location is known for nearby alerts and directions.',
+          focus: input,
+        };
+      }
+      return null;
+    },
+  };
 }
 
 function renderRegisterForm(mount, ctx) {
@@ -470,14 +577,15 @@ function renderRegisterForm(mount, ctx) {
     error.hidden = true;
     const submit = form.querySelector('button[type=submit]');
     submit.disabled = true;
-    // Coordinates come from a chosen suggestion, never from typed text.
-    // Without them the organization would never appear in a nearby search
-    // or an area alert, which is most of the point of registering.
-    if (!picker.selected()) {
+    // Country, then region, then an address actually chosen from the
+    // suggestions. Coordinates never come from typed text: without them the
+    // organization is invisible to every nearby search and area alert, which
+    // is most of the point of registering.
+    const gap = picker.missing();
+    if (gap) {
       error.hidden = false;
-      error.textContent = 'Choose your address from the suggestions, so the '
-        + 'exact location is known for nearby alerts and directions.';
-      picker.focusInput();
+      error.textContent = gap.message;
+      gap.focus?.focus();
       submit.disabled = false;
       return;
     }

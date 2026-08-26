@@ -176,6 +176,16 @@ const run = async () => {
     // fail because a third-party geocoder is slow or down while the suite
     // runs, so the lookup is served locally with a canned Photon response.
     await stubGeocoder(coord);
+
+    // Country, then region, then the address: the search stays locked until
+    // a country is chosen, so that the lookup is scoped rather than global.
+    assert.ok(await coord.locator('#addressSearch').isDisabled(),
+      'the address search must be locked until a country is chosen');
+    await coord.locator('#countryCode').selectOption('CA');
+    await coord.locator('#province').selectOption('Ontario');
+    assert.ok(await coord.locator('#addressSearch').isEnabled(),
+      'choosing a country must unlock the address search');
+
     await coord.locator('#addressSearch').fill('100 Example Street');
     await coord.locator('.address-result').first().click();
 
@@ -188,6 +198,8 @@ const run = async () => {
     assert.equal(await coord.locator('#lat').inputValue(), '43.6532');
     assert.equal(await coord.locator('#lng').inputValue(), '-79.3832');
     assert.equal(await coord.locator('#city').inputValue(), 'Toronto');
+    assert.equal(await coord.locator('#province').inputValue(), 'Ontario');
+    assert.equal(await coord.locator('#country').inputValue(), 'Canada');
 
     await coord.locator('#contactEmail').fill('office@example.com');
     await coord.getByRole('button', { name: 'Submit for verification' }).click();
@@ -220,6 +232,9 @@ const run = async () => {
     assert.ok(storedOrg.fields.createdAt?.timestampValue, 'the submission time was not recorded');
     assert.ok(!storedOrg.fields.verifiedAt && !storedOrg.fields.verifiedBy,
       'a pending registration must not carry verification fields');
+    // The country and region the registrant chose, not the geocoder's guess.
+    assert.equal(storedOrg.fields.country.stringValue, 'Canada');
+    assert.equal(storedOrg.fields.province.stringValue, 'Ontario');
     log('registration stored as pending, with who submitted it and when');
 
     // A coordinator cannot promote their own organization: that is enforced

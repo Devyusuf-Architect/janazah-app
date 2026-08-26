@@ -59,26 +59,64 @@ export function normalizeFeature(feature) {
 }
 
 /**
+ * Build the string actually sent to the geocoder.
+ *
+ * The country and region the registrant picked are appended to what they
+ * typed. "Main Street" is in a hundred countries; "Main Street, Ontario,
+ * Canada" is in far fewer, and the difference decides whether a masjid ends
+ * up at the right coordinates or silently at the wrong ones.
+ *
+ * Exported for testing: this is pure string work and worth pinning.
+ */
+export function buildQuery(typed, { region, country } = {}) {
+  return [String(typed || '').trim(), region, country]
+    .filter((part) => part && String(part).trim())
+    .join(', ');
+}
+
+/**
+ * Keep only results the geocoder agrees are in the chosen country.
+ *
+ * A result with no country at all is kept: the geocoder does not always
+ * return one, and dropping those would hide correct addresses. This filters
+ * out results it says belong somewhere else, which is the actual error case.
+ */
+export function inCountry(places, country) {
+  if (!country) return places;
+  const want = country.trim().toLowerCase();
+  return places.filter((p) => !p.country || p.country.trim().toLowerCase() === want);
+}
+
+/**
  * Address suggestions for a partial query.
  *
- * @param {string} query
- * @param {{ signal?: AbortSignal, limit?: number }} [options]
+ * @param {string} query What the person typed.
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @param {number} [options.limit]
+ * @param {string} [options.country] Country name, for scoping and filtering.
+ * @param {string} [options.region] State/province, appended to the query.
+ * @param {{lat: number, lon: number}} [options.centre] Where to bias results.
  * @returns {Promise<Array<ReturnType<typeof normalizeFeature>>>}
  */
-export async function searchAddresses(query, { signal, limit = 6 } = {}) {
-  const q = String(query || '').trim();
-  if (q.length < 3) return [];
+export async function searchAddresses(query, {
+  signal, limit = 6, country, region, centre,
+} = {}) {
+  const typed = String(query || '').trim();
+  if (typed.length < 3) return [];
 
+  const bias = centre || GEOCODER.bias;
   const url = new URL(GEOCODER.url);
-  url.searchParams.set('q', q);
+  url.searchParams.set('q', buildQuery(typed, { region, country }));
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('lang', 'en');
-  url.searchParams.set('lat', String(GEOCODER.bias.lat));
-  url.searchParams.set('lon', String(GEOCODER.bias.lon));
+  url.searchParams.set('lat', String(bias.lat));
+  url.searchParams.set('lon', String(bias.lon));
 
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Address lookup failed (${res.status})`);
   const data = await res.json();
 
-  return (data?.features || []).map(normalizeFeature).filter(Boolean);
+  const places = (data?.features || []).map(normalizeFeature).filter(Boolean);
+  return inCountry(places, country);
 }

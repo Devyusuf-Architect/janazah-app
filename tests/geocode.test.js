@@ -99,12 +99,110 @@ describe('the registration form no longer asks for coordinates', () => {
   });
 
   test('submission is blocked until a suggestion is actually chosen', () => {
-    assert.match(org, /if \(!picker\.selected\(\)\)/,
-      'typed text that was never resolved has no coordinates');
+    // Now one of three gates, all checked through picker.missing(): typed
+    // text that was never resolved still has no coordinates.
+    assert.match(org, /if \(!selected\) \{/,
+      'a location that was never chosen must still block submission');
+    assert.match(org, /const gap = picker\.missing\(\);[\s\S]{0,200}if \(gap\)/,
+      'the form must refuse to submit while anything is missing');
   });
 
   test('the chosen location is confirmed back to the person', () => {
     assert.match(org, /Selected location: /,
       'the applicant must see which location they picked before submitting');
+  });
+});
+
+describe('scoping the search by country and region', () => {
+  test('the country and region are appended to what was typed', async () => {
+    const { buildQuery } = await import('../public/js/geocode.js');
+    assert.equal(
+      buildQuery('100 Queen St W', { region: 'Ontario', country: 'Canada' }),
+      '100 Queen St W, Ontario, Canada');
+  });
+
+  test('missing parts are left out rather than leaving empty commas', async () => {
+    const { buildQuery } = await import('../public/js/geocode.js');
+    assert.equal(buildQuery('Main St', { country: 'Canada' }), 'Main St, Canada');
+    assert.equal(buildQuery('Main St', {}), 'Main St');
+    assert.equal(buildQuery('  Main St  ', { region: '  ' }), 'Main St');
+  });
+
+  test('results the geocoder places in another country are dropped', async () => {
+    // "Hamilton" is in Canada, New Zealand and Scotland. Registering a masjid
+    // at the wrong one puts it outside every nearby alert, and nothing later
+    // in the system would notice.
+    const { inCountry } = await import('../public/js/geocode.js');
+    const places = [
+      { label: 'Hamilton, Ontario', country: 'Canada' },
+      { label: 'Hamilton, Waikato', country: 'New Zealand' },
+    ];
+    const kept = inCountry(places, 'Canada');
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0].country, 'Canada');
+  });
+
+  test('a result with no country is kept, not silently discarded', async () => {
+    // The geocoder does not always return one. Dropping those would hide
+    // correct addresses, which is a worse failure than showing one extra.
+    const { inCountry } = await import('../public/js/geocode.js');
+    assert.equal(inCountry([{ label: 'Somewhere' }], 'Canada').length, 1);
+  });
+});
+
+describe('countries and regions', () => {
+  test('Canada and the United States carry real subdivision lists', async () => {
+    const { subdivisionsFor } = await import('../public/js/regions.js');
+    assert.equal(subdivisionsFor('CA').length, 13, 'ten provinces and three territories');
+    assert.equal(subdivisionsFor('US').length, 51, 'fifty states and DC');
+    assert.ok(subdivisionsFor('CA').includes('Ontario'));
+    assert.ok(subdivisionsFor('US').includes('District of Columbia'));
+  });
+
+  test('a country without a list falls back to free text', async () => {
+    const { subdivisionsFor } = await import('../public/js/regions.js');
+    assert.equal(subdivisionsFor('PK'), null,
+      'a half-remembered list of another country’s regions is worse than a text box');
+  });
+
+  test('the region is labelled correctly per country', async () => {
+    const { regionLabelFor } = await import('../public/js/regions.js');
+    assert.match(regionLabelFor('CA'), /province/i);
+    assert.match(regionLabelFor('US'), /state/i);
+    assert.ok(regionLabelFor('PK'), 'every country needs some label');
+  });
+
+  test('every country has a unique code and a name', async () => {
+    const { COUNTRIES } = await import('../public/js/regions.js');
+    const codes = COUNTRIES.map((c) => c.code);
+    assert.equal(new Set(codes).size, codes.length, 'duplicate country code');
+    for (const c of COUNTRIES) {
+      assert.match(c.code, /^[A-Z]{2}$/, `${c.name} has a bad code`);
+      assert.ok(c.name.trim(), `${c.code} has no name`);
+    }
+    assert.equal(COUNTRIES[0].code, 'CA', 'this launches in Canada; it goes first');
+  });
+});
+
+describe('the registration form asks in the right order', () => {
+  const org = readFileSync('public/js/views/org.js', 'utf8');
+
+  test('country and region come before the address box', () => {
+    const country = org.indexOf("id: 'countryCode'");
+    const region = org.indexOf('const regionWrap');
+    const address = org.indexOf("id: 'addressSearch'");
+    assert.ok(country > 0 && region > 0 && address > 0);
+    assert.ok(country < address, 'country must be asked before the address');
+    assert.ok(region < address, 'the region must be asked before the address');
+  });
+
+  test('the address box is locked until a country is chosen', () => {
+    assert.match(org, /id: 'addressSearch'[\s\S]{0,200}disabled: true/,
+      'searching before a country is chosen is the thing this change removes');
+  });
+
+  test('submission names whichever part is missing', () => {
+    assert.match(org, /missing: \(\) =>/);
+    assert.match(org, /Choose the country this masjid is in/);
   });
 });
