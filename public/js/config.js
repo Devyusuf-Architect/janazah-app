@@ -10,7 +10,7 @@
 
 export const firebaseConfig = {
   apiKey: 'AIzaSyBWYAmlSHrBFIiHu5C_gwSaPqGULyHPqQs',
-  authDomain: 'janaza-app-5baf2.firebaseapp.com',
+  authDomain: 'taziyah.com',
   projectId: 'janaza-app-5baf2',
   storageBucket: 'janaza-app-5baf2.firebasestorage.app',
   messagingSenderId: '471694085674',
