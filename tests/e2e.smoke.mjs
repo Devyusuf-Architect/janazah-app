@@ -854,7 +854,48 @@ const run = async () => {
     log('terms page resolves on a direct visit, not only via in-app navigation');
 
     // ---- the home page, and the nav that ties the site together -------------
+    // ---- the welcome, on a first visit only --------------------------------
+    // A brand-new browser has never seen Ta'ziyah, so the root sends it to the
+    // introduction. Everything after this in the suite is about the index, so
+    // the same page then proves it does not come back.
     const guest = await newPage();
+    await guest.goto(BASE);
+    await guest.locator('.wel-hero').waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/welcome$/,
+      'a first visit to the root should land on the welcome');
+
+    const welcomeText = await guest.locator('#view').innerText();
+    for (const claim of [/verified masjids/i, /No account needed/i,
+                         /never sent to us/i, /How it works/i]) {
+      assert.match(welcomeText, claim, `the welcome is missing: ${claim}`);
+    }
+    // Real notices, not an invented one: the suite has published some by now.
+    await guest.locator('.wel-proof .jrow').first().waitFor({ timeout: 15000 });
+    assert.match(await guest.locator('.wel-proof').innerText(), /Test Masjid/,
+      'the welcome must show notices that actually exist');
+    log('a first visit lands on the welcome, showing real notices');
+
+    // Nothing about the visit leaves the device.
+    assert.equal(
+      await guest.evaluate(() => localStorage.getItem('taziyah.visited')), '1');
+    assert.equal(await guest.evaluate(() => document.cookie), '',
+      'no cookie records the visit');
+
+    await guest.getByRole('link', { name: 'View Janazahs' }).first().click();
+    await guest.locator('.notice-card').first().waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/janazahs$/);
+
+    // Second time at the root: the index, not the introduction again. A
+    // welcome screen between somebody and a funeral notice is an obstacle.
+    await guest.locator('.brand').click();
+    await guest.locator('.home-head').waitFor({ timeout: 15000 });
+    assert.match(guest.url(), /\/$/, 'the root must be the index after the first visit');
+    assert.equal(await guest.locator('.wel-hero').count(), 0);
+    log('the welcome does not come back on the second visit');
+
+    // Still reachable on purpose, for anyone who wants it.
+    await guest.goto(`${BASE}/welcome`);
+    await guest.locator('.wel-hero').waitFor({ timeout: 15000 });
     await guest.goto(BASE);
     await guest.locator('.home-head').waitFor({ timeout: 15000 });
 
@@ -930,6 +971,10 @@ const run = async () => {
     // A drawer, not a squeezed sidebar: it must be out of the way until asked
     // for, and reachable without hunting.
     const phone = await newPage({ viewport: { width: 390, height: 844 } });
+    // A fresh context, so mark it as having been here to reach the index
+    // rather than the first-visit welcome.
+    await phone.goto(BASE);
+    await phone.evaluate(() => localStorage.setItem('taziyah.visited', '1'));
     await phone.goto(BASE);
     await phone.locator('.home-head').waitFor({ timeout: 15000 });
     assert.ok(!(await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })

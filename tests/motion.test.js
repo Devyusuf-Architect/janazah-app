@@ -90,10 +90,16 @@ describe('the reactive layer', () => {
     assert.match(block.slice(0, 500), /outline: 2px solid var\(--accent\)/);
   });
 
+  /** The "Reactive controls" section only, not everything after it. */
+  const reactiveSection = () => {
+    const from = css.indexOf('Reactive controls.');
+    const rest = css.slice(from);
+    const nextBanner = rest.indexOf('/* ------------------------------------', 10);
+    return nextBanner > 0 ? rest.slice(0, nextBanner) : rest;
+  };
+
   test('nothing animates itself: every rule added is a hover, press or focus', () => {
-    const section = css.slice(css.indexOf('Reactive controls.'));
-    const stopAt = section.indexOf('/* ---------- reduced motion');
-    const body = stopAt > 0 ? section.slice(0, stopAt) : section;
+    const body = reactiveSection();
     // An `animation:` that is not tied to an interaction would run on its own.
     const animations = body.match(/^\s*animation: [a-zA-Z]/gm) || [];
     for (const line of animations) {
@@ -103,7 +109,7 @@ describe('the reactive layer', () => {
   });
 
   test('motion stays small: no transform larger than a few pixels', () => {
-    const section = css.slice(css.indexOf('Reactive controls.'));
+    const section = reactiveSection();
     for (const match of section.matchAll(/translate[XY]\((-?[\d.]+)px\)/g)) {
       assert.ok(Math.abs(Number(match[1])) <= 3,
         `a ${match[1]}px move is more than this application should do: ${match[0]}`);

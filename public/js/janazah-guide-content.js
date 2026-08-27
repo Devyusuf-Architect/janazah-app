@@ -285,3 +285,18 @@ export const SCOPE_NOTE =
   'Taʻziyah is a notification service, not a religious authority. This page '
   + 'is offered as a reminder for people who may not have prayed a Janazah '
   + 'before, with each text’s source given so it can be checked.';
+
+/**
+ * The istirjāʻ, recited on hearing of a death.
+ *
+ * Kept here rather than in the view that shows it, because this file is the
+ * one place religious content lives and the one place an imam reviewing it
+ * has to read. Arabic verified against the standard text of the ayah; the
+ * transliteration follows the same convention as the recitations above.
+ */
+export const ISTIRJA = {
+  arabic: 'إِنَّا لِلَّهِ وَإِنَّا إِلَيْهِ رَاجِعُونَ',
+  transliteration: 'Innā lillāhi wa innā ilayhi rājiʻūn',
+  english: 'Indeed we belong to Allah, and indeed to Him we return.',
+  source: "Qur'an, Surah al-Baqarah (2:156)",
+};

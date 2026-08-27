@@ -16,6 +16,8 @@ import {
   ownScrollRestoration, rememberScroll, restoreScroll, watchScroll,
 } from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
+import { renderWelcome, teardownWelcome } from './views/welcome.js';
+import { isFirstVisit, markVisited } from './visited.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
 import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
@@ -45,6 +47,7 @@ let isAdmin = false;
 
 function teardownAll() {
   teardownHome();
+  teardownWelcome();
   teardownFeed();
   teardownDashboard();
   teardownOrgPage();
@@ -60,6 +63,12 @@ function renderRoute() {
   paintNav();
 
   const path = location.pathname;
+  // Read before marking, so the first route of a session still knows it was
+  // the first. Marking here rather than only on the home page means somebody
+  // who arrived at /janazahs is not shown an introduction the next time they
+  // tap the logo: they have already seen the real thing.
+  const firstVisit = isFirstVisit();
+  markVisited();
   const notice = path.match(/^\/n\/([A-Za-z0-9_-]+)\/?$/);
   if (notice) {
     renderSingleNotice(mount(), notice[1]);
@@ -118,6 +127,11 @@ function renderRoute() {
     renderAccount(mount(), { user });
     return;
   }
+  if (/^\/welcome\/?$/.test(path)) {
+    document.title = "Ta'ziyah — Janazah notices you can trust";
+    renderWelcome(mount());
+    return;
+  }
   if (/^\/about\/?$/.test(path)) {
     document.title = "About — Ta'ziyah";
     renderAbout(mount());
@@ -154,6 +168,22 @@ function renderRoute() {
     return;
   }
 
+  // A first-time visitor gets the welcome; everybody else gets the index.
+  // Only ever on "/", so a link straight to a notice or the guide is never
+  // interrupted by an introduction — somebody who arrived at a real funeral
+  // notice has already seen the thing an introduction would describe.
+  //
+  // Deliberately not conditioned on being signed out. Sign-in requires
+  // visiting /signin, which marks the device as having been here, so a
+  // signed-in account on a device with no history is a case that does not
+  // really occur — and checking would mean waiting for auth to resolve, which
+  // shows the index first and then replaces it.
+  if (path === '/' && firstVisit) {
+    history.replaceState(null, '', '/welcome');
+    document.title = "Ta'ziyah — Janazah notices you can trust";
+    renderWelcome(mount());
+    return;
+  }
   document.title = "Ta'ziyah";
   renderHome(mount());
 }

@@ -182,7 +182,7 @@ function sectionHead(title, link = null) {
  * tap away on its own page and does not belong in a list somebody is reading
  * quickly.
  */
-function janazahRow(notice, distanceLabel = null) {
+export function janazahRow(notice, distanceLabel = null) {
   const place = notice.prayerLocation;
   const cancelled = notice.status === 'cancelled';
 

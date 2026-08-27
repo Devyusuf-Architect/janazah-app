@@ -2755,3 +2755,252 @@ body.is-scrolled .masthead {
    --------------------------------------------------------------------------- */
 
 .stack, .jlist, .mgrid, .mlist { contain: layout style; }
+
+/* ---------------------------------------------------------------------------
+   The welcome page.
+
+   Shown once, to somebody who has been sent a link and does not yet know
+   whether to trust it. It is allowed more room than the rest of the app —
+   this is the one screen whose job is to make a case — but the restraint
+   holds: this is a service about funerals, and a page that performs at
+   somebody who has just been bereaved would be the wrong thing entirely.
+
+   The scroll effects are CSS scroll-driven animation where the browser has
+   it, and simply absent where it does not. No scroll listener, no library,
+   nothing running on the main thread while a long page moves.
+   --------------------------------------------------------------------------- */
+
+.welcome {
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+/* A hairline that fills as the page is read. Decoration, and it says so: it
+   is aria-hidden and carries no information the page does not. */
+.wel-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: var(--accent);
+  opacity: .7;
+  z-index: 50;
+  pointer-events: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .wel-progress {
+      animation: welProgress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+@keyframes welProgress { to { transform: scaleX(1); } }
+
+/* ---------- the opening ---------- */
+
+.wel-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: min(78vh, 40rem);
+  padding: 2rem 0 3rem;
+}
+
+.wel-hero__eyebrow {
+  margin: 0 0 1.25rem;
+  font-family: var(--serif);
+  font-size: .95rem;
+  letter-spacing: .04em;
+  color: var(--accent);
+}
+
+.wel-hero__title {
+  font-family: var(--serif);
+  /* Larger than anywhere else in the app, and still nowhere near the
+     screen-filling headline this replaced on the home page. */
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  margin: 0 0 1.25rem;
+}
+.wel-hero__line { display: block; }
+
+.wel-hero__lede {
+  margin: 0 0 1.9rem;
+  max-width: 30rem;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+
+.wel-hero__actions { display: flex; gap: .7rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.wel-hero__note { margin: 0; font-size: .86rem; color: var(--ink-3); }
+
+/* Three lines that arrive one after another, and the whole opening drifting
+   up as it is scrolled past. Both are opacity and transform only. */
+@media (prefers-reduced-motion: no-preference) {
+  .wel-hero__eyebrow,
+  .wel-hero__line,
+  .wel-hero__lede,
+  .wel-hero__actions,
+  .wel-hero__note {
+    animation: welRise .7s var(--ease) both;
+  }
+  .wel-hero__line:nth-child(1) { animation-delay: .06s; }
+  .wel-hero__line:nth-child(2) { animation-delay: .14s; }
+  .wel-hero__line:nth-child(3) { animation-delay: .22s; }
+  .wel-hero__lede { animation-delay: .34s; }
+  .wel-hero__actions { animation-delay: .42s; }
+  .wel-hero__note { animation-delay: .5s; }
+}
+@keyframes welRise {
+  from { opacity: 0; transform: translateY(14px); }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Leaving the top of the screen, the opening fades rather than sliding
+       away under the header. */
+    .wel-hero__title,
+    .wel-hero__lede {
+      animation: welFade linear both;
+      animation-timeline: view(block);
+      animation-range: exit 0% exit 70%;
+    }
+  }
+}
+@keyframes welFade { to { opacity: .15; transform: translateY(-10px); } }
+
+.wel-scroll {
+  display: block;
+  width: 1px;
+  height: 3rem;
+  margin-top: 2.5rem;
+  overflow: hidden;
+}
+.wel-scroll__line {
+  display: block;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(var(--line-strong), transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wel-scroll__line { animation: welTrickle 2.4s var(--ease) infinite; }
+}
+@keyframes welTrickle {
+  0%   { transform: translateY(-100%); }
+  60%, 100% { transform: translateY(100%); }
+}
+
+/* ---------- sections ---------- */
+
+.wel-eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--sans);
+  font-size: .76rem;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.wel-section__title {
+  font-family: var(--serif);
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0 0 .9rem;
+}
+
+.wel-proof,
+.wel-how,
+.wel-privacy,
+.wel-org,
+.wel-end { padding: 3.5rem 0; border-top: 1px solid var(--line); }
+
+.wel-proof__list .jlist { border-top: 0; }
+
+/* ---------- how it works ---------- */
+
+.wel-steps { list-style: none; margin: 2rem 0 0; padding: 0; }
+
+.wel-step {
+  display: flex;
+  gap: 1.25rem;
+  padding-bottom: 2rem;
+  position: relative;
+}
+/* A line joining the numbers, so the three read as a sequence rather than
+   three cards that happen to be stacked. */
+.wel-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 1.1rem;
+  top: 2.6rem;
+  bottom: .6rem;
+  width: 1px;
+  background: var(--line);
+}
+.wel-step__num {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wel-step__title { margin: .3rem 0 .35rem; font-size: 1.02rem; }
+.wel-step__body { margin: 0; color: var(--ink-2); font-size: .95rem; }
+
+/* ---------- privacy ---------- */
+
+.wel-privacy__body { color: var(--ink-2); max-width: 34rem; }
+
+.wel-facts { list-style: none; margin: 1.6rem 0 1.2rem; padding: 0; display: grid; gap: .8rem; }
+.wel-fact { display: flex; gap: .7rem; align-items: flex-start; }
+.wel-fact .icon { flex: none; margin-top: .2rem; color: var(--accent); }
+.wel-fact strong { display: block; font-size: .95rem; }
+.wel-fact span { font-size: .88rem; color: var(--ink-3); }
+
+/* ---------- masjids ---------- */
+
+.wel-org {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.wel-org__body { margin: 0; color: var(--ink-2); max-width: 30rem; font-size: .95rem; }
+
+/* ---------- closing ---------- */
+
+.wel-end { text-align: center; padding-bottom: 5rem; }
+.wel-end__title {
+  font-family: var(--arabic);
+  font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+  line-height: 1.9;
+  direction: rtl;
+  margin: 0 0 .5rem;
+}
+.wel-end__translit { margin: 0 0 .2rem; color: var(--ink-2); font-size: .95rem; }
+.wel-end__meaning { margin: 0 0 .4rem; color: var(--ink-3); font-size: .9rem; }
+.wel-end__source { margin: 0 0 2rem; color: var(--ink-3); font-size: .8rem; opacity: .8; }
+.wel-end__actions { display: flex; gap: .7rem; justify-content: center; flex-wrap: wrap; }
+.wel-end__note { margin: 1.6rem 0 0; font-size: .86rem; color: var(--ink-3); }
+
+@media (max-width: 600px) {
+  .wel-hero { min-height: min(70vh, 32rem); }
+  .wel-hero__actions .btn { flex: 1 1 auto; justify-content: center; }
+  .wel-org { align-items: stretch; }
+}

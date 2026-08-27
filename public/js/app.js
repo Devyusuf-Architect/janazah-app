@@ -10,6 +10,7 @@ import { $, el, toast, friendlyError } from './ui.js';
 import { isSampleMode } from './sample-mode.js';
 import { revealIn, pageEnter, watchScroll } from './motion.js';
 import { slideIndicator } from './indicator.js';
+import { markVisited } from './visited.js';
 import * as store from './store.js';
 
 import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
@@ -103,6 +104,9 @@ function route() {
 }
 
 watchScroll();
+// Somebody working in the console has used Ta'ziyah. Clicking through to the
+// public site should show them their notices, not an introduction.
+markVisited();
 
 let stopNavIndicator = null;
 
