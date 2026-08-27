@@ -144,3 +144,41 @@ export function restoreScroll(key, { remembered = false } = {}) {
   const to = remembered ? positions.get(key) ?? 0 : 0;
   window.scrollTo({ top: to, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
+
+// ------------------------------------------------------------ scroll state
+//
+// The masthead sits over the page with a blur behind it. Flat against the top
+// of an unscrolled page that reads correctly; once content is passing beneath
+// it, the edge needs to be visible or the two planes merge and the header
+// looks like part of the article.
+//
+// A passive listener with a class toggled only on the crossing, so scrolling a
+// long feed does not write to the DOM on every frame.
+
+export function watchScroll({ threshold = 8 } = {}) {
+  let scrolled = null;
+  const update = () => {
+    const now = window.scrollY > threshold;
+    if (now === scrolled) return;
+    scrolled = now;
+    document.body.classList.toggle('is-scrolled', now);
+  };
+  update();
+  window.addEventListener('scroll', update, { passive: true });
+  return () => window.removeEventListener('scroll', update);
+}
+
+/**
+ * Scroll to an element, clearing the sticky masthead.
+ *
+ * CSS scroll-margin handles anchors the browser navigates to itself; this is
+ * for the times the app decides to move the page, such as jumping to the first
+ * thing wrong on a form.
+ */
+export function scrollTo(node, { block = 'start' } = {}) {
+  if (!node) return;
+  node.scrollIntoView({
+    behavior: REDUCED() ? 'auto' : 'smooth',
+    block,
+  });
+}

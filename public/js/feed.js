@@ -13,7 +13,7 @@ import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import {
   revealIn, autoReveal, pageEnter,
-  ownScrollRestoration, rememberScroll, restoreScroll,
+  ownScrollRestoration, rememberScroll, restoreScroll, watchScroll,
 } from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
@@ -195,6 +195,7 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', () => route({ back: true }));
 
 ownScrollRestoration();
+watchScroll();
 
 const navToggle = $('#nav-toggle');
 if (navToggle) wireNavToggle(navToggle, nav());

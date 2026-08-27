@@ -154,8 +154,18 @@ html { -webkit-text-size-adjust: 100%; }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
-/* Anchored content clears the sticky masthead instead of hiding under it. */
+/* Anchored content clears the sticky masthead instead of hiding under it.
+   scroll-padding on the scroll container covers everything the browser
+   scrolls to, including keyboard focus moving into a form field behind the
+   header; :target keeps working for links that predate it. */
+html { scroll-padding-top: 5rem; }
 :target { scroll-margin-top: 5rem; }
+
+/* A drawer or a dialog that has been scrolled to its end should not start
+   scrolling the page behind it. */
+.modal, .sidenav, .settings-nav, .tabs, .address-results {
+  overscroll-behavior: contain;
+}
 
 body {
   margin: 0;
@@ -307,7 +317,9 @@ body.is-nav-collapsed .app-body { --sidenav: 3.75rem; }
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .nav-item .icon { flex: none; opacity: .75; }
-.nav-item:hover { background: var(--surface-2); color: var(--ink); }
+/* Same specificity trap as .tab above, plus one more reason here: a hover
+   background would paint over the sliding marker. */
+.nav-item:hover:not(.nav-item--active) { background: var(--surface-2); color: var(--ink); }
 .nav-item--active {
   background: var(--accent-soft);
   color: var(--accent);
@@ -858,6 +870,7 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 /* ---------- tabs, and the phone tab bar ---------- */
 
 .tabs {
+  position: relative;
   display: flex;
   gap: .25rem;
   padding: .25rem;
@@ -883,13 +896,20 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   color: var(--ink-2);
   transition: background .15s ease, color .15s ease, box-shadow .15s ease;
 }
-.tab:hover { color: var(--ink); }
+/* :not(.tab--active) because .tab:hover outranks .tab--active on specificity:
+   without it, hovering the tab you are already on repaints its label as if it
+   were inactive. */
+.tab:hover:not(.tab--active) { color: var(--ink); }
 /* On a wide screen the segmented control reads better as words alone. */
 .tab .icon { display: none; }
 .tab--active {
-  background: var(--surface);
   color: var(--accent);
   font-weight: 600;
+}
+/* Where the highlight lives when JavaScript has not placed the marker: the
+   control still reads correctly, it simply does not travel. */
+.tabs:not(.has-slider) .tab--active {
+  background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
 
@@ -920,7 +940,8 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
     text-align: center;
   }
   .tab .icon { display: block; }
-  .tab--active { box-shadow: none; background: var(--accent-soft); }
+  .tabs:not(.has-slider) .tab--active { box-shadow: none; background: var(--accent-soft); }
+  .tabs .slider { background: var(--accent-soft); box-shadow: none; }
   /* "Masajid I follow (2)" will not fit a quarter of a phone; trim to the
      part that identifies it, keeping the count. */
   .tab__label {
@@ -1465,9 +1486,12 @@ select.field { cursor: pointer; }
   opacity: 0;
   transform: translateY(12px);
   transition: opacity var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease);
-  will-change: opacity, transform;
 }
-.reveal.is-revealed { opacity: 1; transform: none; will-change: auto; }
+.reveal.is-revealed { opacity: 1; transform: none; }
+/* Deliberately no will-change. It was hinted here, which meant every row of a
+   long feed that had not yet been revealed held its own compositor layer —
+   dozens of them on a phone, which is the opposite of what the hint is for.
+   Opacity and transform are composited without it. */
 
 /* The safety net: with no JavaScript at all, nothing stays invisible. */
 @media (scripting: none) {
@@ -1481,6 +1505,8 @@ select.field { cursor: pointer; }
 .reveal:nth-child(4) { transition-delay: .12s; }
 .reveal:nth-child(5) { transition-delay: .16s; }
 .reveal:nth-child(6) { transition-delay: .20s; }
+.reveal:nth-child(7) { transition-delay: .24s; }
+.reveal:nth-child(8) { transition-delay: .28s; }
 
 /* A route change is the same app moving, not a browser reload. 180ms and
    6px: the most this application should ever do to a page somebody opened to
@@ -1556,9 +1582,17 @@ select.field { cursor: pointer; }
 
 .address-results { animation: menuIn var(--dur-fast) var(--ease); }
 
-/* The masthead already blurs what passes under it; this keeps the edge from
-   appearing abruptly on the first scroll. */
-.masthead { transition: box-shadow var(--dur) var(--ease); }
+/* The masthead already blurs what passes under it. Flat against the top of an
+   unscrolled page that reads correctly; once content is moving beneath it the
+   edge has to be visible, or the header looks like part of the article. */
+.masthead {
+  transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  border-bottom-color: transparent;
+}
+body.is-scrolled .masthead {
+  border-bottom-color: var(--line);
+  box-shadow: 0 1px 12px -6px rgba(0, 0, 0, .35);
+}
 
 /* ---------- reduced motion ----------
  *
@@ -1602,6 +1636,8 @@ select.field { cursor: pointer; }
   }
 
   .app-body,
+  .slider, .slider.is-settled,
+  .masthead,
   .settings-panel.is-entering,
   .settings-nav__item,
   .switch__track, .switch__track::after,
@@ -2473,7 +2509,7 @@ select.field { cursor: pointer; }
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 .settings-nav__item .icon { flex: none; opacity: .7; }
-.settings-nav__item:hover { background: var(--surface-2); color: var(--ink); }
+.settings-nav__item:hover:not(.is-active) { background: var(--surface-2); color: var(--ink); }
 .settings-nav__item.is-active {
   background: var(--accent-soft);
   color: var(--accent);
@@ -2579,7 +2615,9 @@ select.field { cursor: pointer; }
      put a label and a control on the same line. */
   .settings { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
   .settings-nav {
-    position: static;
+    /* relative rather than static: still not sticky at this width, but the
+       marker needs something to be positioned against. */
+    position: relative;
     flex-direction: row;
     gap: .3rem;
     overflow-x: auto;
@@ -2644,3 +2682,76 @@ select.field { cursor: pointer; }
   text-align: center;
   font-family: var(--mono);
 }
+
+/* ---------------------------------------------------------------------------
+   The sliding marker.
+
+   One highlight that travels between tabs rather than a highlight that is
+   repainted somewhere else. On the widest jump — leftmost tab to rightmost —
+   a repaint gives the eye no clue that anything moved; this shows the whole
+   distance. Placed by indicator.js, which measures the current item.
+   --------------------------------------------------------------------------- */
+
+.slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  /* No transition until the first placement has happened, so it appears where
+     it belongs instead of sliding in from the corner. */
+  transition: opacity var(--dur-fast) var(--ease);
+}
+/* Its own easing rather than the app's --ease, which is heavily front-loaded:
+   over a short hop that reads as crisp, but across the full width of a
+   segmented control it arrives before the eye has followed it, which is the
+   thing this replaced. This one spreads the travel more evenly so the
+   distance is actually seen. */
+.slider.is-settled {
+  --slide: .34s cubic-bezier(.4, 0, .2, 1);
+  transition: transform var(--slide), width var(--slide), height var(--slide),
+              opacity var(--dur-fast) var(--ease);
+}
+/* The buttons sit above the marker; without this it covers their labels. */
+.has-slider > *:not(.slider) { position: relative; z-index: 1; }
+
+/* The settings menu is a column on a desktop and a row on a phone. The marker
+   carries both offsets and both dimensions, so it follows either without
+   knowing which one it is in.
+
+   No `position: relative` here: the menu is already `position: sticky`, which
+   is a positioned element and therefore the containing block the marker needs.
+   Setting relative would have quietly cancelled the sticky and let the menu
+   scroll away with the page. */
+.settings-nav .slider {
+  border-radius: 9px;
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+.settings-nav:not(.has-slider) .settings-nav__item.is-active { background: var(--accent-soft); }
+.settings-nav.has-slider .settings-nav__item.is-active { background: none; }
+
+/* The console's own bar, same treatment. */
+.nav { position: relative; }
+.nav .slider { border-radius: 999px; background: var(--accent-soft); box-shadow: none; }
+.nav:not(.has-slider) .nav-item--active { background: var(--accent-soft); }
+.nav.has-slider .nav-item--active { background: none; }
+
+/* ---------------------------------------------------------------------------
+   Long pages.
+
+   content-visibility: auto was tried here and removed. It does skip layout and
+   paint for rows nobody is looking at, but a skipped row is not rendered, and
+   an unrendered row's text is absent from innerText — so a notice off the
+   bottom of the screen quietly stopped existing as far as anything reading the
+   page was concerned. On lists this length the saving was not worth a rule
+   that changes what the page says it contains.
+
+   Containment on the list itself has no such cost: it stops a row changing
+   from forcing layout of the whole column, and affects nothing readable.
+   --------------------------------------------------------------------------- */
+
+.stack, .jlist, .mgrid, .mlist { contain: layout style; }

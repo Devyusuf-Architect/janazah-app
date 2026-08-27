@@ -14,6 +14,7 @@ import {
 import { verificationDocumentUrl } from '../upload.js';
 import { renderAdminSample } from './admin-sample.js';
 import * as store from '../store.js';
+import { slideIndicator } from '../indicator.js';
 
 const EMPTY_COPY = {
   pending: 'No registrations are waiting for review.',
@@ -24,10 +25,17 @@ const EMPTY_COPY = {
 };
 
 let unwatchers = [];
+let stopIndicator = null;
 
 export function teardownAdmin() {
   unwatchers.forEach((fn) => fn());
   unwatchers = [];
+}
+
+/** Separate from teardownAdmin, which runs on every tab change. */
+export function teardownAdminChrome() {
+  stopIndicator?.();
+  stopIndicator = null;
 }
 
 export function renderAdmin(mount, ctx) {
@@ -41,6 +49,10 @@ export function renderAdmin(mount, ctx) {
   const tabs = el('div', { class: 'tabs' });
   const panel = el('div', {});
   mount.append(tabs, panel);
+  // paint() below replaces every button, so the marker watches the container
+  // rather than holding references to buttons that will not survive.
+  teardownAdminChrome();
+  stopIndicator = slideIndicator(tabs);
 
   const views = {
     'Verification requests': () => queueView(panel, 'pending', ctx),

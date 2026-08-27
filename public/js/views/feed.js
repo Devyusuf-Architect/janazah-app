@@ -17,6 +17,7 @@ import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
 import * as push from '../push.js';
 import * as store from '../store.js';
+import { slideIndicator } from '../indicator.js';
 
 const REPORT_REASONS = [
   // Listed first: a family asking for their own relative's notice to come
@@ -33,11 +34,14 @@ const REPORT_REASONS = [
 ];
 
 let unwatch = null;
+let stopIndicator = null;
 let notices = [];
 let orgsById = new Map();
 let filter = 'all';
 
 export function teardownFeed() {
+  stopIndicator?.();
+  stopIndicator = null;
   if (unwatch) { unwatch(); unwatch = null; }
 }
 
@@ -110,6 +114,10 @@ export function renderFeed(mount, { initialFilter } = {}) {
   ]));
 
   const tabs = el('div', { class: 'tabs' });
+  // The marker follows whatever paintTabs() rebuilds, so it does not need
+  // re-attaching each time the follow count changes the labels.
+  stopIndicator?.();
+  stopIndicator = slideIndicator(tabs);
   const list = el('div', { class: 'stack' });
   mount.append(tabs, list);
 

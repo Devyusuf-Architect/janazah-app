@@ -21,6 +21,7 @@ import {
 import { auth } from '../firebase.js';
 import { el, icon, toast, friendlyError, showModal, closeModal } from '../ui.js';
 import { qrSvg } from '../qr.js';
+import { slideIndicator } from '../indicator.js';
 import { signOutUser } from './auth.js';
 import * as prefs from '../prefs.js';
 import * as loc from '../location.js';
@@ -29,6 +30,8 @@ import * as push from '../push.js';
 import * as store from '../store.js';
 
 const ISSUER = "Ta'ziyah";
+
+let stopIndicator = null;
 
 const SECTIONS = [
   { key: 'profile', label: 'Profile', icon: 'users', render: profileSection },
@@ -77,6 +80,11 @@ export function renderAccount(mount, ctx) {
 
   const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Settings sections' });
   const panel = el('div', { class: 'settings-panel' });
+  // Follows whichever section is current, in a column on a desktop and a row
+  // on a phone: the marker carries both offsets, so it does not need to know
+  // which way round the menu is.
+  stopIndicator?.();
+  stopIndicator = slideIndicator(nav, { activeSelector: '.settings-nav__item.is-active' });
 
   // Only the panel is repainted when a section changes or a preference is
   // saved. Re-rendering the page would lose scroll position and the open

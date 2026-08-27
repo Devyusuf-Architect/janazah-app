@@ -8,13 +8,14 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast, friendlyError } from './ui.js';
 import { isSampleMode } from './sample-mode.js';
-import { revealIn, pageEnter } from './motion.js';
+import { revealIn, pageEnter, watchScroll } from './motion.js';
+import { slideIndicator } from './indicator.js';
 import * as store from './store.js';
 
 import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
 import { renderOrgs } from './views/org.js';
 import { renderNotices, teardownNotices } from './views/notices.js';
-import { renderAdmin, teardownAdmin } from './views/admin.js';
+import { renderAdmin, teardownAdmin, teardownAdminChrome } from './views/admin.js';
 import { renderAccount } from './views/account.js';
 
 const mount = () => $('#view');
@@ -81,6 +82,7 @@ const ROUTES = {
 function teardown() {
   teardownNotices();
   teardownAdmin();
+  teardownAdminChrome();
 }
 
 function route() {
@@ -100,11 +102,17 @@ function route() {
   revealIn(mount());
 }
 
+watchScroll();
+
+let stopNavIndicator = null;
+
 function renderNav() {
   const nav = $('#nav');
   nav.replaceChildren();
   if (!ctx.user) { nav.hidden = true; return; }
   nav.hidden = false;
+  stopNavIndicator?.();
+  stopNavIndicator = slideIndicator(nav, { activeSelector: '.nav-item--active' });
 
   for (const [key, def] of Object.entries(ROUTES)) {
     if (def.adminOnly && !ctx.isAdmin) continue;

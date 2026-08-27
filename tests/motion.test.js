@@ -132,3 +132,123 @@ describe('the reactive layer', () => {
       `${globals} reduced-motion blocks; they should be consolidated`);
   });
 });
+
+describe('the sliding marker', () => {
+  const css = readFileSync('public/css/styles.css', 'utf8');
+  const indicator = readFileSync('public/js/indicator.js', 'utf8');
+
+  test('one marker travels, rather than a highlight being repainted', () => {
+    // Across the full width of a segmented control a repaint gives the eye no
+    // clue that anything moved; the whole point is to show the distance.
+    assert.match(css, /\.slider\.is-settled \{[\s\S]{0,260}transition: transform var\(--slide\)/);
+    assert.match(indicator, /marker\.style\.transform =\s*\n?\s*`translate\(\$\{active\.offsetLeft\}px, \$\{active\.offsetTop\}px\)`/);
+  });
+
+  test('it carries both axes, so a column menu works without a second mode', () => {
+    assert.match(indicator, /offsetLeft.*offsetTop/s);
+    assert.match(indicator, /marker\.style\.height = `\$\{active\.offsetHeight\}px`/);
+  });
+
+  test('the first placement does not animate', () => {
+    // Otherwise it slides in from the corner on load, which reads as the page
+    // still assembling itself.
+    assert.match(indicator, /if \(!settled\) \{[\s\S]{0,200}is-settled/);
+    assert.match(css, /\.slider \{[\s\S]{0,400}transition: opacity var\(--dur-fast\)/);
+  });
+
+  test('it survives the views rebuilding their buttons', () => {
+    // The feed replaces every tab whenever a follow count changes the labels.
+    assert.match(indicator, /if \(marker\.parentNode !== container\) container\.prepend\(marker\)/);
+    assert.match(indicator, /new MutationObserver\(place\)/);
+  });
+
+  test('it holds no window listener that would outlive the view', () => {
+    // window would keep the closure, the container, and a whole detached
+    // view alive after the route changed.
+    assert.ok(!/window\.addEventListener/.test(indicator),
+      'observe the container instead; both observers are collected with it');
+    assert.match(indicator, /new ResizeObserver\(place\)/);
+  });
+
+  test('without JavaScript the control still shows which tab is current', () => {
+    // The highlight simply does not travel.
+    assert.match(css, /\.tabs:not\(\.has-slider\) \.tab--active \{/);
+    assert.match(css, /\.settings-nav:not\(\.has-slider\) \.settings-nav__item\.is-active/);
+    assert.match(css, /\.nav:not\(\.has-slider\) \.nav-item--active/);
+  });
+
+  test('hovering the current item does not make it look inactive', () => {
+    // .tab:hover outranks .tab--active on specificity, so without the :not()
+    // the label you are pointing at reverts to the inactive colour.
+    assert.match(css, /\.tab:hover:not\(\.tab--active\)/);
+    assert.match(css, /\.nav-item:hover:not\(\.nav-item--active\)/);
+    assert.match(css, /\.settings-nav__item:hover:not\(\.is-active\)/);
+  });
+
+  test('the settings menu keeps its sticky position', () => {
+    // A marker needs a positioned containing block, and `position: relative`
+    // here would have cancelled the sticky and let the menu scroll away.
+    const rule = css.slice(css.indexOf('.settings-nav {'));
+    assert.match(rule.slice(0, 200), /position: sticky/);
+    assert.ok(!/^\.settings-nav \{ position: relative/m.test(css));
+  });
+});
+
+describe('scrolling a long page', () => {
+  const css = readFileSync('public/css/styles.css', 'utf8');
+  const motion = readFileSync('public/js/motion.js', 'utf8');
+
+  test('the masthead gains its edge only once content passes under it', () => {
+    assert.match(css, /\.masthead \{[\s\S]{0,220}border-bottom-color: transparent/);
+    assert.match(css, /body\.is-scrolled \.masthead \{/);
+    assert.match(motion, /export function watchScroll/);
+  });
+
+  test('the scroll listener is passive and writes only on the crossing', () => {
+    // A long feed must not touch the DOM on every frame of a scroll.
+    assert.match(motion, /if \(now === scrolled\) return;/);
+    assert.match(motion, /\{ passive: true \}/);
+  });
+
+  test('anything scrolled to clears the sticky header', () => {
+    assert.match(css, /html \{ scroll-padding-top: 5rem; \}/);
+    assert.match(css, /:target \{ scroll-margin-top: 5rem; \}/);
+  });
+
+  test('scrolling inside a drawer or dialog does not move the page behind it', () => {
+    assert.match(css, /overscroll-behavior: contain/);
+  });
+
+  test('a list is contained, but nothing hides its own text', () => {
+    // content-visibility: auto was tried and removed: a skipped row is not
+    // rendered, and an unrendered row's text is absent from innerText, so a
+    // notice below the fold stopped existing as far as anything reading the
+    // page was concerned. Containment on the list has no such cost.
+    assert.match(css, /\.stack, \.jlist, \.mgrid, \.mlist \{ contain: layout style; \}/);
+    assert.ok(!/content-visibility: auto;/.test(css),
+      'content-visibility changes what the page reports it contains');
+  });
+
+  test('unrevealed rows do not each hold a compositor layer', () => {
+    // will-change on .reveal meant dozens of layers on a phone, which is the
+    // opposite of what the hint is for.
+    const rule = css.slice(css.indexOf('.reveal {'), css.indexOf('.reveal.is-revealed'));
+    assert.ok(!/will-change/.test(rule),
+      'opacity and transform are composited without the hint');
+  });
+});
+
+describe('all of the new motion is switched off again for reduced motion', () => {
+  const css = readFileSync('public/css/styles.css', 'utf8');
+  const reduced = css.slice(css.lastIndexOf('@media (prefers-reduced-motion: reduce)'));
+
+  test('the marker jumps instead of travelling', () => {
+    // Still shows which tab is current; it simply arrives rather than moving.
+    assert.ok(reduced.includes('.slider, .slider.is-settled'),
+      'the sliding marker still animates under reduced motion');
+  });
+
+  test('the masthead edge appears without fading', () => {
+    assert.ok(reduced.includes('.masthead'));
+  });
+});
