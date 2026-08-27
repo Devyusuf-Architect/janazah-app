@@ -4,6 +4,27 @@
  * worst moment of their week, often in a hurry, often on a phone. It should
  * feel calm, dignified and unmistakably trustworthy. Warmth over sterility,
  * clarity over cleverness, and nothing that draws attention to itself.
+ *
+ * Breakpoints. There is no single global switch-over: almost everything here
+ * is sized with clamp(), flex-wrap and auto-fit grids, which adapt on their
+ * own without a media query at all. Where a component does need a hard
+ * line — because a layout genuinely changes shape rather than just
+ * reflowing — the values below are the ones in use, each picked for what
+ * the component next to it stops fitting, not a rounded number:
+ *
+ *   460px   the account controls give up "Create account" for "Sign in"
+ *   560px   a Janazah row stacks instead of compressing
+ *   640px   the general phone tier: hero, tabs, forms, cards, the guide
+ *   760px   the settings menu becomes a horizontal scroll row
+ *   900px   the sidebar and the console bar become a drawer
+ *
+ * A component gets its own number only when its own content demands one;
+ * forcing every breakpoint onto one shared value would mean either the
+ * settings menu collapsing a hundred pixels too early or the drawer arriving
+ * a hundred pixels too late for something else. What stays consistent is the
+ * unit (px, matching the viewport widths a phone is actually measured in)
+ * and the direction (max-width, mobile-first only where content is already
+ * simple enough not to need a floor).
  */
 
 /* ---------- tokens ---------- */
@@ -386,7 +407,13 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 .nav-scrim {
   position: fixed;
   inset: 0;
-  z-index: 44;
+  /* Below the masthead (40) and the drawer (45), not above them: the
+     masthead establishes its own stacking context, so a scrim placed above
+     it would dim the whole bar, including controls that have nothing to do
+     with the drawer it belongs to. (The drawer itself still ends up on top
+     of the masthead where the two overlap — that is why the drawer carries
+     its own close row rather than relying on the hamburger underneath it.) */
+  z-index: 39;
   background: rgba(0, 0, 0, .4);
   backdrop-filter: blur(1px);
 }
@@ -409,13 +436,10 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 .nav-item--ghost { color: var(--ink-3); }
 
 /* The console masthead carries its whole nav, so it sizes to it rather than
-   holding the public site's fixed bar height. */
+   holding the public site's fixed bar height. Above the drawer breakpoint
+   the whole bar can wrap onto a second line if it has to; below it, the nav
+   is a drawer instead and there is nothing left in the masthead to wrap. */
 .masthead--console { height: auto; min-height: 3.5rem; flex-wrap: wrap; gap: 1.25rem; }
-
-@media (max-width: 720px) {
-  .masthead--console { padding-block: .6rem; }
-  .nav { order: 3; width: 100%; }
-}
 
 /* ---------- account menu ---------- */
 
@@ -569,6 +593,46 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   }
   .account__name { display: none; }
   .account__button { padding: .3rem; }
+}
+
+/* Below the same breakpoint, the console's horizontal bar becomes an
+   off-canvas drawer too, opened by #console-nav-toggle. Its own block, not
+   folded into .sidenav's above: the console has no app-body grid to
+   collapse, and keeping the two separate keeps each easy to read on its
+   own even though they change at the same width. */
+@media (max-width: 900px) {
+  .masthead--console .nav-toggle { display: flex; }
+  .masthead--console .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 45;
+    width: min(17rem, 82vw);
+    height: 100dvh;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: .3rem;
+    padding: 1rem .6rem;
+    overflow-y: auto;
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition: transform var(--dur) var(--ease), visibility var(--dur);
+  }
+  .masthead--console .nav.is-open { transform: translateX(0); visibility: visible; }
+  .masthead--console .nav .nav-item {
+    justify-content: flex-start;
+    padding-inline: .7rem;
+  }
+  .masthead--console .nav-spacer { display: none; }
+  .masthead--console .nav-user {
+    padding: .6rem .7rem 0;
+    margin-top: .4rem;
+    border-top: 1px solid var(--line);
+    font-size: .78rem;
+  }
 }
 
 @media (max-width: 460px) {
@@ -950,6 +1014,38 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* Not every .tabs is the app's own bottom bar. The admin portal reuses the
+     same segmented-control look for its eight-item section switcher, which
+     has no icons and was never meant to dock to the bottom of the screen —
+     eight unlabelled columns is not a thumb-width control. .tabs--plain
+     opts a tab group out of the phone treatment above and keeps the
+     horizontally-scrolling segmented control instead. */
+  .tabs.tabs--plain {
+    position: static;
+    inset: auto;
+    margin: 0 0 1.5rem;
+    padding: .25rem;
+    border-radius: 999px;
+    background: var(--bg-sunk);
+    border-top: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .tabs.tabs--plain .tab {
+    flex: 1 0 auto;
+    flex-direction: row;
+    font-size: .82rem;
+    font-weight: 500;
+    padding: .5rem .9rem;
+  }
+  .tabs.tabs--plain .tab .icon { display: none; }
+  .tabs.tabs--plain .tab__label { overflow: visible; text-overflow: clip; }
+  .tabs.tabs--plain:not(.has-slider) .tab--active {
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .tabs.tabs--plain .slider { background: var(--surface); box-shadow: var(--shadow-sm); }
 }
 
 /* ---------- the notice ---------- */
@@ -1156,7 +1252,13 @@ dl.kv dd { margin: 0; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.field--inline { width: auto; display: inline-block; }
+/* max-width, not just width: auto, or a select whose longest option is a
+   long organization name sizes itself to that text and pushes past the
+   viewport on a narrow screen (the org picker on the notices tab does
+   exactly this). Capped, the browser clips the selected option's label
+   inside the control instead, which is what a native select already does
+   well once it is not allowed to grow past its container. */
+.field--inline { width: auto; max-width: 100%; display: inline-block; }
 textarea.field { resize: vertical; line-height: 1.5; }
 select.field { cursor: pointer; }
 
@@ -2614,10 +2716,14 @@ body.is-scrolled .masthead {
      this width would leave the settings themselves in a column too narrow to
      put a label and a control on the same line. */
   .settings { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  /* relative rather than static: still not sticky at this width, but the
+     marker needs something to be positioned against. top: 0 matters here —
+     left at the desktop rule's 4.5rem (a sticky *threshold* there, harmless)
+     it becomes a literal offset under relative and drops this row onto the
+     panel beneath it. */
   .settings-nav {
-    /* relative rather than static: still not sticky at this width, but the
-       marker needs something to be positioned against. */
     position: relative;
+    top: 0;
     flex-direction: row;
     gap: .3rem;
     overflow-x: auto;
@@ -3003,4 +3109,58 @@ body.is-scrolled .masthead {
   .wel-hero { min-height: min(70vh, 32rem); }
   .wel-hero__actions .btn { flex: 1 1 auto; justify-content: center; }
   .wel-org { align-items: stretch; }
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile touch and input handling.
+
+   Two problems that only show up on a real phone, not in a resized desktop
+   browser, so they get their own block rather than living beside the rules
+   they adjust:
+
+   1. Any text input under 16px triggers iOS Safari's zoom-on-focus. .field
+      is .95rem, which is 15.2px at the default root size — just under the
+      line, and easy to miss on a laptop where nothing zooms. Bumped to a
+      true 16px here rather than everywhere, since desktop has no such limit
+      and the rest of the type scale is deliberately tuned for it.
+   2. A button or tab sized for a mouse pointer is smaller than a fingertip.
+      44px is the common comfortable-tap-target figure (Apple's own HIG and
+      the WCAG 2.5.5 target-size guidance both land near it); most controls
+      here already clear it once padding is added to their line-height, but
+      the smaller variants do not, so this raises only what needs it. */
+@media (max-width: 640px) {
+  .field, select.field, textarea.field {
+    font-size: 16px;
+  }
+  #totp-code, #mfa-code {
+    /* Already large and centred; kept in step with the rule above rather
+       than left at a value that happens to already clear it. */
+    font-size: max(1.3rem, 16px);
+  }
+
+  .btn, .tab, .nav-item, .account__button, .settings-nav__item,
+  .qa__item, .jrow__go, .finder__locate {
+    min-height: 2.75rem;
+  }
+  .btn--small { min-height: 2.25rem; }
+  .check input, .switch__track { flex: none; }
+  /* The switch itself stays its visual size; the row around it gets the
+     room instead, so the control everyone recognises does not grow. */
+  .set-row__control { min-height: 2.75rem; align-items: center; }
+
+  /* .field--inline sizes to its content on a desktop, which is fine for a
+     short option list. The notices tab's organization picker can hold a
+     long masjid name, and a <select> does not wrap that text — it just
+     keeps growing, taking the page past the edge of the phone with it.
+     max-width alone does not stop this: shrink-to-fit still floors the box
+     at the content's own width. An explicit width does, because at that
+     point the browser clips the label inside the control instead of
+     resizing around it. Full width also means one column instead of a
+     label and a control competing for the same narrow row. */
+  .field--inline { display: block; width: 100%; margin-top: .35rem; }
+
+  /* A masjid name long enough to wrap sat centred against its Follow
+     button, which put the button beside the name's second line rather than
+     its first. Top-aligned reads correctly whether the name wraps or not. */
+  .list-row { align-items: flex-start; }
 }
