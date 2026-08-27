@@ -6,11 +6,12 @@
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
-import { $, el, toast, friendlyError } from './ui.js';
+import { $, el, icon, toast, friendlyError } from './ui.js';
 import { isSampleMode } from './sample-mode.js';
 import { revealIn, pageEnter, watchScroll } from './motion.js';
 import { slideIndicator } from './indicator.js';
 import { markVisited } from './visited.js';
+import { wireNavToggle, closeNav } from './nav.js';
 import * as store from './store.js';
 
 import { renderAuth, signOutUser, completeRedirectSignIn } from './views/auth.js';
@@ -110,6 +111,13 @@ markVisited();
 
 let stopNavIndicator = null;
 
+// Wired once: the drawer toggle for narrow screens. Above 900px this button
+// is hidden by CSS and nothing here has any effect. #nav is rebuilt on every
+// route, but the toggle and the drawer element itself are not, so this only
+// needs to run once at bootstrap.
+const navToggle = $('#console-nav-toggle');
+if (navToggle) wireNavToggle(navToggle, $('#nav'), 'console-nav-scrim');
+
 function renderNav() {
   const nav = $('#nav');
   nav.replaceChildren();
@@ -118,11 +126,26 @@ function renderNav() {
   stopNavIndicator?.();
   stopNavIndicator = slideIndicator(nav, { activeSelector: '.nav-item--active' });
 
+  // Drawer only; on the desktop bar there is nothing to close, and CSS hides
+  // this there. The hamburger button itself sits under the open drawer (both
+  // anchor to the same top-left corner, on purpose: see the drawer's own
+  // comment), so this row is the reachable way to close it by hand.
+  nav.append(el('button', {
+    class: 'sidenav__close',
+    type: 'button',
+    'aria-label': 'Close the menu',
+    onclick: () => { if (navToggle) closeNav(navToggle, nav, 'console-nav-scrim'); },
+  }, [icon('x', { size: 18 }), el('span', { text: 'Close' })]));
+
   for (const [key, def] of Object.entries(ROUTES)) {
     if (def.adminOnly && !ctx.isAdmin) continue;
     nav.append(el('button', {
       class: `nav-item${ctx.route === key ? ' nav-item--active' : ''}`,
-      onclick: () => { ctx.route = key; route(); },
+      onclick: () => {
+        ctx.route = key;
+        if (navToggle) closeNav(navToggle, nav, 'console-nav-scrim');
+        route();
+      },
     }, def.label));
   }
 

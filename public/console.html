@@ -55,6 +55,15 @@
   </p>
 
   <header class="masthead masthead--console">
+    <!-- Hidden above 900px by CSS; below it, the horizontal bar becomes a
+         slide-out drawer and this is what opens it. Same control, same
+         behaviour, as the public site's own hamburger. -->
+    <button id="console-nav-toggle" class="nav-toggle" type="button"
+            aria-label="Menu" aria-expanded="false" aria-controls="nav">
+      <span class="nav-toggle__bar"></span>
+      <span class="nav-toggle__bar"></span>
+      <span class="nav-toggle__bar"></span>
+    </button>
     <!-- Always home, never the console's own root. Wherever someone is, the
          name in the corner is the way back out to the public site. -->
     <a class="brand" href="/">
@@ -63,6 +72,7 @@
     </a>
     <nav id="nav" class="nav" hidden></nav>
   </header>
+  <div id="console-nav-scrim" class="nav-scrim" hidden></div>
 
   <main id="view" class="view">
     <p class="muted">Loading…</p>

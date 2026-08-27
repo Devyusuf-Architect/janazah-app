@@ -241,9 +241,17 @@ export function renderNav(nav, { path, user, isAdmin = false }) {
   if (account) renderAccount(account, { user, path });
 }
 
-/** Wires the mobile menu toggle once. Call this at bootstrap, not per-route. */
-export function wireNavToggle(toggle, nav) {
-  const scrim = document.getElementById('nav-scrim');
+/**
+ * Wires a mobile menu toggle once. Call this at bootstrap, not per-route.
+ *
+ * @param {HTMLElement} toggle The hamburger button.
+ * @param {HTMLElement} nav The drawer it opens.
+ * @param {string} [scrimId] Id of the dimmed backdrop behind the drawer.
+ *   Defaults to the public site's, so existing callers need no change; the
+ *   console passes its own so the two drawers do not fight over one scrim.
+ */
+export function wireNavToggle(toggle, nav, scrimId = 'nav-scrim') {
+  const scrim = document.getElementById(scrimId);
   const set = (open) => {
     nav.classList.toggle('is-open', open);
     toggle.setAttribute('aria-expanded', String(open));
@@ -256,13 +264,14 @@ export function wireNavToggle(toggle, nav) {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') set(false);
   });
+  return set;
 }
 
 /** Close the mobile menu, e.g. after an in-app navigation. */
-export function closeNav(toggle, nav) {
+export function closeNav(toggle, nav, scrimId = 'nav-scrim') {
   nav.classList.remove('is-open');
   toggle.setAttribute('aria-expanded', 'false');
   document.body.classList.remove('is-drawer-open');
-  const scrim = document.getElementById('nav-scrim');
+  const scrim = document.getElementById(scrimId);
   if (scrim) scrim.hidden = true;
 }
