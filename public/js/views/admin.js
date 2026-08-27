@@ -46,7 +46,10 @@ export function renderAdmin(mount, ctx) {
     el('h1', { text: 'Platform administration' }),
   ]));
 
-  const tabs = el('div', { class: 'tabs' });
+  // tabs--plain: eight sections with no icons, not the app's own bottom
+  // navigation, so it keeps the desktop segmented-control look on a phone
+  // instead of docking to the bottom of the screen. See styles.css.
+  const tabs = el('div', { class: 'tabs tabs--plain' });
   const panel = el('div', {});
   mount.append(tabs, panel);
   // paint() below replaces every button, so the marker watches the container
