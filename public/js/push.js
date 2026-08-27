@@ -72,8 +72,13 @@ export const isEnabled = () => !!state().token;
  * its radius, and every masjid it follows.
  */
 export function desiredTopics() {
-  const topics = new Set(followedOrgIds().map((id) => `org_${id}`));
   const settings = loc.settings();
+  // Turning followed-masjid alerts off unsubscribes from those topics rather
+  // than hiding the messages on arrival: the device stops being told, which is
+  // the only version of "off" that is actually true.
+  const topics = new Set(settings.followAlerts
+    ? followedOrgIds().map((id) => `org_${id}`)
+    : []);
   // Narrowing the scope unsubscribes from the area topics entirely, so the
   // volume control works at the source rather than by discarding messages.
   if (settings.alertScope !== 'follows' && settings.enabled && settings.last) {

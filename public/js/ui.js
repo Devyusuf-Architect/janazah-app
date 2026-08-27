@@ -169,18 +169,46 @@ export function askReason({ title, body, label, confirmText, required = true }) 
   });
 }
 
-export function showModal(title, contentNode, { wide = false } = {}) {
+// Whatever modal is currently open, so a flow that replaces one dialog with
+// another (two-factor setup, then the confirmation) can close the first from
+// anywhere rather than threading its close function through every callback.
+let openModal = null;
+
+/** Close the current modal, if any. Safe to call when none is open. */
+export function closeModal() {
+  openModal?.();
+  openModal = null;
+}
+
+/**
+ * @param {string} title
+ * @param {Node} contentNode
+ * @param {object} [options]
+ * @param {boolean} [options.wide]
+ * @param {Node[]} [options.actions] Replaces the default Close button. The
+ *   caller is then responsible for offering a way out, which every flow that
+ *   passes actions does.
+ */
+export function showModal(title, contentNode, { wide = false, actions = null } = {}) {
+  closeModal();
   const backdrop = el('div', { class: 'modal-backdrop' });
   const close = () => backdrop.remove();
   backdrop.append(el('div', { class: `modal${wide ? ' modal--wide' : ''}`, role: 'dialog', 'aria-modal': 'true' }, [
     el('h2', { text: title }),
     contentNode,
-    el('div', { class: 'modal-actions' }, [
+    el('div', { class: 'modal-actions' }, actions || [
       el('button', { class: 'btn', type: 'button', onclick: close }, 'Close'),
     ]),
   ]));
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+  // Escape closes it. A dialog that can only be dismissed by finding the right
+  // button is a trap for anyone using a keyboard.
+  const onKey = (e) => {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+  };
+  document.addEventListener('keydown', onKey);
   document.body.append(backdrop);
+  openModal = () => { close(); document.removeEventListener('keydown', onKey); };
   return close;
 }
 

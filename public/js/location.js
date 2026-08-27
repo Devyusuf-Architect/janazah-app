@@ -34,6 +34,10 @@ const DEFAULTS = {
   // This is the volume control, and it works by narrowing what the device
   // subscribes to rather than by discarding messages on arrival.
   alertScope: 'nearby',
+  // Whether a masjid this device follows may notify it. Separate from
+  // alertScope, which is about area coverage: somebody can want their own
+  // masjids and nothing else, or the area and not the masjids.
+  followAlerts: true,
   last: null, // { lat, lng, at }
 };
 
@@ -55,6 +59,7 @@ export function settings() {
       ...parsed,
       radiusKm: Number.isFinite(parsed.radiusKm) ? parsed.radiusKm : DEFAULTS.radiusKm,
       alertScope: parsed.alertScope === 'follows' ? 'follows' : DEFAULTS.alertScope,
+      followAlerts: parsed.followAlerts !== false,
     };
   } catch {
     return { ...DEFAULTS };

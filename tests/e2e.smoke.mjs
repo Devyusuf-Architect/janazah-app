@@ -159,6 +159,19 @@ async function pickPlace(page, prefix, name, query) {
   await page.locator(`#${prefix}-results`).waitFor({ state: 'hidden', timeout: 5000 });
 }
 
+/** Mark an emulator account's email as confirmed, as clicking the link would. */
+async function confirmEmail(email) {
+  const localId = await uidFor(email);
+  const res = await fetch(
+    `${AUTH}/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:update`,
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId, emailVerified: true }),
+    });
+  assert.ok(res.ok, `could not confirm ${email}: ${res.status}`);
+}
+
 async function signUp(page, { email, password }, name, { start } = {}) {
   await page.goto(`${BASE}/console${start ? `?start=${start}` : ''}`);
   await page.getByRole('button', { name: 'Create an account' }).click();
@@ -178,6 +191,11 @@ async function signIn(page, { email, password }) {
   await page.locator('#nav').waitFor({ state: 'visible', timeout: 15000 });
 }
 
+// Set once the suite deliberately triggers an enrolment the emulator cannot
+// satisfy, so the 400 it answers with is not mistaken for a real fault
+// anywhere else in the run.
+let sawTotpAttempt = false;
+
 const run = async () => {
   const root = await buildTestApp();
   const server = await serve(root, 5000);
@@ -193,7 +211,19 @@ const run = async () => {
     // stacks and must render correctly without them, so a blocked font host
     // is not a failure. Everything else in the console is.
     const ignorable = (text) => /favicon/i.test(text)
-      || /ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED|ERR_CERT_AUTHORITY_INVALID/.test(text);
+      || /ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_NAME_NOT_RESOLVED|ERR_CERT_AUTHORITY_INVALID/.test(text)
+      // Two-factor enrolment against the emulator, which does not implement
+      // TOTP: the 400 and the diagnostic this app deliberately logs beside it
+      // are the expected outcome, and the test above asserts the person sees
+      // a clean sentence rather than either of them.
+      || /phoneEnrollmentInfo/.test(text)
+      || /Two-factor authentication is unavailable\. Check that the Firebase/.test(text)
+      || (/status of 400/.test(text) && sawTotpAttempt)
+      // The SDK's own notice that a listener's stream dropped, which this
+      // suite causes by reloading the page mid-run to pick up a changed
+      // account record. It says in the same breath that it recovers, and the
+      // assertions after the reload only pass because it did.
+      || /Could not reach Cloud Firestore backend/.test(text);
     page.on('console', (m) => {
       if (m.type() === 'error' && !ignorable(m.text())) {
         failures.push(`console error: ${m.text()}`);
@@ -617,13 +647,91 @@ const run = async () => {
       .waitFor({ timeout: 15000 });
     log('family takedown request resolved, with the outcome recorded');
 
-    // ---- account security --------------------------------------------------
+    // ---- settings ----------------------------------------------------------
+    // Sections with a menu, not one long card, and every control on them is
+    // either a real Firebase operation or a device-local preference.
     await coord.getByRole('button', { name: 'Account' }).click();
-    const accountText = await coord.locator('#view').innerText();
-    assert.match(accountText, /two-step sign-in/i, 'expected the second-factor section');
+    await coord.locator('.settings-nav').waitFor({ timeout: 15000 });
+    for (const section of ['Profile', 'Account', 'Notifications', 'Location',
+                           'Appearance', 'Privacy']) {
+      await coord.locator('.settings-nav').getByRole('button', { name: section, exact: true })
+        .waitFor({ timeout: 5000 });
+    }
+
+    await coord.locator('.settings-nav').getByRole('button', { name: 'Account', exact: true }).click();
+    const accountText = await coord.locator('.settings-panel').innerText();
+    assert.match(accountText, /Two-factor authentication/i, 'expected the second-factor section');
     assert.match(accountText, /publish notices in a masjid/i,
       'expected the reason two-step matters to be stated');
-    log('account security screen offers a second factor');
+    assert.match(accountText, /Sign-in method/i);
+
+    // ---- two-factor authentication, for real -------------------------------
+    // Firebase refuses to enrol a second factor on an unconfirmed address, so
+    // the screen must say that rather than offering a button that fails.
+    assert.match(accountText, /Confirm your email address first/i,
+      'an unconfirmed account must be told why it cannot enrol yet');
+    assert.equal(
+      await coord.getByRole('button', { name: 'Set up two-factor authentication' }).count(), 0,
+      'the setup button must not be offered before the email is confirmed');
+
+    await confirmEmail(COORD.email);
+    await coord.reload();
+    await coord.locator('#nav').waitFor({ state: 'visible', timeout: 15000 });
+    await coord.getByRole('button', { name: 'Account' }).click();
+    await coord.locator('.settings-nav').getByRole('button', { name: 'Account', exact: true }).click();
+    await coord.getByRole('button', { name: 'Set up two-factor authentication' })
+      .waitFor({ timeout: 10000 });
+    log('two-factor enrolment is gated on a confirmed email, as Firebase requires');
+
+    log('settings opens on sections, and Account offers a second factor');
+
+    // Enrolment itself cannot be exercised here: the Firebase Auth emulator
+    // does not implement TOTP multi-factor at all — its enrolment endpoint
+    // only understands phone factors and answers "Missing phoneEnrollmentInfo".
+    // So what this asserts instead is the behaviour that matters when the
+    // feature is unavailable for any reason, which is precisely the situation
+    // the emulator reproduces: the person gets one plain sentence, not a
+    // Firebase error string they can do nothing with.
+    sawTotpAttempt = true;
+    await coord.getByRole('button', { name: 'Set up two-factor authentication' }).click();
+    await coord.locator('#toast.is-visible, #toast').waitFor({ timeout: 15000 });
+    await coord.waitForTimeout(500);
+    const setupToast = await coord.locator('#toast').innerText();
+    assert.match(setupToast, /Two-factor authentication is temporarily unavailable\./,
+      `expected the clean message, got: ${setupToast}`);
+    for (const leak of ['Firebase:', 'auth/', 'phoneEnrollmentInfo', 'Identity Platform',
+                        'phase-5-notes']) {
+      assert.ok(!setupToast.includes(leak),
+        `a developer-facing detail reached the screen: ${setupToast}`);
+    }
+    log('an unavailable second factor reads as one plain sentence, not a Firebase error');
+
+    // Appearance is applied to the document immediately, and remembered.
+    await coord.locator('.settings-nav').getByRole('button', { name: 'Appearance', exact: true }).click();
+    const theme = coord.locator('.settings-panel select').first();
+    await theme.selectOption('dark');
+    await coord.waitForTimeout(200);
+    assert.equal(await coord.evaluate(() => document.documentElement.dataset.theme), 'dark',
+      'choosing a theme must apply it to the page at once');
+    await coord.reload();
+    await coord.locator('#nav').waitFor({ state: 'visible', timeout: 15000 });
+    assert.equal(await coord.evaluate(() => document.documentElement.dataset.theme), 'dark',
+      'the theme must survive a reload, and be applied before the first paint');
+    await coord.evaluate(() => localStorage.removeItem('taziyah.appearance'));
+
+    // Turning a notification off unsubscribes the device rather than hiding
+    // messages once they have arrived.
+    await coord.goto(`${BASE}/console`);
+    await coord.locator('#nav').waitFor({ state: 'visible', timeout: 15000 });
+    await coord.getByRole('button', { name: 'Account' }).click();
+    await coord.locator('.settings-nav').getByRole('button', { name: 'Notifications', exact: true }).click();
+    await coord.locator('.switch__input').first().waitFor({ timeout: 5000 });
+    await coord.locator('.switch__input').nth(1).uncheck();
+    assert.equal(
+      await coord.evaluate(() => JSON.parse(localStorage.getItem('janazah.location')).followAlerts),
+      false, 'turning off followed-masjid alerts must be recorded as a preference');
+    await coord.locator('.switch__input').nth(1).check();
+    log('settings apply immediately and persist, without reloading the page');
 
     // A visitor physically in Toronto.
     const local = await newPage({
@@ -900,7 +1008,7 @@ const run = async () => {
     const dashboardText = await member.locator('#view').innerText();
     for (const claim of [
       /Upcoming Janazahs/, /Janazahs near me/i, /Following/i,
-      /Notification settings/i, /Account security/i,
+      /Notification settings/i, /Account security/i, /Open settings/i,
     ]) {
       assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);
     }

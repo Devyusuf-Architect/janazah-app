@@ -11,7 +11,7 @@
 import { el, friendlyError } from '../ui.js';
 import { publicNoticeView } from '../notice-view.js';
 import { consentPanel, settingsPanel } from './nearby.js';
-import { renderAccount } from './account.js';
+import { accountSummary } from './account.js';
 import { orgRow } from './masjids.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
@@ -128,6 +128,7 @@ export function renderDashboard(mount, ctx) {
     ? settingsPanel(loc.settings(), () => renderDashboard(mount, ctx))
     : consentPanel(() => renderDashboard(mount, ctx)));
 
-  accountCard.append(el('div', { class: 'dash-card__account' }));
-  renderAccount(accountCard.querySelector('.dash-card__account'), ctx);
+  // A summary and a way through to Settings, not the settings page nested in
+  // a dashboard tile.
+  accountCard.append(accountSummary(ctx));
 }

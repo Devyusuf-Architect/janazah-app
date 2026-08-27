@@ -106,3 +106,41 @@ export function autoReveal(container) {
   mo.observe(container, { childList: true, subtree: true });
   return () => mo.disconnect();
 }
+
+// -------------------------------------------------------- scroll position
+//
+// Somebody scrolls a long feed, opens a notice, and presses back. Returning
+// them to the top of the list means finding their place again — and on this
+// site "their place" is often a specific funeral they were reading about.
+//
+// Kept in memory rather than in history.state: the position is only useful
+// within a session, and writing it into history entries means every scroll
+// event competing to replaceState.
+
+const positions = new Map();
+
+/** Take the browser out of the loop; the router decides where the page sits. */
+export function ownScrollRestoration() {
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+}
+
+/** Remember where `key` was scrolled to. Call before leaving a page. */
+export function rememberScroll(key) {
+  positions.set(key, window.scrollY);
+}
+
+/**
+ * Put the page where it should be for this navigation.
+ *
+ * Going back to somewhere already visited returns to the remembered offset;
+ * anything else starts at the top, because arriving halfway down a page you
+ * have not seen is disorienting rather than helpful.
+ *
+ * Instant, not smooth: a restored position should already be there when the
+ * page appears. Animating to it means watching the page scroll itself, which
+ * reads as the site doing something rather than as returning.
+ */
+export function restoreScroll(key, { remembered = false } = {}) {
+  const to = remembered ? positions.get(key) ?? 0 : 0;
+  window.scrollTo({ top: to, behavior: 'instant' in window ? 'instant' : 'auto' });
+}

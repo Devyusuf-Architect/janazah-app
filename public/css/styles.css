@@ -65,6 +65,10 @@
   --dur-slow: .38s;
 }
 
+/* The dark palette. Defined once and used by two selectors: the system
+   preference, and an explicit choice made in Settings. tests/prefs.test.js
+   asserts the two copies stay identical, since a token added to one and
+   not the other is a theme that is subtly wrong only for some people. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
@@ -101,9 +105,51 @@
   }
 }
 
+/* dark-palette-copy */
+:root[data-theme="dark"] {
+
+  color-scheme: dark;
+
+  --bg: #121614;
+  --bg-sunk: #0d100f;
+  --surface: #1a201d;
+  --surface-2: #212824;
+
+  --ink: #eef1ee;
+  --ink-2: #b3bfb9;
+  --ink-3: #83948c;
+
+  --line: #2c3733;
+  --line-strong: #3b4842;
+
+  --accent: #6fc4a4;
+  --accent-hover: #86d3b6;
+  --accent-ink: #0b1a14;
+  --accent-soft: #16302a;
+  --accent-line: #2b4d43;
+
+  --gold: #d9b26a;
+  --gold-soft: #2b2417;
+  --gold-line: #473b23;
+
+  --danger: #ef9b95;
+  --danger-soft: #2e1c1b;
+  --danger-line: #4c2e2c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 24px -12px rgba(0, 0, 0, .6);
+  --shadow-lg: 0 30px 70px -24px rgba(0, 0, 0, .8);
+}
+
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
+
+/* Text size, set from Settings. Everything in this sheet is in rem, so moving
+   the root size moves the whole interface together rather than leaving
+   headings and controls at their old scale around larger body copy. */
+:root[data-text="large"] { font-size: 112.5%; }
 
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
@@ -116,7 +162,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.55;
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
@@ -213,6 +259,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
   display: grid;
   grid-template-columns: var(--sidenav, 15rem) minmax(0, 1fr);
   align-items: start;
+  /* Collapsing the sidebar slides the content across rather than snapping it.
+     Browsers that cannot interpolate grid tracks simply jump, which is what
+     happened before. */
+  transition: grid-template-columns var(--dur) var(--ease);
 }
 body.is-nav-collapsed .app-body { --sidenav: 3.75rem; }
 
@@ -316,6 +366,9 @@ body.is-nav-collapsed .nav-item__label {
   overflow: hidden;
   clip-path: inset(50%);
 }
+/* The labels fade rather than vanishing mid-slide. */
+.nav-item__label { transition: opacity var(--dur-fast) var(--ease); }
+body.is-nav-collapsed .nav-item__label { opacity: 0; }
 body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 
 .nav-scrim {
@@ -1532,6 +1585,7 @@ select.field { cursor: pointer; }
      assumed harmless, so this block stays the single place that answers
      "what moves". */
   .view.is-entering,
+  .settings-panel.is-entering,
   .home-results:not([hidden]) { animation: none; }
 
   .btn--primary:hover:not(:disabled),
@@ -1547,6 +1601,11 @@ select.field { cursor: pointer; }
     transform: none;
   }
 
+  .app-body,
+  .settings-panel.is-entering,
+  .settings-nav__item,
+  .switch__track, .switch__track::after,
+  .nav-item__label,
   .nav-item::before,
   .account__caret,
   .account__avatar,
@@ -2374,3 +2433,214 @@ select.field { cursor: pointer; }
 .stepper__num { transition: background var(--dur) var(--ease),
                             border-color var(--dur) var(--ease),
                             color var(--dur) var(--ease); }
+
+/* ---------------------------------------------------------------------------
+   Settings.
+
+   A menu down the side and one section at a time, rather than one long card.
+   The point is that somebody looking for the alert distance can see where it
+   lives without reading everything else on the way there.
+   --------------------------------------------------------------------------- */
+
+.settings {
+  display: grid;
+  grid-template-columns: 12.5rem minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.settings-nav {
+  position: sticky;
+  top: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .65rem;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: .9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.settings-nav__item .icon { flex: none; opacity: .7; }
+.settings-nav__item:hover { background: var(--surface-2); color: var(--ink); }
+.settings-nav__item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.settings-nav__item.is-active .icon { opacity: 1; }
+
+.settings-panel { min-width: 0; }
+/* Switching section moves the panel, not the page: the menu stays put and the
+   scroll position is kept. */
+.settings-panel.is-entering { animation: pageEnter var(--dur) var(--ease); }
+
+.set-group { margin-bottom: 2.2rem; }
+.set-group__title {
+  margin: 0 0 .2rem;
+  font-family: var(--serif);
+  font-size: 1.02rem;
+}
+.set-group > .hint { margin-top: .5rem; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: .85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.set-row__text { min-width: 0; }
+.set-row__label { margin: 0; font-size: .93rem; color: var(--ink); }
+.set-row__desc { margin: .15rem 0 0; font-size: .82rem; color: var(--ink-3); }
+.set-row__value { color: var(--ink-2); overflow-wrap: anywhere; }
+.set-row__control { flex: none; display: flex; align-items: center; gap: .5rem; }
+
+.set-actions { display: flex; gap: .5rem; flex-wrap: wrap; padding: .85rem 0 0; }
+
+.set-identity { display: flex; align-items: center; gap: .9rem; margin: .8rem 0 .2rem; }
+.set-avatar {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.set-avatar--initials {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1rem;
+}
+.set-identity__name { margin: 0; font-weight: 600; }
+.set-identity__mail { margin: .1rem 0 0; font-size: .85rem; color: var(--ink-3); overflow-wrap: anywhere; }
+
+/* A real checkbox, drawn as a switch. Keyboard-reachable and announced as a
+   switch; the visible part is decoration over it. */
+.switch { display: inline-flex; cursor: pointer; }
+.switch__input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.switch__track {
+  position: relative;
+  display: block;
+  width: 2.5rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.switch__track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: .17rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--ink-3);
+  transform: translateY(-50%);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.switch__input:checked + .switch__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch__input:checked + .switch__track::after {
+  transform: translateY(-50%) translateX(1.05rem);
+  background: var(--accent-ink);
+}
+.switch__input:focus-visible + .switch__track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  /* Stacked, with the menu across the top as a scrollable row. A sidebar at
+     this width would leave the settings themselves in a column too narrow to
+     put a label and a control on the same line. */
+  .settings { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    gap: .3rem;
+    overflow-x: auto;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav__item { white-space: nowrap; }
+  .set-row { align-items: flex-start; flex-direction: column; gap: .6rem; }
+  .set-row__control { align-self: flex-start; }
+}
+
+/* ---------- two-factor setup ---------- */
+
+.mfa__lede { font-size: .95rem; margin-bottom: .75rem; }
+.mfa__steps { margin: 0 0 1.1rem; padding-left: 1.2rem; font-size: .88rem; color: var(--ink-2); }
+.mfa__steps li { margin: .3rem 0; }
+
+.mfa__qr {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  /* White, always. A QR code tinted to match the page is a QR code some
+     cameras will not read. */
+  background: #ffffff;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.qr { display: block; }
+
+.mfa__manual { margin-bottom: 1.1rem; }
+.mfa__manual summary { cursor: pointer; font-size: .88rem; color: var(--accent); }
+.mfa__key {
+  margin: .4rem 0 .3rem;
+  padding: .6rem .7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: .95rem;
+  letter-spacing: .06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.mfa--done { text-align: center; }
+.mfa__tick {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  margin: .2rem auto 1rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+#totp-code, #mfa-code {
+  font-size: 1.3rem;
+  letter-spacing: .32em;
+  text-align: center;
+  font-family: var(--mono);
+}

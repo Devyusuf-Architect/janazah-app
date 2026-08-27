@@ -29,6 +29,19 @@
     }
   }
   </script>
+  <script>
+    /* Appearance, applied before the first paint. Loading this as a module
+       would run it after the page has rendered, so somebody who chose Light
+       on a dark-mode device would watch the whole app flash dark first.
+       Mirrors public/js/prefs.js; tests/prefs.test.js keeps them in step. */
+    try {
+      var a = JSON.parse(localStorage.getItem('taziyah.appearance') || '{}');
+      if (a.theme === 'light' || a.theme === 'dark') {
+        document.documentElement.dataset.theme = a.theme;
+      }
+      if (a.textSize === 'large') document.documentElement.dataset.text = 'large';
+    } catch (e) { /* storage blocked; the defaults are correct anyway */ }
+  </script>
 </head>
 <body>
   <p id="env-banner" class="env-banner" hidden>

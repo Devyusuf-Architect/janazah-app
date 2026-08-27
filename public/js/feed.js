@@ -11,7 +11,10 @@ import { $, el, toast } from './ui.js';
 import { isSampleMode, initSampleMode } from './sample-mode.js';
 import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
-import { revealIn, autoReveal, pageEnter } from './motion.js';
+import {
+  revealIn, autoReveal, pageEnter,
+  ownScrollRestoration, rememberScroll, restoreScroll,
+} from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
@@ -161,10 +164,11 @@ function renderRoute() {
 // autoReveal keeps watching the mount for whatever arrives later.
 let stopReveal = () => {};
 
-function route() {
+function route({ back = false } = {}) {
   stopReveal();
   renderedFor = user?.uid ?? null;
   renderRoute();
+  restoreScroll(location.pathname + location.search, { remembered: back });
   pageEnter(mount());
   revealIn(mount());
   stopReveal = autoReveal(mount());
@@ -178,12 +182,19 @@ document.addEventListener('click', (event) => {
   const url = new URL(link.href);
   if (url.origin !== location.origin || url.pathname.startsWith('/console')) return;
   event.preventDefault();
+  // Where they were on the page they are leaving, so pressing back returns
+  // them to it rather than to the top of a long feed.
+  rememberScroll(location.pathname + location.search);
   history.pushState(null, '', url.pathname + url.search);
   closeNav($('#nav-toggle'), nav());
   route();
 });
 
-window.addEventListener('popstate', route);
+// Back and forward return to the remembered offset; a fresh navigation
+// starts at the top.
+window.addEventListener('popstate', () => route({ back: true }));
+
+ownScrollRestoration();
 
 const navToggle = $('#nav-toggle');
 if (navToggle) wireNavToggle(navToggle, nav());

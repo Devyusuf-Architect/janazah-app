@@ -112,7 +112,8 @@ function askForCode(resolver) {
       } catch (err) {
         error.hidden = false;
         error.textContent = err?.code === 'auth/invalid-verification-code'
-          ? 'That code was not accepted. Codes change every 30 seconds.'
+          ? 'The code could not be verified. Please try again. Codes change '
+            + 'every 30 seconds, so use the one showing now.'
           : friendlyError(err);
         submit.disabled = false;
       }
@@ -121,6 +122,9 @@ function askForCode(resolver) {
     backdrop.append(el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true' }, [
       el('h2', { text: 'Enter your six-digit code' }),
       el('p', { class: 'muted', text: 'From your authenticator app.' }),
+      el('p', { class: 'hint' },
+        'Two-factor authentication is on for this account, so a code is '
+        + 'needed alongside your password.'),
       code,
       error,
       el('div', { class: 'modal-actions' }, [

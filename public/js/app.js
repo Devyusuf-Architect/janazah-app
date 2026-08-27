@@ -92,6 +92,10 @@ function route() {
   }
   renderNav();
   target.render(mount(), ctx);
+  // A console tab is a different screen, not a scroll position within one.
+  // The browser is left to its own devices on reload, since the console keeps
+  // no history entries of its own to restore against.
+  window.scrollTo({ top: 0, behavior: 'auto' });
   pageEnter(mount());
   revealIn(mount());
 }
