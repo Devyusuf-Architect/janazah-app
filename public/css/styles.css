@@ -249,14 +249,14 @@ a { color: var(--accent); text-underline-offset: 2px; }
   letter-spacing: -0.02em;
 }
 .brand__mark {
-  display: grid;
-  place-items: center;
+  /* The logo is a self-contained circular mark (public/logo.svg): its own
+     background and colours are drawn into the file, fixed regardless of
+     light/dark theme, the way a badge-style logo normally stays fixed rather
+     than re-colouring itself with the page around it. */
+  display: block;
+  flex: none;
   width: 1.7rem;
   height: 1.7rem;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: .7rem;
 }
 .brand__sub { font-weight: 400; color: var(--ink-3); font-size: .8em; }
 

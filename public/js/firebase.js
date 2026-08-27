@@ -54,7 +54,7 @@ if (unconfigured && !isLocal) {
         max-width: 34rem; width: 100%; background: #fff; border: 1px solid #e4ded3;
         border-radius: 14px; padding: 2.25rem; box-shadow: 0 1px 2px rgba(22,32,28,.04), 0 6px 20px -8px rgba(22,32,28,.12);
       }
-      .mark { font-size: 1.5rem; color: #14503f; }
+      .mark { display: block; width: 2.4rem; height: 2.4rem; margin-bottom: .25rem; }
       h1 {
         margin: .5rem 0 0; font: 600 1.6rem/1.25 Georgia, 'Times New Roman', serif;
         letter-spacing: -0.015em; color: #16201c;
@@ -70,7 +70,7 @@ if (unconfigured && !isLocal) {
     </style></head>
     <body>
       <main class="card">
-        <div class="mark" aria-hidden="true">&#9670;</div>
+        <img class="mark" src="/logo.svg" alt="" aria-hidden="true" width="38" height="38">
         <h1>Ta'ziyah isn't connected to a Firebase project yet</h1>
         <p>This is a deploy of the app before its Firebase config was set, not an error in the app itself.</p>
         <ol>
