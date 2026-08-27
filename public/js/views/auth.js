@@ -41,8 +41,20 @@ export async function signInWithGoogle() {
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
       return;
     }
+    // Three different reasons the popup mechanism itself cannot work, not
+    // three different reasons sign-in failed. auth/web-storage-unsupported is
+    // the one that actually matters most in practice: Firebase's popup flow
+    // relays the result back to this window through third-party storage on
+    // its own authDomain, and that is exactly what browsers increasingly
+    // block by default (Safari's Intelligent Tracking Prevention, Chrome and
+    // Firefox with third-party cookies off, most in-app browsers). Without
+    // this, someone on such a browser completes Google sign-in in the popup,
+    // watches it close, and lands back on the sign-in form with no
+    // explanation -- Google sign-in reads as broken even though nothing
+    // actually failed on Google's side.
     if (code === 'auth/popup-blocked'
-        || code === 'auth/operation-not-supported-in-this-environment') {
+        || code === 'auth/operation-not-supported-in-this-environment'
+        || code === 'auth/web-storage-unsupported') {
       // Leaves the page entirely; completeRedirectSignIn() picks it up when
       // the browser comes back.
       await signInWithRedirect(auth, provider);

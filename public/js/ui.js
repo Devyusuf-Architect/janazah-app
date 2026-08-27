@@ -287,6 +287,14 @@ export function friendlyError(err, context) {
     return 'Your browser blocked the sign-in window. Allow pop-ups for this ' +
       'site, or try again and we will send you to Google instead.';
   }
+  if (code === 'auth/web-storage-unsupported') {
+    // Reachable in principle if signInWithRedirect itself also fails after
+    // falling back from a popup (see signInWithGoogle in views/auth.js); the
+    // fallback means this should be rare in practice.
+    return 'Your browser is blocking the data Google sign-in needs (often ' +
+      'third-party cookies). Allow cookies for this site, or try a ' +
+      'different browser, then try again.';
+  }
   if (code === 'auth/network-request-failed') {
     return 'Could not reach the sign-in service. Check your connection and try again.';
   }
