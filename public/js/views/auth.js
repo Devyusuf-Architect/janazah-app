@@ -11,6 +11,7 @@ import {
   TotpMultiFactorGenerator, sendEmailVerification,
 } from 'firebase/auth';
 import { auth } from '../firebase.js';
+import { APP } from '../config.js';
 import { el, toast, friendlyError } from '../ui.js';
 
 /**
@@ -192,6 +193,7 @@ export function renderAuth(mount, { variant = 'coordinator', initialMode = 'sign
       google.disabled = false;
     }
   });
+  const divider = el('div', { class: 'auth-divider' }, [el('span', { text: 'or' })]);
 
   toggle.addEventListener('click', () => {
     mode = mode === 'signin' ? 'signup' : 'signin';
@@ -206,8 +208,7 @@ export function renderAuth(mount, { variant = 'coordinator', initialMode = 'sign
   form.append(
     title,
     blurb,
-    google,
-    el('div', { class: 'auth-divider' }, [el('span', { text: 'or' })]),
+    ...(APP.googleSignIn ? [google, divider] : []),
     nameField,
     el('div', { class: 'field-group' }, [
       el('label', { class: 'label', for: 'email', text: 'Email' }),
