@@ -271,11 +271,17 @@ export function formatJanazahTime(notice) {
   const date = notice.janazahAt?.toDate ? notice.janazahAt.toDate() : notice.janazahAt;
   if (!date) return '';
   const zone = notice.timeZone || APP.defaultTimeZone;
+  // Most masjids on this platform are on Eastern time, so spelling that out
+  // on every single notice is noise. The abbreviation earns its place only
+  // when the notice is actually in some other zone, where leaving it off
+  // would let someone show up hours off from the real prayer time.
+  const showZone = zone !== APP.defaultTimeZone;
   let formatted;
   try {
     formatted = new Intl.DateTimeFormat('en-CA', {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+      hour: 'numeric', minute: '2-digit',
+      ...(showZone ? { timeZoneName: 'short' } : {}),
       timeZone: zone,
     }).format(date);
   } catch {
