@@ -5,9 +5,49 @@
 // the Android app registered in the existing Firebase project
 // (janaza-app-5baf2), because google-services.json is keyed to it.
 
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ExpoConfig } from 'expo/config';
 
 const ANDROID_PACKAGE = 'com.taziyah.app';
+
+const GOOGLE_SERVICES = './google-services.json';
+
+/**
+ * The web OAuth client id, read out of google-services.json.
+ *
+ * Firebase Auth wants a *web* client's ID token even when the sign-in
+ * happened on Android, which is a genuinely confusing detail and the usual
+ * reason Continue with Google fails with nothing but a developer error. The
+ * value is already in the file the Android build requires, so it is read from
+ * there rather than asked for a second time: two places to keep in step is
+ * one more than necessary, and the copy would eventually be the stale one.
+ *
+ * It is a public identifier, not a secret. EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+ * still overrides it, for a build that has to point at a different client.
+ */
+function googleWebClientId(): string {
+  const override = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  if (override) return override;
+
+  const path = resolve(__dirname, GOOGLE_SERVICES);
+  if (!existsSync(path)) return '';
+  try {
+    const file = JSON.parse(readFileSync(path, 'utf8'));
+    for (const client of file.client ?? []) {
+      for (const oauth of client.oauth_client ?? []) {
+        // Type 3 is the web client. Type 1 is the Android one, which is
+        // matched by certificate fingerprint and is never named in code.
+        if (oauth.client_type === 3 && oauth.client_id) return oauth.client_id;
+      }
+    }
+  } catch {
+    // A malformed file is reported properly by scripts/preflight.mjs and by
+    // the prebuild itself. Failing the config evaluation here would only
+    // replace both messages with a worse one.
+  }
+  return '';
+}
 
 // The public site. Notifications link to it, and Android App Links let those
 // links open this app instead of a browser. Kept here rather than in the
@@ -66,7 +106,7 @@ const config: ExpoConfig = {
       'android.permission.READ_EXTERNAL_STORAGE',
       'android.permission.WRITE_EXTERNAL_STORAGE',
     ],
-    googleServicesFile: './google-services.json',
+    googleServicesFile: GOOGLE_SERVICES,
     intentFilters: [
       {
         action: 'VIEW',
@@ -131,6 +171,7 @@ const config: ExpoConfig = {
   extra: {
     siteOrigin: `https://${SITE}`,
     androidPackage: ANDROID_PACKAGE,
+    googleWebClientId: googleWebClientId(),
   },
 };
 

@@ -51,29 +51,37 @@ if (!existsSync(gsPath)) {
     }
     // An OAuth client of type 3 is the web client Firebase Auth needs to
     // accept a Google ID token, even on Android.
+    // An OAuth client of type 3 is the web client Firebase Auth needs in
+    // order to accept a Google ID token, even when the sign-in happened on
+    // Android. app.config.ts reads it straight out of this file.
     const hasWebClient = (gs.client ?? []).some((c) =>
       (c.oauth_client ?? []).some((o) => o.client_type === 3));
     if (!hasWebClient) {
       warnings.push(
         'No web OAuth client in google-services.json, so Continue with Google\n'
-        + '  will not work. Add the SHA-1 and SHA-256 fingerprints of both the\n'
-        + '  EAS debug and release keystores to the Android app in the Firebase\n'
-        + '  console, then download the file again.',
+        + '  is hidden in this build. Email and password sign-in is unaffected.\n'
+        + '  Add the SHA-1 and SHA-256 fingerprints of both the EAS debug and\n'
+        + '  release keystores to the Android app in the Firebase console, then\n'
+        + '  download the file again.',
+      );
+    }
+
+    // Present in the file, but only actually usable once the signing
+    // certificate fingerprints are registered. Nothing in the file records
+    // whether they are, so this cannot be checked here and is called out
+    // instead: it is the single most common reason Continue with Google
+    // fails on Android with nothing but a developer error.
+    if (hasWebClient) {
+      warnings.push(
+        'Continue with Google is switched on in this build. It will still fail\n'
+        + '  until the SHA-1 and SHA-256 fingerprints of the EAS debug AND\n'
+        + '  release keystores are registered against com.taziyah.app in the\n'
+        + '  Firebase console. `eas credentials` prints them.',
       );
     }
   } catch {
     problems.push('google-services.json is not valid JSON.');
   }
-}
-
-// ---- Google sign-in client id -------------------------------------------
-if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
-  warnings.push(
-    'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set, so Continue with Google is\n'
-    + '  hidden in this build. Email and password sign-in is unaffected. The\n'
-    + '  value is the client_id of the type 3 OAuth client in\n'
-    + '  google-services.json. It is a public identifier, not a secret.',
-  );
 }
 
 // ---- the shared modules --------------------------------------------------

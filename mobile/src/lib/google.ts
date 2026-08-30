@@ -15,13 +15,23 @@
 // fingerprints of both the EAS debug and release keystores have to be added
 // there or sign-in fails with a developer error and nothing more useful.
 
+import Constants from 'expo-constants';
 import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 
-/** Public client identifier, not a secret. Absent until the console is set up. */
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+/**
+ * Public client identifier, not a secret.
+ *
+ * Read out of google-services.json at config time (see app.config.ts), so
+ * there is one place the project is described and no second value to keep in
+ * step with it. Empty when the file has no web OAuth client, which is what
+ * hides the button rather than letting it fail on tap.
+ */
+const WEB_CLIENT_ID = String(
+  Constants.expoConfig?.extra?.googleWebClientId ?? '',
+);
 
 export const isGoogleConfigured = (): boolean => WEB_CLIENT_ID.length > 0;
 
