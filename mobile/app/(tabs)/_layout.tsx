@@ -14,8 +14,8 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
-import { useColors, type } from '@/theme';
-import { TabIcon, type TabIconName } from '@/components/TabIcon';
+import { useColors, type } from '../../src/theme';
+import { TabIcon, type TabIconName } from '../../src/components/TabIcon';
 
 const TABS: { name: string; title: string; icon: TabIconName }[] = [
   { name: 'index', title: 'Home', icon: 'home' },

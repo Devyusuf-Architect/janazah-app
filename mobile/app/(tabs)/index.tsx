@@ -1,54 +1,139 @@
 // Home.
 //
-// Phase 1 puts the frame in place: the greeting, the search field and the
-// section headings that Phase 2 fills with real notices. Nothing here fetches
-// yet, and the placeholders say so rather than pretending to be an empty
-// feed, because "no Janazahs today" and "this is not built yet" must never
-// look the same in an app like this one.
+// Not a landing page. Somebody opening this has usually just been told, by
+// text message or in a phone call, that a Janazah is happening, often today.
+// The screen has one job at that moment: what is happening, where, and how do
+// I get there.
+//
+// So: a one-line greeting, a search field, and then notices. Four upcoming,
+// three nearby, and whatever the masjids they follow have published. Each
+// section defers to its own tab rather than growing, because a home screen
+// that tries to be every tab is a home screen nobody scrolls to the bottom of.
 
-import React from 'react';
-import { View } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { RefreshControl, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen, ScreenScroll } from '@/components/Screen';
-import { Text } from '@/components/Text';
-import { Surface } from '@/components/Surface';
-import { Greeting } from '@/features/home/Greeting';
-import { SearchField } from '@/features/home/SearchField';
-import { SectionHeader } from '@/features/home/SectionHeader';
-import { space } from '@/theme';
+import { Screen, ScreenScroll } from '../../src/components/Screen';
+import { Text } from '../../src/components/Text';
+import { Divider } from '../../src/components/Surface';
+import { Loading, Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { Greeting } from '../../src/features/home/Greeting';
+import { SearchField } from '../../src/features/home/SearchField';
+import { SectionHeader } from '../../src/features/home/SectionHeader';
+import { NoticeRow } from '../../src/features/notices/NoticeRow';
+import { SampleBanner } from '../../src/features/home/SampleBanner';
+import { useUpcomingNotices } from '../../src/lib/queries';
+import type { Notice } from '../../src/lib/notice';
+import { space, useColors } from '../../src/theme';
+
+/** How many rows each section shows before deferring to its own tab. */
+const UPCOMING_LIMIT = 4;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+
+  const {
+    data, isPending, isError, refetch, isRefetching,
+  } = useUpcomingNotices();
+
+  const notices = useMemo(
+    () => data?.pages.flatMap((page) => page.notices) ?? [],
+    [data],
+  );
+  const stale = data?.pages.some((page) => page.stale) ?? false;
+
+  // Refetched when the tab is focused rather than kept on a live listener.
+  // Somebody who backgrounds the app on the way to a masjid and reopens it in
+  // the car park gets the current time; a socket held open all night does not
+  // earn its battery.
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  const open = (notice: Notice) => router.push(`/n/${notice.id}`);
 
   return (
     <Screen>
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
+      <ScreenScroll
+        contentContainerStyle={{ paddingTop: insets.top + space.md }}
+        refreshControl={(
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        )}
+      >
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
           <Greeting />
           <SearchField />
         </View>
 
-        <SectionHeader title="Upcoming" />
-        <Placeholder note="Upcoming Janazahs appear here." />
+        <SampleBanner />
 
-        <SectionHeader title="Near you" />
-        <Placeholder note="Janazahs close to you appear here once location is on." />
+        {stale ? (
+          <View style={{ paddingTop: space.lg }}>
+            <StaleBanner onRetry={refetch} />
+          </View>
+        ) : null}
 
-        <SectionHeader title="Masjids you follow" />
-        <Placeholder note="Notices from masjids you follow appear here." />
+        <SectionHeader
+          title="Upcoming"
+          action={notices.length > UPCOMING_LIMIT
+            ? { label: 'See all', onPress: () => router.push('/search') }
+            : undefined}
+        />
+
+        {isPending ? <Loading label="Loading notices" /> : null}
+
+        {isError ? (
+          <View style={{ paddingHorizontal: space.lg }}>
+            <ErrorState
+              message="Notices could not be loaded. You may be offline."
+              onRetry={refetch}
+            />
+          </View>
+        ) : null}
+
+        {!isPending && !isError && notices.length === 0 ? (
+          <View style={{ paddingHorizontal: space.lg }}>
+            <Empty message="No Janazah notices have been published for the days ahead." />
+          </View>
+        ) : null}
+
+        {notices.slice(0, UPCOMING_LIMIT).map((notice, index) => (
+          <View key={notice.id}>
+            {index > 0 ? <Divider inset={space.lg} /> : null}
+            <NoticeRow notice={notice} onPress={open} />
+          </View>
+        ))}
+
+        <SectionHeader
+          title="Near you"
+          action={{ label: 'Open', onPress: () => router.push('/nearby') }}
+        />
+        <View style={{ paddingHorizontal: space.lg }}>
+          {/* One row, not half a screen. The brief was explicit that a
+              disabled state must not take over the page, and this is the
+              state most people will see on first launch. */}
+          <Text variant="callout" tone="muted">
+            Turn on location in Nearby to see which of these are close to you.
+            It stays on your phone.
+          </Text>
+        </View>
+
+        <SectionHeader
+          title="Masjids you follow"
+          action={{ label: 'Open', onPress: () => router.push('/following') }}
+        />
+        <View style={{ paddingHorizontal: space.lg }}>
+          <Text variant="callout" tone="muted">
+            Follow a masjid to see its notices here.
+          </Text>
+        </View>
       </ScreenScroll>
     </Screen>
-  );
-}
-
-function Placeholder({ note }: { note: string }) {
-  return (
-    <Surface
-      padded
-      style={{ marginHorizontal: space.lg, marginTop: space.sm }}
-    >
-      <Text variant="callout" tone="muted">{note}</Text>
-    </Surface>
   );
 }

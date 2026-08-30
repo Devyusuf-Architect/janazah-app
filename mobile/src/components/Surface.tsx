@@ -7,7 +7,7 @@
 import React from 'react';
 import { View, type ViewProps } from 'react-native';
 
-import { useColors, radius, space } from '@/theme';
+import { useColors, radius, space } from '../theme';
 
 type Props = ViewProps & {
   /** 'flat' sits on the page ground; 'raised' is the default panel. */

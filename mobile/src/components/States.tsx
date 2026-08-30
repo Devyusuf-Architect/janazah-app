@@ -12,7 +12,7 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { useColors, radius, space } from '@/theme';
+import { useColors, radius, space } from '../theme';
 import { Text } from './Text';
 import { Button } from './Button';
 

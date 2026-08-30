@@ -10,7 +10,7 @@ import {
   ActivityIndicator, Pressable, View, type PressableProps,
 } from 'react-native';
 
-import { useColors, radius, space, HIT_SLOP_MIN } from '@/theme';
+import { useColors, radius, space, HIT_SLOP_MIN } from '../theme';
 import { Text } from './Text';
 
 type Props = Omit<PressableProps, 'children'> & {

@@ -10,7 +10,7 @@ import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { Text } from './Text';
-import { useColors, space, HIT_SLOP_MIN } from '@/theme';
+import { useColors, space, HIT_SLOP_MIN } from '../theme';
 
 type Props = {
   title: string;

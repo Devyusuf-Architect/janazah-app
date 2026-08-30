@@ -5,16 +5,17 @@
 // asynchronously, and nothing here waits for it, because reading notices
 // needs no account and must not be held up by one.
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { connectEmulators } from '@/lib/firebase';
-import { AuthProvider } from '@/lib/auth';
-import { ThemeProvider, useTheme } from '@/theme';
+import { connectEmulators } from '../src/lib/firebase';
+import { AuthProvider } from '../src/lib/auth';
+import { initSampleMode } from '../src/lib/sample';
+import { ThemeProvider, useTheme } from '../src/theme';
 
 // Connected at module scope so it happens before the first query, and only
 // ever once. The function is itself idempotent for Fast Refresh.
@@ -48,6 +49,8 @@ function Chrome() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="n/[id]" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="signin" options={{ presentation: 'modal' }} />
       </Stack>
     </>
@@ -55,9 +58,14 @@ function Chrome() {
 }
 
 export default function RootLayout() {
+  const [, setSamplesResolved] = useState(false);
+
   useEffect(() => {
-    // Nothing yet. The placeholder marks where font loading and the deferred
-    // splash hide will go once the brand faces are bundled (Phase 7).
+    // Whether the administrator has sample data switched on. Read once, at
+    // launch, and defaulting to off: a network failure at startup must never
+    // be the reason a fictional Janazah notice appears. The state flip is
+    // what repaints the banner and the feed if the answer is yes.
+    initSampleMode().then(() => setSamplesResolved(true)).catch(() => {});
   }, []);
 
   return (

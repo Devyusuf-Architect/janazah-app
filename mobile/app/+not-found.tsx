@@ -8,10 +8,10 @@ import React from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 
-import { Screen } from '@/components/Screen';
-import { Text } from '@/components/Text';
-import { Button } from '@/components/Button';
-import { space } from '@/theme';
+import { Screen } from '../src/components/Screen';
+import { Text } from '../src/components/Text';
+import { Button } from '../src/components/Button';
+import { space } from '../src/theme';
 
 export default function NotFound() {
   return (

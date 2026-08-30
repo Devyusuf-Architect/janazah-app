@@ -9,8 +9,8 @@ import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { Text } from '@/components/Text';
-import { useColors, radius, space, HIT_SLOP_MIN } from '@/theme';
+import { Text } from '../../components/Text';
+import { useColors, radius, space, HIT_SLOP_MIN } from '../../theme';
 
 export function SearchField() {
   const colors = useColors();

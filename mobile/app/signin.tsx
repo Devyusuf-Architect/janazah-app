@@ -12,19 +12,19 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen, ScreenScroll } from '@/components/Screen';
-import { Text } from '@/components/Text';
-import { Field } from '@/components/Field';
-import { Button } from '@/components/Button';
-import { Surface } from '@/components/Surface';
-import { useAuth } from '@/lib/auth';
-import { getGoogleIdToken, isGoogleConfigured, GoogleSignInError } from '@/lib/google';
+import { Screen, ScreenScroll } from '../src/components/Screen';
+import { Text } from '../src/components/Text';
+import { Field } from '../src/components/Field';
+import { Button } from '../src/components/Button';
+import { Surface } from '../src/components/Surface';
+import { useAuth } from '../src/lib/auth';
+import { getGoogleIdToken, isGoogleConfigured, GoogleSignInError } from '../src/lib/google';
 import {
   challengeFrom, isTotp, resolveWithTotp,
   UNSUPPORTED_FACTOR_MESSAGE, type MfaChallenge,
-} from '@/lib/mfa';
-import { friendlyAuthError } from '@/lib/auth-errors';
-import { space } from '@/theme';
+} from '../src/lib/mfa';
+import { friendlyAuthError } from '../src/lib/auth-errors';
+import { space } from '../src/theme';
 
 type Mode = 'signin' | 'signup';
 

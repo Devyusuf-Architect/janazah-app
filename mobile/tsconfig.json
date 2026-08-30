@@ -7,11 +7,7 @@
     // The bridge tests run under `node --test` with type stripping, which
     // resolves the real .ts path at runtime. Safe here because this project
     // never emits: Metro compiles it.
-    "allowImportingTsExtensions": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@shared/*": ["./src/shared/*"]
-    }
+    "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
   "exclude": ["node_modules", "android", "ios"]

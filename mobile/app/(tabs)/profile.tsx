@@ -13,14 +13,14 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen, ScreenScroll } from '@/components/Screen';
-import { Text } from '@/components/Text';
-import { Surface, Divider } from '@/components/Surface';
-import { Button } from '@/components/Button';
-import { Row } from '@/components/Row';
-import { useAuth } from '@/lib/auth';
-import { signOutGoogle } from '@/lib/google';
-import { space } from '@/theme';
+import { Screen, ScreenScroll } from '../../src/components/Screen';
+import { Text } from '../../src/components/Text';
+import { Surface, Divider } from '../../src/components/Surface';
+import { Button } from '../../src/components/Button';
+import { Row } from '../../src/components/Row';
+import { useAuth } from '../../src/lib/auth';
+import { signOutGoogle } from '../../src/lib/google';
+import { space } from '../../src/theme';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();

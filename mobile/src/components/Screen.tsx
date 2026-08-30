@@ -8,7 +8,7 @@ import React from 'react';
 import { View, ScrollView, type ScrollViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColors, space } from '@/theme';
+import { useColors, space } from '../theme';
 
 export function Screen({
   children, sunk = false,

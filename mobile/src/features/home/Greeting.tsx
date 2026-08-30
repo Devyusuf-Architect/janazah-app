@@ -9,8 +9,8 @@
 
 import React from 'react';
 
-import { Text } from '@/components/Text';
-import { useAuth } from '@/lib/auth';
+import { Text } from '../../components/Text';
+import { useAuth } from '../../lib/auth';
 
 /** First name only. A full legal name in a greeting is not a greeting. */
 function firstName(displayName: string | null | undefined): string | null {

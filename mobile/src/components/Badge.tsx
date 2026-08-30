@@ -9,7 +9,7 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { useColors, radius, space } from '@/theme';
+import { useColors, radius, space } from '../theme';
 import { Text } from './Text';
 
 type Tone = 'verified' | 'cancelled' | 'corrected' | 'neutral';

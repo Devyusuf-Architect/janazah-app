@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { TextInput, View, type TextInputProps } from 'react-native';
 
 import { Text } from './Text';
-import { useColors, radius, space, type, HIT_SLOP_MIN } from '@/theme';
+import { useColors, radius, space, type, HIT_SLOP_MIN } from '../theme';
 
 type Props = TextInputProps & {
   label: string;

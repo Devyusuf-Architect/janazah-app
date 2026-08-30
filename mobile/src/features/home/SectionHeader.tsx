@@ -7,8 +7,8 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Text } from '@/components/Text';
-import { space, useColors } from '@/theme';
+import { Text } from '../../components/Text';
+import { space, useColors } from '../../theme';
 
 export function SectionHeader({ title, action }: {
   title: string;

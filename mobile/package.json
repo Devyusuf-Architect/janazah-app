@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "prebuild": "node scripts/preflight.mjs && expo prebuild --platform android",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"test/*.test.ts\"",
+    "test": "node --experimental-strip-types --import ./test/extensionless.mjs --test \"test/*.test.ts\"",
     "doctor": "npx expo-doctor",
     "preflight": "node scripts/preflight.mjs",
     "icons": "node scripts/build-android-icons.mjs"
@@ -52,6 +52,9 @@
   "devDependencies": {
     "@types/node": "^26.4.0",
     "@types/react": "~19.2.0",
+    "@types/react-dom": "^19.2.5",
+    "esbuild": "^0.28.2",
+    "react-native-web": "^0.21.2",
     "typescript": "~5.9.2"
   }
 }

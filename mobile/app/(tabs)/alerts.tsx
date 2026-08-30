@@ -10,9 +10,9 @@ import React from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen } from '@/components/Screen';
-import { Text } from '@/components/Text';
-import { space } from '@/theme';
+import { Screen } from '../../src/components/Screen';
+import { Text } from '../../src/components/Text';
+import { space } from '../../src/theme';
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();

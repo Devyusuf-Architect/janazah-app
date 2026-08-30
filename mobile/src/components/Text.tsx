@@ -9,7 +9,7 @@
 import React from 'react';
 import { Text as RNText, type TextProps, type TextStyle } from 'react-native';
 
-import { useColors, type } from '@/theme';
+import { useColors, type } from '../theme';
 
 export type TextVariant = keyof typeof type;
 export type TextTone = 'default' | 'muted' | 'subtle' | 'accent' | 'danger' | 'onAccent';

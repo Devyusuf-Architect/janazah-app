@@ -24,7 +24,7 @@ import {
 } from '@react-native-firebase/firestore';
 
 import { db } from './firebase';
-import { CURRENT_WINDOW_HOURS } from '@shared/config';
+import { CURRENT_WINDOW_HOURS } from '../shared/config';
 
 export type DocSnapshot = QueryDocumentSnapshot;
 

@@ -11,3 +11,7 @@ ios/
 # not a secret, but it is per-project and generated from the console rather
 # than authored here, so it is fetched at build time instead of committed.
 google-services.json
+
+# Design harness output. Regenerate with `node preview/build.mjs`.
+preview/out/
+preview/shots/
