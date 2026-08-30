@@ -10,9 +10,9 @@
 // of the site uses, so a change to any of them changes this page too rather
 // than leaving it quietly stale.
 
-import { el, icon, toast, skeleton } from '../ui.js';
+import { el, icon, toast, skeleton, directionsMenu } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
-import { formatDistance, directionsUrl } from '../geo.js';
+import { formatDistance } from '../geo.js';
 import * as store from '../store.js';
 import * as loc from '../location.js';
 import * as follows from '../follows.js';
@@ -213,12 +213,7 @@ export function janazahRow(notice, distanceLabel = null) {
         : null,
     ]),
     place
-      ? el('a', {
-        class: 'btn btn--small jrow__go',
-        href: directionsUrl(place),
-        target: '_blank',
-        rel: 'noopener noreferrer',
-      }, [icon('route', { size: 15 }), el('span', { text: 'Directions' })])
+      ? directionsMenu(place, { label: 'Directions', triggerClass: 'btn btn--small jrow__go' })
       : null,
   ]);
 }

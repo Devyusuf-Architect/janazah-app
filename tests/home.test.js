@@ -62,9 +62,12 @@ describe('a Janazah row answers the questions in order', () => {
     }
   });
 
-  test('directions open the real map link, not a placeholder', () => {
-    assert.match(home, /href: directionsUrl\(place\)/);
-    assert.match(home, /rel: 'noopener noreferrer'/);
+  test('directions open a real map link, not a placeholder', () => {
+    // The single Google-only link was replaced by a small menu of map apps
+    // (geo.test.js pins the URLs directionsOptions builds, ui.test.js pins
+    // that directionsMenu links out with rel="noopener noreferrer"); here it
+    // is enough to know the row wires a real location into that menu.
+    assert.match(home, /directionsMenu\(place, \{ label: 'Directions'/);
   });
 
   test('a cancelled notice is marked rather than dropped', () => {
@@ -79,7 +82,7 @@ describe('nothing on the home page is reimplemented', () => {
   test('it reads the same notice stream, follows and distances as everywhere else', () => {
     for (const shared of [
       'store.watchPublicNotices', 'follows.followedOrgIds', 'loc.noticeDistanceKm',
-      'loc.nearbyNotices', 'formatJanazahTime', 'directionsUrl',
+      'loc.nearbyNotices', 'formatJanazahTime', 'directionsMenu',
     ]) {
       assert.ok(home.includes(shared), `the home page should reuse ${shared}`);
     }

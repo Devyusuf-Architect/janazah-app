@@ -132,11 +132,47 @@ export function subscriptionCells(lat, lng, radiusKm, { maxCells = 40 } = {}) {
   return { precision: 2, cells: cellsCovering(lat, lng, effectiveRadius, 2) };
 }
 
-/** Deep link that opens directions in whatever maps app the device prefers. */
-export function directionsUrl(loc) {
-  if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
-  }
+/**
+ * The map apps a "Directions" action can open, in the order they should be
+ * offered. Google Maps and Apple Maps fall back to a text query when
+ * coordinates are missing; Waze has no address-based mode, so it is left out
+ * entirely rather than linked to something broken.
+ */
+export function directionsOptions(loc) {
+  const hasCoords = Number.isFinite(loc?.lat) && Number.isFinite(loc?.lng);
   const q = encodeURIComponent([loc?.name, loc?.address].filter(Boolean).join(', '));
-  return `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+
+  const options = [
+    {
+      key: 'google',
+      label: 'Google Maps',
+      href: hasCoords
+        ? `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`
+        : `https://www.google.com/maps/dir/?api=1&destination=${q}`,
+    },
+    {
+      key: 'apple',
+      label: 'Apple Maps',
+      href: hasCoords
+        ? `https://maps.apple.com/?daddr=${loc.lat},${loc.lng}`
+        : `https://maps.apple.com/?q=${q}`,
+    },
+  ];
+  if (hasCoords) {
+    options.push({
+      key: 'waze',
+      label: 'Waze',
+      href: `https://waze.com/ul?ll=${loc.lat},${loc.lng}&navigate=yes`,
+    });
+  }
+  return options;
+}
+
+/**
+ * Deep link that opens directions in Google Maps. Kept as the single-URL
+ * entry point for callers that just want one working link; directionsOptions
+ * is the one to use when someone should get a choice of app.
+ */
+export function directionsUrl(loc) {
+  return directionsOptions(loc)[0].href;
 }

@@ -1,6 +1,8 @@
 // Small DOM helpers. No framework: this app is a handful of forms and lists,
 // and a build step would cost more than it saves.
 
+import { directionsOptions } from './geo.js';
+
 /** Escape text for interpolation into innerHTML. */
 export function esc(value) {
   return String(value ?? '')
@@ -73,6 +75,67 @@ export function icon(name, { size = 18 } = {}) {
     svg.append(path);
   }
   return svg;
+}
+
+/**
+ * A "Directions" button that reveals a small menu of map apps, rather than
+ * jumping straight to one provider. Same open/close pattern as the account
+ * menu in nav.js: click the trigger to toggle, click elsewhere or press
+ * Escape to close.
+ *
+ * @param {object} loc A location with name/address and, ideally, lat/lng.
+ * @param {object} [options]
+ * @param {string} [options.label]       Trigger text. Default 'Directions'.
+ * @param {string} [options.triggerClass] Class list for the trigger button,
+ *   so it can look like a small button in one place and an inline link
+ *   elsewhere.
+ */
+export function directionsMenu(loc, { label = 'Directions', triggerClass = 'btn btn--small' } = {}) {
+  const options = directionsOptions(loc);
+  if (!options.length) return null;
+
+  const panel = el('ul', { class: 'directions-menu__panel', hidden: true, role: 'menu' },
+    options.map((opt) => el('li', {}, [
+      el('a', {
+        class: 'directions-menu__item',
+        role: 'menuitem',
+        href: opt.href,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      }, opt.label),
+    ])));
+
+  const button = el('button', {
+    class: `${triggerClass} directions-menu__trigger`,
+    type: 'button',
+    'aria-haspopup': 'menu',
+    'aria-expanded': 'false',
+  }, [icon('route', { size: 15 }), el('span', { text: label })]);
+
+  const onDocClick = (event) => { if (!wrap.contains(event.target)) close(); };
+  const onKeyDown = (event) => { if (event.key === 'Escape') close(); };
+  const close = () => {
+    panel.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('keydown', onKeyDown);
+  };
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (panel.hidden) {
+      panel.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onDocClick);
+      document.addEventListener('keydown', onKeyDown);
+    } else {
+      close();
+    }
+  });
+  // Choosing an option closes the menu behind it, same as the account menu.
+  panel.addEventListener('click', close);
+
+  const wrap = el('div', { class: 'directions-menu' }, [button, panel]);
+  return wrap;
 }
 
 /** Placeholder cards, so a slow network shows shape rather than the word "Loading". */

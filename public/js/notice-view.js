@@ -2,9 +2,8 @@
 // coordinator's preview, the administrator's review screen, and the community
 // feed. One implementation, so a preview cannot drift from what is published.
 
-import { el, icon } from './ui.js';
+import { el, icon, directionsMenu } from './ui.js';
 import { formatJanazahTime, FORBIDDEN_PUBLIC_FIELDS } from './model.js';
-import { directionsUrl } from './geo.js';
 
 /**
  * @param {object} notice        A public notice document.
@@ -91,10 +90,7 @@ function locationRow(label, place, linkText) {
       el('p', { class: 'kv-label', text: label }),
       el('p', { class: 'kv-value', text: place.name }),
       el('p', { class: 'kv-sub', text: place.address }),
-      el('a', {
-        class: 'link-inline', target: '_blank', rel: 'noopener noreferrer',
-        href: directionsUrl(place),
-      }, [icon('route', { size: 15 }), el('span', { text: linkText })]),
+      directionsMenu(place, { label: linkText, triggerClass: 'link-inline' }),
     ]),
   ]);
 }
