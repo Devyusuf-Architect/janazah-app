@@ -39,12 +39,14 @@ export function renderHome(mount) {
   const upcoming = el('section', { class: 'home-section' });
   const near = el('section', { class: 'home-section' });
   const followed = el('section', { class: 'home-section' });
+  const explore = el('section', { class: 'home-section', hidden: true });
 
   const repaint = () => {
     paintResults(results, state);
     paintUpcoming(upcoming, state);
     paintNear(near, state, repaint);
     paintFollowed(followed, state, repaint);
+    paintExplore(explore, state);
   };
 
   mount.replaceChildren(
@@ -53,7 +55,9 @@ export function renderHome(mount) {
     upcoming,
     near,
     followed,
+    explore,
     quickActions(),
+    growingNote(),
     guideStrip(),
   );
 
@@ -146,7 +150,7 @@ function paintResults(mount, state) {
 
   if (!notices.length && !orgs.length) {
     mount.append(el('div', { class: 'home-empty' }, [
-      el('p', { text: `Nothing matches “${state.query.trim()}”.` }),
+      el('p', { text: 'No Janazahs match your search.' }),
       el('p', { class: 'muted' },
         'Only current and upcoming Janazahs are listed here. A masjid that '
         + 'has not registered yet will not appear.'),
@@ -260,10 +264,15 @@ export function paintUpcoming(mount, state) {
 
   if (!visible.length) {
     mount.append(el('div', { class: 'home-empty' }, [
-      el('p', { text: 'No current or upcoming Janazahs.' }),
+      el('p', { text: 'No Janazah notices have been published yet.' }),
       el('p', { class: 'muted' },
-        'This updates on its own as verified masjids publish. Nothing needs '
-        + 'refreshing.'),
+        'Ta’ziyah is currently welcoming Masjids and funeral coordinators to '
+        + 'join the platform.'),
+      el('div', { class: 'home-empty__actions' }, [
+        el('a', { class: 'btn btn--small', href: '/masjids' }, 'Find a Masjid'),
+        el('a', { class: 'btn btn--small btn--primary', href: '/register-masjid' },
+          'Register a Masjid'),
+      ]),
     ]));
     return;
   }
@@ -408,6 +417,71 @@ export function paintFollowed(mount, state, repaint) {
     mount.append(el('a', { class: 'home-more', href: '/following' },
       `${followedOrgs.length - FOLLOWED_LIMIT} more`));
   }
+}
+
+// ------------------------------------------------------------------ explore
+
+/**
+ * Shown only while there is nothing real yet to fill the page. Once the
+ * first real notice is published this disappears on its own — it is a
+ * softer landing for an empty site, not a permanent fixture, so it must not
+ * linger and clutter the page once Janazahs are actually flowing.
+ *
+ * A visitor here could be a community member or someone representing a
+ * masjid, and before sign-in there is no reliable way to tell which. Rather
+ * than guess, both audiences are served on the same screen: the ordinary
+ * community actions, plus one more prominent card for registering a masjid.
+ */
+function paintExplore(mount, state) {
+  if (state.loading || state.notices.length) {
+    mount.hidden = true;
+    mount.replaceChildren();
+    return;
+  }
+  mount.hidden = false;
+
+  const enableNearby = el('button', { class: 'qa__item qa__item--button', type: 'button' },
+    [icon('pin', { size: 17 }), el('span', { text: 'Enable nearby alerts' })]);
+  enableNearby.addEventListener('click', () => enableLocation(enableNearby, () => paintExplore(mount, state)));
+
+  mount.replaceChildren(
+    sectionHead('Get started with Ta’ziyah'),
+    el('div', { class: 'guide-strip reveal' }, [
+      el('div', {}, [
+        el('h2', { class: 'guide-strip__title', text: 'Bring Your Masjid to Ta’ziyah' }),
+        el('p', { class: 'guide-strip__sub' },
+          'Register your Masjid to publish verified Janazah notices and keep '
+          + 'your community informed.'),
+      ]),
+      el('a', { class: 'btn btn--primary btn--small', href: '/register-masjid' },
+        'Register Organization'),
+    ]),
+    el('ul', { class: 'qa' }, [
+      el('li', {}, [el('a', { class: 'qa__item', href: '/masjids' },
+        [icon('building', { size: 17 }), el('span', { text: 'Find or follow a Masjid' })])]),
+      el('li', {}, [el('a', { class: 'qa__item', href: '/janazah-guide' },
+        [icon('shield', { size: 17 }), el('span', { text: 'How to perform Janazah' })])]),
+      el('li', {}, [enableNearby]),
+      el('li', {}, [el('a', { class: 'qa__item', href: '/about' },
+        [icon('flag', { size: 17 }), el('span', { text: 'Learn how Ta’ziyah works' })])]),
+    ]),
+  );
+}
+
+/**
+ * A small, calm note that Ta'ziyah is early rather than empty. Deliberately
+ * not a banner, and deliberately not a number: there is no honest count yet
+ * worth stating, and a bare "0" reads as failure rather than honesty.
+ */
+function growingNote() {
+  return el('section', { class: 'home-section' }, [
+    el('div', { class: 'growing-note reveal' }, [
+      el('h2', { class: 'growing-note__title', text: 'Ta’ziyah is growing' }),
+      el('p', { class: 'growing-note__sub' },
+        'We are currently onboarding Masjids across Ontario. As organizations '
+        + 'join, verified Janazah notices will appear here.'),
+    ]),
+  ]);
 }
 
 // ------------------------------------------------------------ the last bits

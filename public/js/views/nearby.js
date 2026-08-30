@@ -61,7 +61,7 @@ export function renderNearby(mount, { getNotices, onChange, renderCard }) {
     mount.append(el('div', { class: 'empty' }, [
       el('p', {
         text: settings.radiusKm === 0
-          ? 'No current or upcoming Janazahs anywhere.'
+          ? 'There are currently no published Janazahs near you.'
           : `No Janazahs within ${settings.radiusKm} km of where you are.`,
       }),
       el('p', { class: 'muted', text: 'Try a wider distance, or check all notices.' }),

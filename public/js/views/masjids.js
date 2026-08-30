@@ -74,7 +74,8 @@ function paint(mount, orgs) {
   if (!orgs.length) {
     mount.append(el('div', { class: 'empty' }, [
       el('h2', { text: 'No verified masjids yet' }),
-      el('p', { text: 'Once one is verified, it will appear here.' }),
+      el('p', { text: 'Verified Masjids will appear here as they join Ta’ziyah.' }),
+      el('a', { class: 'btn btn--primary', href: '/register-masjid' }, 'Register Your Masjid'),
     ]));
   } else {
     const repaint = () => list.replaceChildren(...orgs.map((org) => orgRow(org, () => {})));
