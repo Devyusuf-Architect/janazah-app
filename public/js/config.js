@@ -21,7 +21,7 @@ export const APP = {
   name: "Ta'ziyah",
 
   // ---------------------------------------------------------------------
-  // SAMPLE DATA. Set to false before this site is public.
+  // SAMPLE DATA. Off, because this site is public.
   // ---------------------------------------------------------------------
   //
   // While true, the app shows the fictional notices in
@@ -31,12 +31,16 @@ export const APP = {
   // because a fake Janazah notice that reads as real is the single most
   // harmful thing this app could show.
   //
-  // Turning this off is the whole removal process: one word here. Nothing is
-  // written to the database, so there is nothing to clean up afterwards.
-  // (scripts/sample-data-live.mjs is the other option, which writes real
+  // Flip this back to true for a live demo (a conference, a partner
+  // walkthrough) and back to false afterwards. Nothing is written to the
+  // database either way, so there is nothing to clean up. A platform admin
+  // can also override this at runtime from the admin portal's Sample data
+  // tab, which is the better choice once the site is live: it needs no
+  // redeploy and asks for confirmation before turning samples on.
+  // (scripts/sample-data-live.mjs is a third option, which writes real
   // documents to a real project and needs credentials. This flag needs
   // neither, and works before the security rules are deployed.)
-  sampleData: true,
+  sampleData: false,
   // Web Push certificate key pair, from
   // Firebase console > Project settings > Cloud Messaging > Web configuration.
   // Like the config above this is a public identifier, not a secret: it lets a

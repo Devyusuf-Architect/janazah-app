@@ -31,11 +31,13 @@ describe('turning the flag off removes everything', () => {
       'withSamples must pass live data straight through while the flag is off');
   });
 
-  test('the flag is a single boolean, documented as the removal step', () => {
+  test('the flag is a single boolean, off by default now the site is live', () => {
     assert.match(config, /sampleData:\s*(true|false),/,
       'one flag, so removal cannot be partially done');
-    assert.match(config, /Set to false before this site is public/i,
-      'the config must say plainly what has to happen before launch');
+    assert.match(config, /sampleData:\s*false,/,
+      'the production default must be off now that the site is public');
+    assert.match(config, /Off, because this site is public/i,
+      'the config must say plainly why the default is off');
   });
 
   test('the displayed samples are never written to the database', () => {
