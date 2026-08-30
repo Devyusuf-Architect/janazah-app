@@ -191,7 +191,7 @@ export function janazahRow(notice, distanceLabel = null) {
       el('div', { class: 'jrow__top' }, [
         el('span', { class: 'jrow__org', text: notice.orgName || 'Janazah notice' }),
         el('span', { class: 'chip chip--verified' },
-          [icon('check', { size: 12 }), el('span', { text: 'Verified' })]),
+          [icon('check', { size: 12 }), el('span', { text: 'Verified Masjid' })]),
         distanceLabel ? el('span', { class: 'chip', text: distanceLabel }) : null,
         cancelled ? el('span', { class: 'chip chip--danger', text: 'Cancelled' }) : null,
       ]),
@@ -237,7 +237,7 @@ function masjidRow(org, state) {
       el('span', { class: 'mrow__name', text: org.name }),
       el('p', { class: 'mrow__meta' }, [
         el('span', { class: 'chip chip--verified' },
-          [icon('check', { size: 12 }), el('span', { text: 'Verified' })]),
+          [icon('check', { size: 12 }), el('span', { text: 'Verified Masjid' })]),
         el('span', { text: [org.city, org.province].filter(Boolean).join(', ') }),
       ]),
       el('p', { class: `mrow__next${next ? '' : ' mrow__next--none'}`, text: next

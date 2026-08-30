@@ -27,7 +27,7 @@ const STATUS_COPY = {
           'this can be verified. Their question is below. Answering it is ' +
           'the only thing holding this up.',
   },
-  verified: { tone: 'ok', text: 'Verified. This organization can publish Janazah notices.' },
+  verified: { tone: 'ok', text: 'Verified Organization. This organization can publish Janazah notices.' },
   rejected: { tone: 'error', text: 'Verification was declined.' },
   suspended: {
     tone: 'error',

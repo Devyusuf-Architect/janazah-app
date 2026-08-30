@@ -91,7 +91,7 @@ export async function renderOrgPage(mount, orgId) {
           el('h1', { text: org.name }),
           el('p', { class: 'muted', text: [org.address, org.city, org.province].filter(Boolean).join(', ') }),
         ]),
-        el('span', { class: 'badge badge--ok', text: 'Verified' }),
+        el('span', { class: 'badge badge--ok', text: 'Verified Organization' }),
       ]),
       el('p', { class: 'hint' },
         'Verified by a platform administrator, which is what allows it to ' +
