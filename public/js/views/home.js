@@ -123,6 +123,9 @@ function noticeHaystack(notice) {
   return normalize([
     notice.orgName, notice.prayerLocation?.name, notice.prayerLocation?.address,
     notice.burialLocation?.name, notice.burialLocation?.address,
+    // Same gate the display uses (notice-view.js): a name search can only
+    // ever surface a name the family already agreed to show publicly.
+    notice.showDeceasedName ? notice.deceasedName : null,
   ].filter(Boolean).join(' '));
 }
 
