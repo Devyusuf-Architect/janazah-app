@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { connectEmulators } from '../src/lib/firebase';
 import { AuthProvider } from '../src/lib/auth';
+import { FollowsProvider } from '../src/features/following/useFollows';
 import { initSampleMode } from '../src/lib/sample';
 import { ThemeProvider, useTheme } from '../src/theme';
 
@@ -50,6 +51,8 @@ function Chrome() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="n/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="search" />
+        <Stack.Screen name="masjids" />
+        <Stack.Screen name="o/[id]" />
         <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="signin" options={{ presentation: 'modal' }} />
       </Stack>
@@ -74,7 +77,11 @@ export default function RootLayout() {
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <Chrome />
+              {/* Inside AuthProvider: the follow list merges with the
+                  account's copy on sign-in, so it has to see auth state. */}
+              <FollowsProvider>
+                <Chrome />
+              </FollowsProvider>
             </AuthProvider>
           </QueryClientProvider>
         </ThemeProvider>

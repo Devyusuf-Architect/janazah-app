@@ -67,6 +67,21 @@ path. All green. `npm test`.
 Not yet done: deployed to a real project and used by an actual masjid. See
 section 8.
 
+## 3b. The mobile application
+
+A separate Android application lives in `mobile/`: Expo and React Native
+Firebase, on this same project, these same accounts and these same rules. It
+is not a wrapper around the website and shares no UI with it; what it does
+share is the pure logic in `public/js`, re-exported through `mobile/src/shared`
+so `geo.js`, `model.js` and the Janazah guide cannot drift between the two.
+
+Architecture, decisions and the phased plan: `docs/mobile-architecture.md`.
+How to build it: `mobile/README.md`.
+
+The web application is unaffected by it. The only shared-backend changes it
+has required so far are the `/users/{uid}` collection described below and one
+composite index.
+
 ## 4. Stack and layout
 
 Plain HTML, CSS and ES modules with **no build step and no framework**. Firebase
@@ -141,6 +156,13 @@ model, and `tests/rules.test.js` is what proves they hold.
     correctionNote, redactedAt
   /private/details              STAFF ONLY. Family contacts, internal notes.
 
+/users/{uid}                    The reader's own record, and nothing else's.
+    followedOrgIds[], prefs {radiusKm, alertScope, followAlerts}, updatedAt
+    Readable and writable by that account only: not by other users, not by
+    organizations, not by platform administrators. Explicit key allowlist,
+    so a coordinate or a name cannot be written here. Anonymous sessions
+    cannot create one. See section 6, "Follows moved into an account".
+
 /admins/{uid}                   Platform administrators. No client may write.
 /auditLog/{id}                  No client write at all, of any kind, by anyone.
                                  Written only by Cloud Functions triggers.
@@ -203,8 +225,39 @@ audited party, is not a trail.
 should publish after verification. The answer is eventually yes.
 
 **Community members need no account.** Reading the feed and following a masjid
-require no sign-in and no user record. Follows live in `localStorage`. Anonymous
-auth exists only so a report is attributable enough to rate limit.
+require no sign-in. Anonymous auth exists only so a report is attributable
+enough to rate limit. This is still true and is still the most important
+property of the public path.
+
+**Follows moved into an account, once there were two clients.** Follows lived
+only in `localStorage`, and the handoff used to say the cost was no
+cross-device sync and that this was the right trade for a first release. It
+was. It does not survive a second client: `localStorage` does not travel
+between a phone and a browser, so "follow a masjid on mobile and see it on the
+web" cannot be built without somewhere shared to put it.
+
+`/users/{uid}` is that place and is deliberately the smallest thing that
+works. Only the account itself may read or write it, including against
+platform administrators, because which masjids somebody follows is a list of
+the communities they belong to and no operational need justifies reading one.
+It carries an explicit key allowlist for the same reason the notice document
+does, so a coordinate, a name or a record of a funeral attended is rejected at
+write time rather than merely unused at read time. Anonymous sessions cannot
+create one, so there is no document per app launch.
+
+Signed out, nothing changed at all: `public/js/follows.js` is still
+synchronous, still `localStorage`, still has no Firebase import, and
+`tests/account-sync.test.js` fails if it grows one. The account copy is a
+mirror kept in step behind the local list, never something a render waits on,
+so a slow network cannot stand between somebody and following a masjid.
+
+**Which preferences travel, and which do not.** Followed masjids, alert scope,
+followed-masjid alerts and the nearby radius are choices about the service and
+sync with the account. The notification and location permissions, the push
+token and its topic subscriptions, the last known position, the theme and text
+size, and the map-or-list preference are properties of one device and stay on
+it. Syncing a permission would mean one device silently changing what another
+one does.
 
 **Rate limits gate notifications, never notices.** A genuine Janazah must always
 be publishable; a false positive that silenced one would be far worse than a
@@ -278,7 +331,8 @@ Real work, not oversights. Any of these is a reasonable next task.
     the write is no longer the client's job.
 12. iPhone push requires the page be added to the Home Screen. The app detects
     and explains this, but expect a meaningful share never to complete it. That
-    is the strongest argument for a native wrapper.
+    is the strongest argument for a native app, which is now being built: see
+    `docs/mobile-architecture.md` and `mobile/`.
 
 ## 9. How to work on this
 
@@ -289,7 +343,12 @@ Real work, not oversights. Any of these is a reasonable next task.
   `tests/public-surface.test.js`, which will fail until you do. That is on
   purpose: it forces the decision to be explicit.
 - Do not add a collection for user positions. If a change seems to need one,
-  that is a signal the design has drifted.
+  that is a signal the design has drifted. This now holds in two places:
+  `tests/rules.test.js` denies one, and `mobile/test/location.test.ts` fails
+  if any module on the mobile nearby path gains the ability to write at all.
+- Do not widen `/users/{uid}`. Its key allowlist is the whole protection, and
+  `tests/account-sync.test.js` and `mobile/test/follows.test.ts` check the
+  client and the rules still agree in both directions.
 - Keep sample data fictional.
 - No build step, no framework, no runtime dependency beyond the Firebase SDK.
   This is meant to be maintainable by one person some years from now.

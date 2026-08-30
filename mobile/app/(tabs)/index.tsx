@@ -25,7 +25,8 @@ import { SectionHeader } from '../../src/features/home/SectionHeader';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { SampleBanner } from '../../src/features/home/SampleBanner';
 import { useLocation } from '../../src/features/nearby/useLocation';
-import { useUpcomingNotices } from '../../src/lib/queries';
+import { useFollows } from '../../src/features/following/useFollows';
+import { useUpcomingNotices, useNoticesFromOrgs } from '../../src/lib/queries';
 import { nearbyNotices, annotate } from '../../src/lib/nearby';
 import type { Notice } from '../../src/lib/notice';
 import { space, useColors } from '../../src/theme';
@@ -33,12 +34,15 @@ import { space, useColors } from '../../src/theme';
 /** How many rows each section shows before deferring to its own tab. */
 const UPCOMING_LIMIT = 4;
 const NEAR_LIMIT = 3;
+const FOLLOWED_LIMIT = 4;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
 
   const location = useLocation();
+  const follows = useFollows();
+  const followed = useNoticesFromOrgs(follows.ids);
   const {
     data, isPending, isError, refetch, isRefetching,
   } = useUpcomingNotices();
@@ -165,13 +169,37 @@ export default function HomeScreen() {
 
         <SectionHeader
           title="Masjids you follow"
-          action={{ label: 'Open', onPress: () => router.push('/following') }}
+          action={{
+            label: follows.ids.length ? 'Open' : 'Find one',
+            onPress: () => router.push(follows.ids.length ? '/following' : '/masjids'),
+          }}
         />
-        <View style={{ paddingHorizontal: space.lg }}>
-          <Text variant="callout" tone="muted">
-            Follow a masjid to see its notices here.
-          </Text>
-        </View>
+
+        {follows.ids.length === 0 ? (
+          <View style={{ paddingHorizontal: space.lg }}>
+            <Text variant="callout" tone="muted">
+              Follow a masjid to see its notices here, and to be told when it
+              publishes one.
+            </Text>
+          </View>
+        ) : (followed.data?.notices ?? []).length === 0 ? (
+          <View style={{ paddingHorizontal: space.lg }}>
+            <Text variant="callout" tone="muted">
+              Nothing upcoming from the masjids you follow.
+            </Text>
+          </View>
+        ) : (
+          (followed.data?.notices ?? []).slice(0, FOLLOWED_LIMIT).map((notice, index) => (
+            <View key={`followed-${notice.id}`}>
+              {index > 0 ? <Divider inset={space.lg} /> : null}
+              <NoticeRow
+                notice={notice}
+                distanceKm={distances.get(notice.id) ?? null}
+                onPress={open}
+              />
+            </View>
+          ))
+        )}
       </ScreenScroll>
     </Screen>
   );

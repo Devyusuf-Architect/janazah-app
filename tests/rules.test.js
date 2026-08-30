@@ -824,6 +824,177 @@ describe('the public feed needs no account', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+
+describe('the reader’s own record', () => {
+  // /users/{uid} is the first per-person document in this project. It exists
+  // because following a masjid has to travel between a phone and a browser,
+  // and localStorage does not. These tests are what keep it from becoming
+  // anything more than that.
+
+  const MEMBER = 'member-uid';
+  const OTHER = 'other-uid';
+
+  /** An authenticated context that is not an anonymous session. */
+  const signedIn = (uid) => env.authenticatedContext(uid, {
+    firebase: { sign_in_provider: 'password' },
+  }).firestore();
+
+  /** The anonymous session every client opens at launch. */
+  const anonymous = (uid) => env.authenticatedContext(uid, {
+    firebase: { sign_in_provider: 'anonymous' },
+  }).firestore();
+
+  async function seedUser(uid, data = {}) {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', uid), {
+        followedOrgIds: [VERIFIED_ORG], ...data,
+      });
+    });
+  }
+
+  test('an account can read and write its own record', async () => {
+    await assertSucceeds(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [VERIFIED_ORG], updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(getDoc(doc(signedIn(MEMBER), 'users', MEMBER)));
+  });
+
+  test('nobody else can read it, including a platform administrator', async () => {
+    // Which masjids somebody follows is a list of the communities they
+    // belong to. No operational need justifies an administrator reading one,
+    // so there is no rule that lets them.
+    await seedUser(MEMBER);
+    await assertFails(getDoc(doc(signedIn(OTHER), 'users', MEMBER)));
+    await assertFails(getDoc(doc(as(ADMIN), 'users', MEMBER)));
+    await assertFails(getDoc(doc(as(OWNER), 'users', MEMBER)));
+    await assertFails(getDoc(doc(anon(), 'users', MEMBER)));
+  });
+
+  test('nobody can write someone else’s record', async () => {
+    await seedUser(MEMBER);
+    for (const db of [signedIn(OTHER), as(ADMIN), as(OWNER), anon()]) {
+      await assertFails(setDoc(doc(db, 'users', MEMBER), {
+        followedOrgIds: [], updatedAt: serverTimestamp(),
+      }));
+    }
+  });
+
+  test('nobody enumerates the users of this platform', async () => {
+    await seedUser(MEMBER);
+    for (const db of [signedIn(MEMBER), as(ADMIN), anon()]) {
+      await assertFails(getDocs(collection(db, 'users')));
+    }
+  });
+
+  test('an anonymous session cannot create a record', async () => {
+    // Every launch of the mobile app opens one. They are handles for rate
+    // limiting, not people, and a document per launch would fill this
+    // collection with garbage nobody can ever reach again.
+    await assertFails(setDoc(doc(anonymous(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [VERIFIED_ORG], updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('a position cannot be stored here, under any key', async () => {
+    // The point of the allowlist. There is no permitted key that could hold
+    // a coordinate, and this is where an attempt to add one fails.
+    const attempts = [
+      { followedOrgIds: [], lat: 43.6532, lng: -79.3832 },
+      { followedOrgIds: [], location: { lat: 43.6532, lng: -79.3832 } },
+      { followedOrgIds: [], lastSeen: { lat: 43.6532, lng: -79.3832 } },
+      { followedOrgIds: [], cell: 'dpz83' },
+      { followedOrgIds: [], prefs: { radiusKm: 10, lat: 43.6532 } },
+    ];
+    for (const attempt of attempts) {
+      await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), attempt));
+    }
+  });
+
+  test('no record of who attended what can be kept here', async () => {
+    for (const attempt of [
+      { followedOrgIds: [], attended: ['notice-1'] },
+      { followedOrgIds: [], viewed: ['notice-1'] },
+      { followedOrgIds: [], history: ['notice-1'] },
+    ]) {
+      await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), attempt));
+    }
+  });
+
+  test('nothing identifying belongs here either', async () => {
+    // The account already has a name and an email in Firebase Auth. Copying
+    // them into a Firestore document only creates a second place to leak
+    // them from.
+    for (const attempt of [
+      { followedOrgIds: [], email: 'someone@example.com' },
+      { followedOrgIds: [], displayName: 'Somebody' },
+      { followedOrgIds: [], phone: '+15555550100' },
+    ]) {
+      await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), attempt));
+    }
+  });
+
+  test('the follow list is a list, and a bounded one', async () => {
+    await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: 'org-verified',
+    }));
+    const tooMany = Array.from({ length: 201 }, (_, i) => `org-${i}`);
+    await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: tooMany,
+    }));
+    await assertSucceeds(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: tooMany.slice(0, 200),
+    }));
+  });
+
+  test('preferences are shape-checked, not accepted as an open map', async () => {
+    await assertSucceeds(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [],
+      prefs: { radiusKm: 20, alertScope: 'follows', followAlerts: false },
+    }));
+    await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [], prefs: { radiusKm: 'far' },
+    }));
+    await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [], prefs: { alertScope: 'everything' },
+    }));
+    await assertFails(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [], prefs: { radiusKm: 10, somethingElse: true },
+    }));
+  });
+
+  test('an account can delete its own record, and only its own', async () => {
+    // Deleting an account has to be able to take this with it.
+    await seedUser(MEMBER);
+    await assertFails(deleteDoc(doc(signedIn(OTHER), 'users', MEMBER)));
+    await assertFails(deleteDoc(doc(as(ADMIN), 'users', MEMBER)));
+    await assertSucceeds(deleteDoc(doc(signedIn(MEMBER), 'users', MEMBER)));
+  });
+
+  test('following still grants nothing over the organization followed', async () => {
+    // The separation the whole model rests on. A follow list is a preference;
+    // it is not a relationship the rules recognise anywhere else.
+    await assertSucceeds(setDoc(doc(signedIn(MEMBER), 'users', MEMBER), {
+      followedOrgIds: [VERIFIED_ORG], updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(signedIn(MEMBER), 'organizations', VERIFIED_ORG), {
+      name: 'Renamed By A Follower',
+    }));
+    await assertFails(addDoc(collection(signedIn(MEMBER), 'notices'), noticeDoc({
+      createdBy: MEMBER,
+    })));
+  });
+
+  test('reading the feed still needs no account at all', async () => {
+    // The regression that would matter most: nothing about adding this
+    // document may make the public path require one.
+    await assertSucceeds(getDocs(query(collection(anon(), 'notices'),
+      where('isPublic', '==', true))));
+    await assertSucceeds(getDocs(query(collection(anon(), 'organizations'),
+      where('verificationStatus', '==', 'verified'))));
+  });
+});
+
 describe('everything else is closed', () => {
   test('the notification rate counter cannot be reset by a client', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {

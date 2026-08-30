@@ -20,11 +20,13 @@ import { Button } from '../../src/components/Button';
 import { Row } from '../../src/components/Row';
 import { useAuth } from '../../src/lib/auth';
 import { signOutGoogle } from '../../src/lib/google';
+import { useFollows } from '../../src/features/following/useFollows';
 import { space } from '../../src/theme';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, ready, isAnonymous, role, signOut } = useAuth();
+  const follows = useFollows();
   const signedIn = ready && !!user && !isAnonymous;
 
   return (
@@ -40,6 +42,12 @@ export default function ProfileScreen() {
                   {user?.displayName?.trim() || 'Signed in'}
                 </Text>
                 <Text variant="callout" tone="muted">{user?.email ?? ''}</Text>
+                <Text variant="caption" tone="subtle">
+                  The masjids you follow and your alert preferences are saved to
+                  this account, so they are the same here and at taziyah.com.
+                  Your appearance choice, and this phone’s notification and
+                  location permissions, stay on this device.
+                </Text>
                 {role.isAdmin ? (
                   <Text variant="caption" tone="subtle">
                     You are a platform administrator. Verification and reports are
@@ -56,8 +64,8 @@ export default function ProfileScreen() {
                 <Text variant="bodyStrong">You are not signed in</Text>
                 <Text variant="callout" tone="muted">
                   Reading notices, following a masjid and turning on alerts all work
-                  without an account. Signing in carries those choices to your other
-                  devices and to taziyah.com.
+                  without an account. Signing in carries the masjids you follow and
+                  your alert preferences to your other devices and to taziyah.com.
                 </Text>
                 <Button
                   label="Sign in"
@@ -73,7 +81,11 @@ export default function ProfileScreen() {
             <Divider inset={space.lg} />
             <Row title="Nearby radius" note="Phase 3" />
             <Divider inset={space.lg} />
-            <Row title="Masjids you follow" note="Phase 4" />
+            <Row
+              title="Masjids you follow"
+              note={follows.ids.length ? String(follows.ids.length) : 'None yet'}
+              onPress={() => router.push(follows.ids.length ? '/following' : '/masjids')}
+            />
             <Divider inset={space.lg} />
             <Row title="Appearance" note="Phase 6" />
           </Surface>

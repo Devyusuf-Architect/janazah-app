@@ -466,6 +466,90 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- the reader's own record ----------
+    //
+    // The first per-person document in this project, and it was a deliberate
+    // decision rather than a drift. Until the mobile app existed, following a
+    // masjid lived in localStorage (public/js/follows.js) and there was no
+    // user record to protect, which was the right trade for a web-only first
+    // release. It cannot survive contact with a second client: localStorage
+    // does not travel between a phone and a browser, so following a masjid on
+    // one and seeing it on the other requires somewhere shared to put it.
+    //
+    // What guards it:
+    //
+    //   Only the account itself. Not other users, not organizations, not
+    //   platform administrators. Which masjids somebody follows is a list of
+    //   the communities they belong to, and no operational need justifies an
+    //   administrator reading one.
+    //
+    //   An explicit key allowlist, for the same reason the notice document
+    //   has one: a coordinate, a name, an email address or a record of a
+    //   funeral attended is rejected at write time rather than merely
+    //   unused at read time. In particular there is no permitted key that
+    //   could hold a position, and prefs is shape-checked so one cannot be
+    //   smuggled in there either.
+    //
+    //   Real accounts only. An anonymous session is created on every launch
+    //   of the mobile app and on the first report from the web; those are
+    //   handles for rate limiting, not people, and letting each one create a
+    //   document would fill this collection with garbage that nobody can ever
+    //   reach again.
+    //
+    // Anonymous and signed-out reading is untouched. Nothing on the public
+    // path requires this document to exist, and following still works with no
+    // account at all, on the device, exactly as before.
+
+    function isNotAnonymous() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function userKeys() {
+      return ['followedOrgIds', 'prefs', 'updatedAt'];
+    }
+
+    function prefsKeys() {
+      return ['radiusKm', 'alertScope', 'followAlerts'];
+    }
+
+    function validPrefs() {
+      return !('prefs' in request.resource.data)
+        || (request.resource.data.prefs.keys().hasOnly(prefsKeys())
+            && request.resource.data.prefs.get('radiusKm', 0) is number
+            && request.resource.data.prefs.get('radiusKm', 0) >= 0
+            && request.resource.data.prefs.get('radiusKm', 0) <= 500
+            && request.resource.data.prefs.get('alertScope', 'nearby')
+                 in ['nearby', 'follows']
+            && request.resource.data.prefs.get('followAlerts', true) is bool);
+    }
+
+    function validUserShape() {
+      return request.resource.data.keys().hasOnly(userKeys())
+        && request.resource.data.followedOrgIds is list
+        // A cap, not a judgement about how many masjids anyone may care
+        // about. It stops this document being used as arbitrary storage,
+        // and 200 is far beyond any real follow list.
+        && request.resource.data.followedOrgIds.size() <= 200
+        && validPrefs();
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && uid() == userId;
+      // Nobody enumerates the users of this platform. Not an administrator
+      // either: there is no screen that needs it and no way to build one by
+      // accident.
+      allow list: if false;
+
+      allow create, update: if isNotAnonymous()
+        && uid() == userId
+        && validUserShape();
+
+      // Deleting an account has to be able to take this with it. Only the
+      // account itself, which is the same rule as writing it.
+      allow delete: if isSignedIn() && uid() == userId;
+    }
+
     // ---------- notification bookkeeping ----------
     // Written only by the notification function through the Admin SDK, which
     // bypasses rules. Closed to every client: it is internal delivery state,

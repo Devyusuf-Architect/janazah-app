@@ -1,11 +1,48 @@
-// Followed organizations, stored on the device.
+// Followed organizations.
 //
-// Deliberately not a user account. Reading the feed and following a masjid
-// need no sign-in, which removes the largest source of friction on the most
-// important path and means there is no user record to protect. The cost is no
-// cross-device sync, which is the right trade for a first release.
+// Signed out, this is exactly what it always was: a list on the device, in
+// localStorage, needing no account. That path is untouched, and it stays the
+// most important one, because reading the feed and following a masjid must
+// never require signing in.
+//
+// Signed in, the same list is mirrored to /users/{uid} so it travels between
+// this browser and the Ta'ziyah app on a phone. The mirror is one-way in each
+// direction and unions on sign-in: what is here and what is there both
+// survive, because somebody who followed three masjids on their phone and two
+// here means to follow five.
+//
+// The API below is deliberately still synchronous. Nine call sites across
+// seven views read it during a render, and making them async to add sync
+// would have been a much larger change than the feature is worth.
+// localStorage stays the thing they read; the account is a mirror kept in
+// step behind them. A slow or failed network therefore cannot stop somebody
+// following a masjid, which is the correct priority.
 
 const KEY = 'janazah.followedOrgs';
+
+/** Notified after any change, so the account mirror can be updated. */
+const listeners = new Set();
+
+/**
+ * @param {(ids: string[]) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function onChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function announce(list) {
+  for (const fn of listeners) {
+    try {
+      fn(list);
+    } catch (err) {
+      // A broken listener must not stop the follow itself, which has
+      // already been written to localStorage by the time we get here.
+      console.error('follows listener', err);
+    }
+  }
+}
 
 function read() {
   try {
@@ -19,13 +56,29 @@ function read() {
   }
 }
 
-function write(list) {
+function write(list, { announceChange = true } = {}) {
+  const unique = [...new Set(list)];
+  let stored = true;
   try {
-    localStorage.setItem(KEY, JSON.stringify([...new Set(list)]));
-    return true;
+    localStorage.setItem(KEY, JSON.stringify(unique));
   } catch {
-    return false;
+    // Private browsing, or storage disabled. Following is a convenience; the
+    // feed must still work without it.
+    stored = false;
   }
+  if (announceChange) announce(unique);
+  return stored;
+}
+
+/**
+ * Replace the whole list without announcing it.
+ *
+ * Used by the account mirror when it has just read the authoritative list
+ * from the server. Announcing here would send it straight back again.
+ */
+export function replaceFromAccount(ids) {
+  return write(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [],
+    { announceChange: false });
 }
 
 export const followedOrgIds = () => read();

@@ -26,6 +26,7 @@ import { signOutUser } from './auth.js';
 import * as prefs from '../prefs.js';
 import * as loc from '../location.js';
 import * as follows from '../follows.js';
+import { deleteAccountRecord } from '../account-sync.js';
 import * as push from '../push.js';
 import * as store from '../store.js';
 
@@ -856,6 +857,11 @@ async function confirmDelete() {
   remove.addEventListener('click', async () => {
     remove.disabled = true;
     try {
+      // The account's own /users document goes first, while there is still a
+      // signed-in session allowed to delete it. Afterwards nobody can: the
+      // rules open that document to its own account and to nobody else, so a
+      // record left behind here would be unreachable forever.
+      await deleteAccountRecord();
       await deleteUser(auth.currentUser);
       closeModal();
       toast('Your account has been deleted.');

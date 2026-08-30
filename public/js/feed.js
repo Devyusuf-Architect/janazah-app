@@ -30,6 +30,7 @@ import { renderPrivacy } from './views/privacy.js';
 import { renderTerms } from './views/terms.js';
 import { renderAuth, completeRedirectSignIn } from './views/auth.js';
 import { renderDashboard, teardownDashboard } from './views/dashboard.js';
+import { startAccountSync } from './account-sync.js';
 
 const mount = () => $('#view');
 const nav = () => $('#nav');
@@ -303,3 +304,9 @@ onAuthStateChanged(auth, (nextUser) => {
     })
     .catch((err) => console.error('isPlatformAdmin', err));
 });
+
+// Follows and alert preferences, mirrored to /users/{uid} while somebody is
+// signed in, so the same choices reach them in the Ta'ziyah app on a phone.
+// Started once, here, and a no-op while signed out: the module watches auth
+// itself and writes nothing without a real account. See account-sync.js.
+startAccountSync();

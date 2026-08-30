@@ -23,6 +23,7 @@ import { Text } from '../../components/Text';
 import { Button } from '../../components/Button';
 import { Surface, Divider } from '../../components/Surface';
 import { VerifiedBadge } from '../../components/Badge';
+import { FollowButton } from '../following/FollowButton';
 import { useColors, space, radius } from '../../theme';
 import { formatNoticeTime, timeSentence } from '../../lib/time';
 import {
@@ -167,6 +168,12 @@ export function NoticeDetail({
               This organization is not currently shown as verified.
             </Text>
           )}
+          {/* Following from here, because this is where somebody decides a
+              masjid matters to them: they came for one funeral and want to
+              hear about the next. */}
+          <View style={{ flexDirection: 'row', paddingTop: space.xs }}>
+            <FollowButton orgId={notice.orgId} />
+          </View>
         </Surface>
       </View>
 
