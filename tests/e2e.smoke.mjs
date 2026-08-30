@@ -435,21 +435,15 @@ const run = async () => {
     assert.match(bodyFont, /Inter|system-ui|-apple-system|sans-serif/,
       `body font stack must fall back gracefully; got ${bodyFont}`);
 
+    // The feed card is intentionally trimmed to the essentials (masjid, time,
+    // venue): burial location and directions are one tap away on the full
+    // notice, checked below once the visitor opens it.
     const feedText = await visitor.locator('#view').innerText();
     assert.ok(feedText.includes('Test Name'), 'approved name missing from the feed');
     assert.ok(feedText.includes('Main Prayer Hall'), 'prayer location missing from the feed');
-    assert.ok(feedText.includes('Example Cemetery'), 'burial location missing from the feed');
     assert.ok(!feedText.includes('555-0100'), 'phone number leaked into the feed');
     assert.ok(!feedText.includes('no visitors'), 'internal notes leaked into the feed');
     log('feed shows the notice to a visitor with no account');
-
-    // Directions links must point somewhere usable for both locations.
-    const directions = await visitor.locator('.public-notice a.link-inline').all();
-    assert.equal(directions.length, 2, 'expected directions for prayer and burial');
-    for (const link of directions) {
-      assert.match(await link.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir/);
-    }
-    log('directions links present for prayer and burial');
 
     // Following is device-local: no write leaves the browser.
     await visitor.getByRole('button', { name: /^Follow Test Masjid$/ }).click();
@@ -469,7 +463,20 @@ const run = async () => {
     assert.match(visitor.url(), /\/n\/[A-Za-z0-9_-]+$/, 'expected a /n/{id} share URL');
     const singleText = await visitor.locator('#view').innerText();
     assert.ok(!singleText.includes('555-0100'), 'phone number leaked into the shared notice page');
+    assert.ok(singleText.includes('Example Cemetery'), 'burial location missing from the full notice');
     log('shared notice page loads at its own URL');
+
+    // Directions menus, one per location, each offering a usable Google Maps link.
+    const directionsWraps = await visitor.locator('.public-notice .directions-menu').all();
+    assert.equal(directionsWraps.length, 2, 'expected a directions menu for prayer and burial');
+    for (const wrap of directionsWraps) {
+      await wrap.locator('.directions-menu__trigger').click();
+      const googleLink = wrap.locator('.directions-menu__item', { hasText: 'Google Maps' });
+      await googleLink.waitFor({ timeout: 5000 });
+      assert.match(await googleLink.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir/);
+      await wrap.locator('.directions-menu__trigger').click();
+    }
+    log('directions menus present for prayer and burial, each with a working Google Maps link');
 
     // Reporting, over an anonymous session.
     await visitor.getByRole('button', { name: 'Report a problem' }).click();
@@ -904,7 +911,7 @@ const run = async () => {
     await guest.locator('.jrow').first().waitFor({ timeout: 15000 });
     const firstRow = await guest.locator('.jrow').first().innerText();
     assert.match(firstRow, /Verified/, 'each Janazah must show it came from a verified masjid');
-    await guest.locator('.jrow').first().getByRole('link', { name: 'Directions' })
+    await guest.locator('.jrow').first().getByRole('button', { name: 'Directions' })
       .waitFor({ timeout: 5000 });
     const headBox = await guest.locator('.home-head').boundingBox();
     assert.ok(headBox.height < 320,
