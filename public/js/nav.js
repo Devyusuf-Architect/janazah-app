@@ -15,13 +15,37 @@
 import { el, icon, toast, friendlyError } from './ui.js';
 import { signOutUser } from './views/auth.js';
 
+// `core: true` marks a section that also has its own button in the mobile
+// bottom bar. Those are hidden from the slide-out drawer on a phone — showing
+// "Janazahs" in two places on the same small screen is not a second way in,
+// it is clutter. Everything without `core` is a "less-used" item and stays
+// in the drawer only.
 const LINKS = [
+  { href: '/', label: 'Home', icon: 'grid', core: true },
+  { href: '/janazahs', label: 'Janazahs', icon: 'clock', core: true },
+  { href: '/near-me', label: 'Near Me', icon: 'pin', core: true },
+  { href: '/following', label: 'Following', icon: 'bookmark', core: true },
+  { href: '/masjids', label: 'Masjids', icon: 'building' },
+  { href: '/janazah-guide', label: 'Janazah Guide', icon: 'shield' },
+  { href: '/account?section=notifications', label: 'Notifications', icon: 'bell' },
+];
+
+// The bottom tab bar on a phone. Not a duplicate nav system: it is rendered
+// from these same routes, and "Profile" opens the very drawer the desktop
+// sidebar collapses into, rather than a third menu of its own.
+const BOTTOM_LINKS = [
   { href: '/', label: 'Home', icon: 'grid' },
   { href: '/janazahs', label: 'Janazahs', icon: 'clock' },
   { href: '/near-me', label: 'Near Me', icon: 'pin' },
-  { href: '/masjids', label: 'Masjids', icon: 'building' },
   { href: '/following', label: 'Following', icon: 'bookmark' },
-  { href: '/janazah-guide', label: 'Janazah Guide', icon: 'shield' },
+];
+
+// The sidebar's own footer, always last regardless of collapse state: the two
+// things somebody wants when they are done browsing sections, not while they
+// are in the middle of one.
+const UTILITY_LINKS = [
+  { href: '/account', label: 'Settings', icon: 'eye' },
+  { href: '/about', label: 'Help & About', icon: 'flag' },
 ];
 
 // Deeper pages are not in the nav but still belong to one of its sections, so
@@ -66,9 +90,10 @@ function setCollapsed(on) {
 }
 
 /** One sidebar row. The label is kept in the DOM when collapsed, for screen readers. */
-function navItem({ href, label, icon: iconName, path, modifier = '' }) {
+function navItem({ href, label, icon: iconName, path, modifier = '', core = false, active }) {
+  const isOn = active !== undefined ? active : isActive(href, path);
   return el('a', {
-    class: `nav-item${modifier}${isActive(href, path) ? ' nav-item--active' : ''}`,
+    class: `nav-item${modifier}${core ? ' nav-item--core' : ''}${isOn ? ' nav-item--active' : ''}`,
     href,
     title: label,
   }, [
@@ -115,12 +140,15 @@ function renderAccount(mount, { user, path }) {
         ? el('span', { class: 'account__who-mail', text: user.email })
         : null,
     ]),
-    el('a', { class: 'account__item', href: '/dashboard', role: 'menuitem' }, 'Dashboard'),
-    // One item, not "Account" and "Settings" pointing at the same page.
+    // Not a link back to the personal home screen: Home in the sidebar is
+    // already that, once someone is signed in, so this menu holds only what
+    // is about the person, not a second way to a page one click away. Not
+    // "Account" and
+    // "Settings" as two items either, since /account is one page — the
+    // sidebar's own Settings row is the second, deliberately different, way
+    // in (see UTILITY_LINKS).
     el('a', { class: 'account__item', href: '/account', role: 'menuitem' },
       'Account and settings'),
-    el('a', { class: 'account__item', href: '/register-masjid', role: 'menuitem' },
-      'Masjid or coordinator'),
     el('button', {
       class: 'account__item account__item--danger',
       type: 'button',
@@ -190,15 +218,18 @@ export function renderNav(nav, { path, user, isAdmin = false }) {
     onclick: () => setDrawer(false),
   }, [icon('x', { size: 18 }), el('span', { text: 'Close' })]));
 
+  // Signed in, "Home" is the personal dashboard — the next few Janazahs, what
+  // is nearby, and who is followed — rather than a second link to the same
+  // public feed the logo already goes to. Signed out, there is no dashboard
+  // to send anyone to, so it is that public feed.
   nav.append(el('div', { class: 'sidenav__group' },
-    LINKS.map((link) => navItem({ ...link, path }))));
+    LINKS.map((link) => {
+      if (link.href !== '/') return navItem({ ...link, path });
+      const href = user ? '/dashboard' : '/';
+      return navItem({ ...link, href, path, active: isActive(href, path) });
+    })));
 
   const personal = [];
-  if (user) {
-    personal.push(navItem({
-      href: '/dashboard', label: 'Dashboard', icon: 'users', path,
-    }));
-  }
   // A platform administrator reading the public feed had no way through to
   // the portal except by knowing the /console URL. The item is marked out
   // because it leads somewhere most people signed in here cannot go.
@@ -216,6 +247,14 @@ export function renderNav(nav, { path, user, isAdmin = false }) {
   nav.append(
     el('div', { class: 'sidenav__rule', 'aria-hidden': 'true' }),
     el('div', { class: 'sidenav__group' }, personal),
+  );
+
+  // Always last: the two things somebody wants once they are done browsing
+  // sections, kept out of the way of the sections themselves.
+  nav.append(
+    el('div', { class: 'sidenav__rule', 'aria-hidden': 'true' }),
+    el('div', { class: 'sidenav__group' },
+      UTILITY_LINKS.map((link) => navItem({ ...link, path, modifier: ' nav-item--quiet' }))),
   );
 
   // Desktop only: the sidebar shrinks to icons. Hidden from the mobile drawer
@@ -239,6 +278,39 @@ export function renderNav(nav, { path, user, isAdmin = false }) {
 
   const account = document.getElementById('account');
   if (account) renderAccount(account, { user, path });
+
+  const bottom = document.getElementById('bottom-nav');
+  if (bottom) renderBottomNav(bottom, { path, user });
+}
+
+/**
+ * The mobile tab bar: the handful of things worth one tap on a phone.
+ * Everything else — Masjids, the guide, Settings, About — is a second tap
+ * away, behind "Profile", rather than crammed in beside these.
+ */
+function renderBottomNav(bar, { path, user }) {
+  bar.replaceChildren();
+  bar.append(...BOTTOM_LINKS.map((link) => {
+    const href = link.href === '/' && user ? '/dashboard' : link.href;
+    return el('a', {
+      class: `bottom-nav__item${isActive(href, path) ? ' bottom-nav__item--active' : ''}`,
+      href,
+    }, [icon(link.icon, { size: 20 }), el('span', { text: link.label })]);
+  }));
+
+  // Opens the very drawer the desktop sidebar collapses into — one slide-out
+  // menu, not a second one built just for this button.
+  const profile = el('button', {
+    class: `bottom-nav__item${/^\/(account|register-masjid|console)/.test(path) ? ' bottom-nav__item--active' : ''}`,
+    type: 'button',
+    onclick: () => document.getElementById('nav-toggle')?.click(),
+  }, [
+    user
+      ? el('span', { class: 'bottom-nav__avatar', text: initialsFor(user) })
+      : icon('users', { size: 20 }),
+    el('span', { text: 'Profile' }),
+  ]);
+  bar.append(profile);
 }
 
 /**

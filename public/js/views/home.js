@@ -170,7 +170,7 @@ function paintResults(mount, state) {
 
 // ---------------------------------------------------------------- the lists
 
-function sectionHead(title, link = null) {
+export function sectionHead(title, link = null) {
   return el('div', { class: 'section-head' }, [
     el('h2', { class: 'section-head__title', text: title }),
     link ? el('a', { class: 'section-head__link', href: link.href, text: link.label }) : null,
@@ -225,7 +225,7 @@ function nextJanazahFor(orgId, notices) {
   return notices.find((n) => n.orgId === orgId && n.status !== 'cancelled') || null;
 }
 
-function masjidRow(org, state) {
+export function masjidRow(org, state) {
   const next = nextJanazahFor(org.id, state.notices);
   // The masjid's name gets its own line. Sitting the badge beside it means a
   // long name wraps and the badge lands underneath on some cards and not
@@ -245,7 +245,7 @@ function masjidRow(org, state) {
   ]);
 }
 
-function paintUpcoming(mount, state) {
+export function paintUpcoming(mount, state) {
   mount.replaceChildren(sectionHead('Upcoming Janazahs',
     { href: '/janazahs', label: 'View all' }));
 
@@ -315,7 +315,7 @@ async function enableLocation(button, repaint) {
   }
 }
 
-function paintNear(mount, state, repaint) {
+export function paintNear(mount, state, repaint) {
   const settings = loc.settings();
   mount.replaceChildren(sectionHead('Near you',
     settings.enabled ? { href: '/near-me', label: 'Distance settings' } : null));
@@ -376,7 +376,7 @@ function paintNear(mount, state, repaint) {
  * appears whether or not somebody is signed in. Gating it behind sign-in would
  * hide a list they already have from the person who made it.
  */
-function paintFollowed(mount, state, repaint) {
+export function paintFollowed(mount, state, repaint) {
   const ids = follows.followedOrgIds();
   mount.replaceChildren(sectionHead('Masjids you follow',
     ids.length ? { href: '/following', label: 'Manage' } : null));
@@ -420,7 +420,7 @@ const ACTIONS = [
   { href: '/register-masjid', icon: 'users', label: 'Register a masjid' },
 ];
 
-function quickActions() {
+export function quickActions() {
   return el('section', { class: 'home-section' }, [
     sectionHead('Quick actions'),
     el('ul', { class: 'qa' }, ACTIONS.map((a) => el('li', {}, [

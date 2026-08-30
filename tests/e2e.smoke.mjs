@@ -14,6 +14,11 @@ import { chromium } from 'playwright';
 import { strict as assert } from 'node:assert';
 import { buildTestApp } from './build-test-app.mjs';
 
+// Set SCREENSHOT_DIR to also save PNGs of the signed-in dashboard at a few
+// widths, for visually checking the redesign. Off by default: an ordinary
+// run of this suite has no reason to write files outside its own process.
+const SHOT_DIR = process.env.SCREENSHOT_DIR || null;
+
 const BASE = 'http://127.0.0.1:5000';
 const PROJECT = 'demo-janazah';
 const AUTH = 'http://127.0.0.1:9099';
@@ -986,9 +991,23 @@ const run = async () => {
     await phone.locator('.home-head').waitFor({ timeout: 15000 });
     assert.ok(!(await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
       .first().isVisible()), 'the sidebar must be closed on a phone until opened');
-    await phone.locator('#nav-toggle').click();
+    // The header hamburger is gone on a phone; the bottom bar's own Home,
+    // Janazahs, Near Me and Following tabs, plus a Profile tab, replace it.
+    assert.ok(!(await phone.locator('#nav-toggle').isVisible()),
+      'the header hamburger must give way to the bottom bar on a phone');
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Following']) {
+      await phone.locator('#bottom-nav').getByRole('link', { name: label, exact: true })
+        .waitFor({ state: 'visible', timeout: 5000 });
+    }
+    await phone.locator('#bottom-nav').getByRole('button', { name: 'Profile' }).click();
+    // Masjids and Janazah Guide are the "less-used" items the bottom bar has
+    // no room for; they live in the menu the Profile tab opens.
     await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
       .first().waitFor({ state: 'visible', timeout: 5000 });
+    // Already on the bottom bar, so no longer duplicated in this menu too.
+    assert.equal(
+      await phone.locator('#nav').getByRole('link', { name: 'Janazahs', exact: true }).count(), 0,
+      'a section already on the bottom bar must not also sit in the drawer');
     // To the right of the drawer, which is where somebody dismissing it taps.
     // The scrim spans the viewport, so its centre is under the drawer itself.
     await phone.locator('#nav-scrim').click({ position: { x: 360, y: 400 } });
@@ -997,7 +1016,7 @@ const run = async () => {
     // The page under it is still the useful one, at a readable width.
     const phoneRow = await phone.locator('.jrow').first().boundingBox();
     assert.ok(phoneRow.width <= 390, 'the page must not scroll sideways on a phone');
-    log('the sidebar is a drawer on a phone, and closes on the scrim');
+    log('the bottom bar is the phone\'s way around, with a slide-out menu for the rest');
     await phone.close();
 
     // ---- the Janazah prayer guide, with no account -------------------------
@@ -1054,17 +1073,61 @@ const run = async () => {
     await member.locator('#email').fill('member@example.com');
     await member.locator('#password').fill('test-password-3');
     await member.getByRole('button', { name: 'Create account' }).click();
-    await member.locator('#view').getByRole('heading', { name: /^Welcome/ }).waitFor({ timeout: 15000 });
+    await member.locator('#view').getByRole('heading', { name: /^Assalamu Alaikum/ }).waitFor({ timeout: 15000 });
     assert.match(member.url(), /\/dashboard$/, 'expected /dashboard after community sign-up');
 
     const dashboardText = await member.locator('#view').innerText();
     for (const claim of [
-      /Upcoming Janazahs/, /Janazahs near me/i, /Following/i,
-      /Notification settings/i, /Account security/i, /Open settings/i,
+      /Assalamu Alaikum/, /Upcoming Janazahs/, /Near you/i,
+      /Masjids you follow/i, /Quick actions/i,
     ]) {
       assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);
     }
-    log('community sign-up lands on a dashboard reusing the existing sections');
+    log('community sign-up lands on a dashboard reusing the public feed\'s own sections');
+
+    // ---- visual check of the redesigned dashboard, at a few widths --------
+    const memberSignIn = async (page) => {
+      await page.goto(`${BASE}/signin`);
+      await page.locator('#email').fill('member@example.com');
+      await page.locator('#password').fill('test-password-3');
+      await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+      await page.locator('.dash-head').waitFor({ timeout: 15000 });
+    };
+    if (SHOT_DIR) {
+      for (const [name, viewport] of [
+        ['mobile-375', { width: 375, height: 812 }],
+        ['mobile-414', { width: 414, height: 896 }],
+        ['tablet-768', { width: 768, height: 1024 }],
+        ['desktop-1280', { width: 1280, height: 900 }],
+        ['desktop-1600', { width: 1600, height: 1000 }],
+      ]) {
+        const shotPage = await newPage({ viewport });
+        await memberSignIn(shotPage);
+        await shotPage.locator('.jrow, .home-empty').first().waitFor({ timeout: 15000 });
+        await shotPage.screenshot({ path: `${SHOT_DIR}/dashboard-${name}-location-off.png`, fullPage: true });
+        await shotPage.close();
+      }
+
+      // The same page with location on, so "Near you" shows distances rather
+      // than the enable prompt.
+      const geoContext = await browser.newContext({
+        viewport: { width: 390, height: 844 },
+        geolocation: { latitude: 43.6532, longitude: -79.3832 },
+        permissions: ['geolocation'],
+      });
+      const geoPage = await geoContext.newPage();
+      await memberSignIn(geoPage);
+      await geoPage.evaluate(() => {
+        localStorage.setItem('janazah.location',
+          JSON.stringify({ enabled: true, radiusKm: 50, last: { lat: 43.6532, lng: -79.3832, at: Date.now() } }));
+      });
+      await geoPage.reload();
+      await geoPage.locator('.dash-head').waitFor({ timeout: 15000 });
+      await geoPage.waitForTimeout(500);
+      await geoPage.screenshot({ path: `${SHOT_DIR}/dashboard-mobile-390-location-on.png`, fullPage: true });
+      await geoContext.close();
+      log(`dashboard screenshots written to ${SHOT_DIR}`);
+    }
 
     // ---- the account menu --------------------------------------------------
     // Everything about the person is behind one control in the top right,
@@ -1077,7 +1140,9 @@ const run = async () => {
     const menu = member.locator('.account__menu');
     await menu.waitFor({ state: 'visible', timeout: 5000 });
     const menuText = await menu.innerText();
-    for (const item of ['Dashboard', 'Account and settings', 'Sign out']) {
+    // "Dashboard" is deliberately not here any more: Home in the sidebar
+    // already is the dashboard once someone is signed in.
+    for (const item of ['Account and settings', 'Sign out']) {
       assert.match(menuText, new RegExp(item), `account menu is missing: ${item}`);
     }
     assert.ok(!/Settings\n/.test(menuText),
@@ -1173,7 +1238,7 @@ const run = async () => {
     await plain.locator('#email').fill('member@example.com');
     await plain.locator('#password').fill('test-password-3');
     await plain.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await plain.locator('#view').getByRole('heading', { name: /^Welcome/ })
+    await plain.locator('#view').getByRole('heading', { name: /^Assalamu Alaikum/ })
       .waitFor({ timeout: 15000 });
     await plain.waitForTimeout(1500);
     assert.equal(

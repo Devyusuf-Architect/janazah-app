@@ -153,7 +153,11 @@ describe('navigation', () => {
 
   test('the account menu holds the personal items, once each', () => {
     const menu = nav.slice(nav.indexOf("class: 'account__menu'"), nav.indexOf('const button'));
-    assert.match(menu, /Dashboard/);
+    // Not "Dashboard": Home in the sidebar already is the dashboard once
+    // someone is signed in, so a second link to it here would be the same
+    // clutter this menu exists to avoid.
+    assert.ok(!/Dashboard/.test(menu),
+      'Dashboard belongs to the sidebar\'s Home item, not a second link here');
     assert.match(menu, /Account and settings/);
     assert.match(menu, /Sign out/);
     // Two entries for one page is the clutter this replaced.

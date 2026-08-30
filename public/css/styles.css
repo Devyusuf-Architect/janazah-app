@@ -593,6 +593,77 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   }
   .account__name { display: none; }
   .account__button { padding: .3rem; }
+
+  /* The bottom bar is the phone's way around, so the header hamburger would
+     be a second one doing the same job; its own drawer content still opens
+     (from the bar's own Profile tab) but the header button behind it hides. */
+  #nav-toggle { display: none; }
+  /* Home, Janazahs, Near Me and Following already have their own tab below;
+     repeating them in the drawer is clutter, not a second way in. */
+  .sidenav .nav-item--core { display: none; }
+  .app-main { padding-bottom: calc(3.9rem + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---------- bottom nav (phone only) ---------- */
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    justify-content: space-around;
+    align-items: stretch;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+.bottom-nav__item {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  padding: .5rem .2rem .4rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: .68rem;
+  font-weight: 500;
+  color: var(--ink-3);
+  text-decoration: none;
+  min-height: 3.9rem;
+  min-width: 0;
+}
+
+.bottom-nav__item .icon { opacity: .8; }
+.bottom-nav__item--active { color: var(--accent); }
+.bottom-nav__item--active .icon { opacity: 1; }
+
+.bottom-nav__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .62rem;
+  font-weight: 700;
+}
+.bottom-nav__item--active .bottom-nav__avatar {
+  background: var(--accent);
+  color: var(--surface);
 }
 
 /* Below the same breakpoint, the console's horizontal bar becomes an
@@ -880,22 +951,32 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   .hero__actions .btn { flex: 1 1 auto; }
 }
 
-/* ---------- dashboard ---------- */
+/* ---------- dashboard (the signed-in home screen) ----------------------
+   Small and clean on purpose: a compact greeting, not a headline, so the
+   four sections below — Upcoming Janazahs first — start close to the top of
+   the screen rather than under a banner. It reuses .home-section, .jlist,
+   .mgrid and .qa from the public home page immediately below, so a change
+   to any of those keeps both pages in step.
+   --------------------------------------------------------------------- */
 
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: 1rem;
-  align-items: start;
+.dash-head {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.4rem;
 }
-.dash-card { margin-bottom: 0; }
-.dash-card--wide { grid-column: 1 / -1; }
-.dash-card h2 { font-size: 1.02rem; margin: 0 0 .6rem; }
-.dash-card .public-notice { padding: .8rem 0; border-top: 1px solid var(--line); }
-.dash-card .public-notice:first-of-type { border-top: 0; }
-.dash-card__account .page-head { margin-bottom: 1rem; }
-.dash-card__account h1 { font-size: 1.02rem; }
-.dash-card__account .card--narrow { max-width: none; margin-inline: 0; }
+
+.dash-head__title {
+  font-family: var(--serif);
+  font-size: clamp(1.25rem, 2.6vw, 1.55rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0 0 .2rem;
+}
+
+.dash-head__sub {
+  margin: 0;
+  font-size: .88rem;
+}
 
 /* ---------- auth ---------- */
 
