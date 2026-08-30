@@ -11,7 +11,10 @@
     "test": "node --experimental-strip-types --import ./test/extensionless.mjs --test \"test/*.test.ts\"",
     "doctor": "npx expo-doctor",
     "preflight": "node scripts/preflight.mjs",
-    "icons": "node scripts/build-android-icons.mjs"
+    "icons": "node scripts/build-android-icons.mjs",
+    "release-check": "node scripts/release-check.mjs",
+    "assetlinks": "node scripts/build-assetlinks.mjs",
+    "store-graphics": "node preview/build.mjs && node scripts/store-graphics.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

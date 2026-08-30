@@ -600,3 +600,35 @@ from `janazah-guide-content.js` and not edited, added to, or paraphrased.
 profile, the signed `.aab`, the Data Safety draft, store listing copy,
 screenshots, sample data confirmed off, and an internal testing track. Upload
 stays yours.
+
+---
+
+## Where this actually got to
+
+All seven phases are built. What follows is the honest state of it, which is
+not the same as "done".
+
+**Built and tested here:** the project and its design system, authentication
+including the TOTP second factor, the notice feed, the notice screen, search,
+Nearby with on-device matching, Following with account synchronization, native
+notifications and deep links, reminders, the profile, the Janazah guide, and
+the release configuration. Around 70 tests specific to the mobile app, plus
+the web suite unchanged and green throughout.
+
+**Never run on a device.** This was built in a container with no Android SDK.
+Every screen has been type-checked, bundled by Metro, and looked at through a
+browser harness at phone width, but nothing has been installed on a phone or
+an emulator. The permission dialogs, the map, the notification channel and
+every native module are unexercised.
+
+**Never delivered a notification.** FCM has not run against the real project
+on either platform: the web app's VAPID key is still a placeholder, so this
+was already true before the mobile app existed. The payload change is tested
+as a payload; delivery is not tested at all. `mobile/docs/play-store.md`
+section 4 is the checklist for the first real attempt.
+
+**Blocked on things only a person can do.** The certificate fingerprints for
+`assetlinks.json`, the keystore and Play App Signing decision, a Maps API key
+if the map view is wanted, whether Vercel or Firebase Hosting serves
+`taziyah.com`, the named accountable person the privacy policy still lacks,
+and the Data Safety judgement in section 1b of the Play document.

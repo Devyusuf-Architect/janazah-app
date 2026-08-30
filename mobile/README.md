@@ -39,14 +39,38 @@ broken app rather than a missing key.
 
 ```bash
 npm install
-npm run preflight     # what is missing, and where to get it
-npm run icons         # regenerate the Android images from public/logo.svg
-npm run prebuild      # generate android/ (gitignored, regenerate freely)
-npm run android       # build and install the dev client
-npm start             # Metro, for a dev client already installed
-npm test              # the bridge and config tests
+npm run preflight       # what is missing, and where to get it
+npm run icons           # regenerate the Android images from public/logo.svg
+npm run prebuild        # generate android/ (gitignored, regenerate freely)
+npm run android         # build and install the dev client
+npm start               # Metro, for a dev client already installed
+npm test                # the bridge, config and logic tests
 npm run typecheck
 ```
+
+Releasing:
+
+```bash
+npm run release-check   # everything that must be true before submitting
+npm run assetlinks -- <SHA-256> <SHA-256>   # Android App Links
+npm run store-graphics  # feature graphic and draft screenshots
+npx eas build --profile production --platform android
+```
+
+`docs/eas.md` explains the three build profiles and the keystore decision.
+`docs/play-store.md` has the Data Safety draft, the listing copy and the
+release testing checklist. Nothing in this repository submits anything.
+
+Looking at the design without a device:
+
+```bash
+node preview/build.mjs && node preview/shoot.mjs
+```
+
+`preview/` renders the real components through react-native-web at phone
+width, in both schemes and at 130% text. It is not the app, it never ships,
+and the native modules are stubbed. It exists because the things most likely
+to be wrong here are the ones a type checker cannot see.
 
 The app talks to the **local Firebase emulators** in a development build,
 which is the native counterpart of the web app's behaviour on localhost. Start

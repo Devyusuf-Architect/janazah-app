@@ -78,9 +78,20 @@ so `geo.js`, `model.js` and the Janazah guide cannot drift between the two.
 Architecture, decisions and the phased plan: `docs/mobile-architecture.md`.
 How to build it: `mobile/README.md`.
 
-The web application is unaffected by it. The only shared-backend changes it
-has required so far are the `/users/{uid}` collection described below and one
-composite index.
+The web application is unaffected by it. The shared-backend changes it has
+required are the `/users/{uid}` collection described below, one composite
+index, the Android blocks added to the FCM payload in `functions/lib/notify.js`
+(the `webpush` block is unchanged and a test says so), and one hosting fix:
+`firebase.json` used to ignore `**/.*`, which excludes every dot-directory and
+would have silently dropped `public/.well-known/assetlinks.json` from every
+deploy.
+
+All seven planned phases are built. Two things are emphatically not done, and
+both are named in `docs/mobile-architecture.md` under "Where this actually got
+to": **nothing has run on a real device**, because it was built in a container
+with no Android SDK, and **no notification has ever been delivered**, because
+FCM has never run against the real project on either platform. The release
+checklist is `mobile/docs/play-store.md`.
 
 ## 4. Stack and layout
 
