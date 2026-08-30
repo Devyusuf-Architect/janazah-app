@@ -43,14 +43,16 @@ export function publicNoticeView(notice, { distanceLabel = null, compact = false
       el('span', { text: formatJanazahTime(notice) }),
     ]),
 
-    el('div', { class: 'kv' }, [
-      locationRow('Prayer', notice.prayerLocation, 'Directions to prayer'),
-      notice.burialLocation
-        ? locationRow('Burial', notice.burialLocation, 'Directions to burial')
-        : null,
-    ]),
+    compact
+      ? venueLine(notice.prayerLocation)
+      : el('div', { class: 'kv' }, [
+        locationRow('Prayer', notice.prayerLocation, 'Directions to prayer'),
+        notice.burialLocation
+          ? locationRow('Burial', notice.burialLocation, 'Directions to burial')
+          : null,
+      ]),
 
-    notice.instructions
+    !compact && notice.instructions
       ? el('p', { class: 'instructions', text: notice.instructions })
       : null,
   ]);
@@ -64,6 +66,20 @@ export function publicNoticeView(notice, { distanceLabel = null, compact = false
       `Private fields present on a public document: ${leaked.join(', ')}. Do not publish.`));
   }
   return view;
+}
+
+/**
+ * The compact-card version of the prayer location: just the venue, not the
+ * street address, and not burial details or a directions link. Those are one
+ * tap away on the full notice, which is exactly where a list reader who wants
+ * them will end up.
+ */
+function venueLine(place) {
+  if (!place?.name) return null;
+  return el('p', { class: 'public-notice__venue' }, [
+    icon('pin', { size: 15 }),
+    el('span', { text: place.name }),
+  ]);
 }
 
 /** One location, with its own directions link. */

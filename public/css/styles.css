@@ -1125,6 +1125,15 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 }
 .public-notice--cancelled .public-notice__title { text-decoration: line-through; }
 .public-notice--cancelled .public-notice__time { color: var(--ink-3); }
+.public-notice__venue {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  font-size: .92rem;
+  color: var(--ink-2);
+}
+.public-notice__venue .icon { color: var(--ink-3); }
 
 .kv { display: grid; gap: .7rem; margin: 0; }
 .kv-row { display: flex; gap: .6rem; align-items: flex-start; }
