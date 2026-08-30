@@ -37,7 +37,10 @@ let unwatch = null;
 let stopIndicator = null;
 let notices = [];
 let orgsById = new Map();
-let filter = 'all';
+// Decided lazily, once, the first time the feed paints with no filter forced
+// on it (see renderFeed below) — after that it is whatever tab the visitor
+// last chose, same as before.
+let filter = null;
 
 export function teardownFeed() {
   stopIndicator?.();
@@ -104,7 +107,15 @@ function groupByDate(list) {
 export function renderFeed(mount, { initialFilter } = {}) {
   teardownFeed();
   mount.replaceChildren();
-  if (initialFilter) filter = initialFilter;
+  if (initialFilter) {
+    filter = initialFilter;
+  } else if (filter === null) {
+    // First landing with no filter forced (i.e. plain /janazahs): someone who
+    // already follows a masjid most likely came here for those, not the full
+    // list. Nobody following anything yet sees everything, since an empty
+    // "Masjids I follow" would be a worse first screen than a full one.
+    filter = follows.followedOrgIds().length ? 'following' : 'all';
+  }
 
   mount.append(el('div', { class: 'feed-intro' }, [
     el('h1', { text: 'Current and upcoming Janazahs' }),
