@@ -139,8 +139,10 @@ export function requestPosition({ timeout = 15000 } = {}) {
       },
       (err) => {
         const map = {
-          1: ['Location permission was declined. You can turn it on again ' +
-              'from your browser settings for this site.', 'denied'],
+          1: ['Location permission was declined. On a computer, look for the ' +
+              'location icon in the address bar and allow it for this site. ' +
+              'On a phone, check Settings for your browser (Location) or tap ' +
+              'the site-info icon next to the address bar.', 'denied'],
           2: ['Your location could not be determined right now. Try again, ' +
               'or check that location services are on for this device.', 'unavailable'],
           3: ['Finding your location took too long. Try again.', 'timeout'],
