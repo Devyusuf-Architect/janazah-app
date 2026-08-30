@@ -97,8 +97,24 @@ if (!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY) {
   );
 }
 
+// ---- Android App Links ---------------------------------------------------
+if (!existsSync(resolve(root, '../public/.well-known/assetlinks.json'))) {
+  warnings.push(
+    'public/.well-known/assetlinks.json does not exist, so a link to\n'
+    + '  https://taziyah.com/n/{id} opens a browser rather than this app, and a\n'
+    + '  notification tap goes to the website. It needs the SHA-256 fingerprint\n'
+    + '  of every certificate that will sign a release, which with Play App\n'
+    + '  Signing is at least two: the upload key and Google\u2019s own.\n'
+    + '    npx eas credentials        (prints the upload key)\n'
+    + '    node scripts/build-assetlinks.mjs <SHA-256> <SHA-256>',
+  );
+}
+
 // ---- the shared modules --------------------------------------------------
-for (const file of ['geo.js', 'model.js', 'verification.js', 'janazah-guide-content.js']) {
+for (const file of [
+  'geo.js', 'model.js', 'verification.js', 'janazah-guide-content.js',
+  'sample-data.js',
+]) {
   if (!existsSync(resolve(root, '../public/js', file))) {
     problems.push(
       `../public/js/${file} is missing. src/shared re-exports it, and Metro\n`

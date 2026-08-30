@@ -24,6 +24,7 @@ import { Button } from '../../components/Button';
 import { Surface, Divider } from '../../components/Surface';
 import { VerifiedBadge } from '../../components/Badge';
 import { FollowButton } from '../following/FollowButton';
+import { ReminderButton } from '../alerts/ReminderButton';
 import { useColors, space, radius } from '../../theme';
 import { formatNoticeTime, timeSentence } from '../../lib/time';
 import {
@@ -196,6 +197,7 @@ export function NoticeDetail({
             Share.share({ message: line }).catch(() => {});
           }}
         />
+        <ReminderButton notice={notice} />
         <Button
           label="Report a problem"
           onPress={onReport}

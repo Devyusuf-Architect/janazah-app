@@ -9,6 +9,7 @@ import { strict as assert } from 'node:assert';
 
 import {
   kindOfChange, buildMessage, topicsForNotice, publicProjection, formatTime, KIND,
+  ANDROID_CHANNEL,
 } from '../lib/notify.js';
 import { cellTopicsForHash, isValidTopic, cellTopic, orgTopic } from '../lib/topics.js';
 
@@ -213,5 +214,85 @@ describe('publicProjection', () => {
     assert.equal(projected.familyContactPhone, undefined);
     assert.equal(projected.internalNotes, undefined);
     assert.equal(projected.createdBy, undefined);
+  });
+});
+
+describe('a notification has to reach a locked Android phone', () => {
+  // The whole reason the mobile app exists. Before it, buildMessage returned
+  // a webpush block and a data block and nothing else, which an Android
+  // device subscribed to the same topic receives as a data-only message and
+  // displays nothing at all for. These pin the three parts that changed that,
+  // and pin that the web app's delivery did not move.
+
+  const opts = { origin: 'https://taziyah.com' };
+
+  test('the top-level notification block is what the system displays', () => {
+    const msg = buildMessage('n1', notice(), KIND.PUBLISHED, opts);
+    assert.ok(msg.notification, 'no top-level notification: a killed app shows nothing');
+    assert.equal(typeof msg.notification.title, 'string');
+    assert.ok(msg.notification.title.length > 0);
+    assert.ok(msg.notification.body.includes('Test Masjid'));
+  });
+
+  test('it is delivered on the channel the app actually creates', () => {
+    // Naming a channel that does not exist drops the message into the default
+    // one, where the importance and the sound are whatever the system chose.
+    const msg = buildMessage('n1', notice(), KIND.PUBLISHED, opts);
+    assert.equal(msg.android.notification.channelId, ANDROID_CHANNEL);
+  });
+
+  test('a cancellation is not held back for battery', () => {
+    // Somebody is otherwise driving to a funeral that is not happening.
+    for (const kind of [KIND.PUBLISHED, KIND.UPDATED, KIND.CANCELLED]) {
+      const msg = buildMessage('n1', notice({ status: 'cancelled' }), kind, opts);
+      assert.equal(msg.android.priority, 'high');
+    }
+  });
+
+  test('one funeral is one notification, on either platform', () => {
+    // A reader who both follows the masjid and is within range is subscribed
+    // to two topics and receives two messages. The tag is what collapses
+    // them, and a correction replaces the original rather than stacking.
+    const msg = buildMessage('n1', notice(), KIND.PUBLISHED, opts);
+    assert.equal(msg.android.notification.tag, 'janazah-n1');
+    assert.equal(msg.webpush.notification.tag, 'janazah-n1');
+    assert.equal(msg.android.collapseKey, 'janazah-n1');
+  });
+
+  test('the link to open is in the data block, for a running app', () => {
+    const msg = buildMessage('n1', notice(), KIND.PUBLISHED, opts);
+    assert.equal(msg.data.link, 'https://taziyah.com/n/n1');
+    assert.equal(msg.data.noticeId, 'n1');
+  });
+
+  test('adding Android did not change what the web receives', () => {
+    // The web app has been sending this exact shape since before a phone
+    // existed. A regression here is silent: notifications simply stop
+    // arriving in browsers.
+    const msg = buildMessage('n1', notice(), KIND.PUBLISHED, opts);
+    assert.equal(msg.webpush.notification.icon, '/icon-192.png');
+    assert.equal(msg.webpush.notification.badge, '/badge.png');
+    assert.equal(msg.webpush.notification.renotify, false);
+    assert.equal(msg.webpush.fcmOptions.link, 'https://taziyah.com/n/n1');
+    assert.equal(
+      buildMessage('n1', notice(), KIND.CANCELLED, opts).webpush.notification.renotify,
+      true,
+    );
+  });
+
+  test('nothing private reaches any of the three transports', () => {
+    // The refusal already existed; this checks it still fires now that there
+    // are more places for a field to end up.
+    assert.throws(
+      () => buildMessage('n1', notice({ familyContactPhone: '555-0100' }), KIND.PUBLISHED, opts),
+      /refusing to notify/,
+    );
+
+    const msg = buildMessage('n1',
+      notice({ deceasedName: 'Fulan ibn Fulan', showDeceasedName: false }),
+      KIND.PUBLISHED, opts);
+    const everything = JSON.stringify(msg);
+    assert.ok(!everything.includes('Fulan'),
+      'a name the family withheld reached a notification');
   });
 });

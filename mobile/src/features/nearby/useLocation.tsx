@@ -1,15 +1,17 @@
-// The location state a screen needs, in one hook.
+// The location state, shared by every screen that needs it.
 //
-// Home and Nearby both want the same three things: the stored point, the
-// preferences, and a way to ask for a fresh fix. Holding that here means the
-// permission flow is written once and both screens behave identically, which
-// matters because the wrong version of "location is off" on one of them would
-// be the app quietly contradicting itself about something it makes a promise
-// about.
+// A provider rather than a per-screen hook, and that is not a refactoring
+// preference. Four screens read this and three change it: Nearby sets the
+// radius, Alerts turns area alerts on and off, and the topic subscription is
+// computed from the result. Separate copies would let the Alerts screen show
+// one radius while the device was subscribed to another, which is the kind of
+// disagreement nobody notices until a funeral is missed.
 //
 // Nothing here reaches Firestore. See the guard in test/location.test.ts.
 
-import { useCallback, useEffect, useState } from 'react';
+import React, {
+  createContext, useCallback, useContext, useEffect, useMemo, useState,
+} from 'react';
 
 import {
   readPoint, readPrefs, writePrefs, disable as disableLocation,
@@ -31,6 +33,8 @@ export type LocationState = {
   enable: () => Promise<void>;
   refresh: () => Promise<void>;
   setRadius: (km: number) => Promise<void>;
+  /** Any of the alert preferences. Kept here so the screens share one copy. */
+  update: (patch: Partial<LocationPrefs>) => Promise<void>;
   turnOff: () => Promise<void>;
 };
 
@@ -41,7 +45,22 @@ const INITIAL_PREFS: LocationPrefs = {
   followAlerts: true,
 };
 
+const LocationContext = createContext<LocationState | null>(null);
+
+export function LocationProvider({ children }: { children: React.ReactNode }) {
+  const value = useLocationState();
+  return (
+    <LocationContext.Provider value={value}>{children}</LocationContext.Provider>
+  );
+}
+
 export function useLocation(): LocationState {
+  const value = useContext(LocationContext);
+  if (!value) throw new Error('useLocation called outside LocationProvider');
+  return value;
+}
+
+function useLocationState(): LocationState {
   const [ready, setReady] = useState(false);
   const [point, setPoint] = useState<Point | null>(null);
   const [prefs, setPrefs] = useState<LocationPrefs>(INITIAL_PREFS);
@@ -91,7 +110,7 @@ export function useLocation(): LocationState {
     }
   }, []);
 
-  return {
+  return useMemo<LocationState>(() => ({
     ready,
     point,
     prefs,
@@ -102,6 +121,7 @@ export function useLocation(): LocationState {
     enable: fetchPosition,
     refresh: fetchPosition,
     setRadius: async (km) => { setPrefs(await writePrefs({ radiusKm: km })); },
+    update: async (patch) => { setPrefs(await writePrefs(patch)); },
     turnOff: async () => {
       // Erases the stored point as well as clearing the flag. Opting out has
       // to actually delete.
@@ -109,5 +129,5 @@ export function useLocation(): LocationState {
       setPoint(null);
       setError(null);
     },
-  };
+  }), [ready, point, prefs, permission, busy, error, fetchPosition]);
 }
