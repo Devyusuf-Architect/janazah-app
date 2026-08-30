@@ -957,7 +957,7 @@ const run = async () => {
 
     await guest.locator('#home-search').fill('zzzz-no-such-place');
     await guest.locator('.home-results .home-empty').waitFor({ timeout: 5000 });
-    assert.match(await guest.locator('.home-results').innerText(), /Nothing matches/,
+    assert.match(await guest.locator('.home-results').innerText(), /No Janazahs match your search/,
       'a search with no results must say so rather than showing an empty page');
 
     await guest.locator('#home-search').fill('');
@@ -1193,11 +1193,20 @@ const run = async () => {
       ['Turn sample data off', false, 'Turn sample data on'],
     ]) {
       await admin.getByRole('button', { name: click }).click();
+      if (expect) {
+        // Turning samples on is the dangerous direction on a live site, so it
+        // asks for confirmation first.
+        await admin.getByRole('heading', { name: 'Show sample data to visitors?' })
+          .waitFor({ timeout: 5000 });
+        await admin.locator('#reason-input').fill('testing the switch');
+        await admin.getByRole('button', { name: 'Turn it on' }).click();
+      }
       await admin.getByRole('button', { name: back }).waitFor({ timeout: 15000 });
       assert.equal(await storedSetting(), expect,
         `"${click}" must store enabled=${expect}, not just change this browser`);
     }
-    log('the sample-data switch is stored where every visitor reads it');
+    log('the sample-data switch is stored where every visitor reads it, and '
+      + 'turning it on asks for confirmation first');
 
     // Removing sample records must not touch a real one.
     await admin.getByRole('button', { name: 'Remove all sample records' }).click();

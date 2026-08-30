@@ -98,6 +98,21 @@ function paint(panel, ctx, counts, countError) {
 }
 
 async function toggle(button, panel, ctx, next) {
+  if (next) {
+    // Turning samples off only ever removes something fake, so it stays one
+    // click. Turning them on, on the live site, is the direction that can
+    // show a fictional notice to a real visitor by mistake, so it gets the
+    // same confirm-with-a-reason step as deleting sample records below.
+    const confirmed = await askReason({
+      title: 'Show sample data to visitors?',
+      body: 'Every visitor to the live site will see fictional notices and '
+          + 'organizations until this is turned off again.',
+      label: 'Type anything to confirm',
+      confirmText: 'Turn it on',
+    });
+    if (confirmed === null) return;
+  }
+
   button.disabled = true;
   try {
     await store.writeSampleDataSetting(next);
