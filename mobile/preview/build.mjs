@@ -24,6 +24,10 @@ await build({
   jsx: 'automatic',
   loader: { '.js': 'jsx', '.png': 'dataurl', '.svg': 'dataurl' },
   define: { __DEV__: 'true', 'process.env.NODE_ENV': '"development"' },
+  // Modules read process.env for build-time switches (the emulator toggle,
+  // the Google client id). A browser has no process, and the harness has no
+  // environment to read, so it gets an empty one rather than a crash.
+  banner: { js: 'globalThis.process = globalThis.process || { env: {} };' },
   alias: {
     'react-native': 'react-native-web',
     // AsyncStorage is native-only. The harness has no preferences to store,
@@ -34,6 +38,20 @@ await build({
     // three-primitive stub that renders browser SVG instead; the app uses
     // the real library.
     'react-native-svg': resolve(here, 'stubs/svg.js'),
+    // The harness renders components, not a working app. The native Firebase
+    // and Expo modules cannot be bundled for a browser, and nothing on this
+    // page needs them to do anything: see stubs/firebase.js.
+    '@react-native-firebase/app': resolve(here, 'stubs/firebase.js'),
+    '@react-native-firebase/auth': resolve(here, 'stubs/firebase.js'),
+    '@react-native-firebase/firestore': resolve(here, 'stubs/firebase.js'),
+    '@react-native-firebase/messaging': resolve(here, 'stubs/firebase.js'),
+    '@react-native-firebase/functions': resolve(here, 'stubs/firebase.js'),
+    '@react-native-google-signin/google-signin': resolve(here, 'stubs/firebase.js'),
+    'expo-constants': resolve(here, 'stubs/expo.js'),
+    'expo-location': resolve(here, 'stubs/expo.js'),
+    'expo-secure-store': resolve(here, 'stubs/expo.js'),
+    'expo-notifications': resolve(here, 'stubs/expo.js'),
+    'expo-router': resolve(here, 'stubs/expo.js'),
   },
   logLevel: 'info',
 });

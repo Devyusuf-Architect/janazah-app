@@ -58,6 +58,9 @@ function Chrome() {
         <Stack.Screen name="n/[id]" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="search" />
         <Stack.Screen name="masjids" />
+        <Stack.Screen name="guide" />
+        <Stack.Screen name="about" />
+        <Stack.Screen name="delete-account" options={{ presentation: 'modal' }} />
         <Stack.Screen name="o/[id]" />
         <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="signin" options={{ presentation: 'modal' }} />

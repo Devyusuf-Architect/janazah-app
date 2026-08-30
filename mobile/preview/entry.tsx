@@ -17,6 +17,9 @@ import { createRoot } from 'react-dom/client';
 import { View, ScrollView } from 'react-native';
 
 import { ThemeProvider, useColors, space } from '../src/theme';
+import { AuthProvider } from '../src/lib/auth';
+import { FollowsProvider } from '../src/features/following/useFollows';
+import { LocationProvider } from '../src/features/nearby/useLocation';
 import { Text } from '../src/components/Text';
 import { Button } from '../src/components/Button';
 import { Surface, Divider } from '../src/components/Surface';
@@ -27,6 +30,7 @@ import { Field } from '../src/components/Field';
 import { NoticeRow } from '../src/features/notices/NoticeRow';
 import { NoticeDetail } from '../src/features/notices/NoticeDetail';
 import { LocationGate } from '../src/features/nearby/LocationGate';
+import { GuideBody } from '../src/features/guide/GuideBody';
 import { ViewToggle } from '../src/features/nearby/ViewToggle';
 import type { Notice } from '../src/lib/notice';
 
@@ -216,6 +220,10 @@ function Gallery() {
         </View>
       </Section>
 
+      <Section title="Janazah guide">
+        <GuideBody />
+      </Section>
+
       <Section title="Type">
         <View style={{ padding: space.lg, gap: space.sm }}>
           <Text variant="display" serif>Display, serif</Text>
@@ -302,9 +310,19 @@ function Gallery() {
 
 const root = document.getElementById('root');
 if (root) {
+  // The same providers the app mounts. The Firebase and Expo modules beneath
+  // them are stubbed (see preview/stubs), so nothing here reaches a backend;
+  // the providers exist because components legitimately read from them and a
+  // harness that had to avoid those components would stop being useful.
   createRoot(root).render(
     <ThemeProvider>
-      <Gallery />
+      <AuthProvider>
+        <FollowsProvider>
+          <LocationProvider>
+            <Gallery />
+          </LocationProvider>
+        </FollowsProvider>
+      </AuthProvider>
     </ThemeProvider>,
   );
 }
