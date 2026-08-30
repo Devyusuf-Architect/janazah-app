@@ -14,6 +14,18 @@ const ANDROID_PACKAGE = 'com.taziyah.app';
 const GOOGLE_SERVICES = './google-services.json';
 
 /**
+ * Google Maps, for the optional map view in Nearby.
+ *
+ * A separate key from anything in google-services.json: Maps SDK for Android
+ * is billed and restricted independently of Firebase. Without it the map
+ * renders blank tiles, which reads as a broken app rather than a missing key,
+ * so the List/Map toggle stays hidden until it is set and Nearby works as a
+ * list. Public identifier, and it should be restricted in Google Cloud to
+ * this package name and signing certificate.
+ */
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+
+/**
  * The web OAuth client id, read out of google-services.json.
  *
  * Firebase Auth wants a *web* client's ID token even when the sign-in
@@ -68,6 +80,11 @@ const config: ExpoConfig = {
 
   android: {
     package: ANDROID_PACKAGE,
+    // Android's automatic cloud backup would otherwise copy the app's private
+    // storage to the user's Drive. The one thing this app keeps that must not
+    // travel that way is the reader's last position, which is why it lives in
+    // expo-secure-store; switching backup off is the second half of that.
+    allowBackup: false,
     // Google Play requires new apps and updates to target Android 16
     // (API 36) from 31 August 2026. Pinned in expo-build-properties below
     // rather than left to whatever the template defaults to.
@@ -107,6 +124,9 @@ const config: ExpoConfig = {
       'android.permission.WRITE_EXTERNAL_STORAGE',
     ],
     googleServicesFile: GOOGLE_SERVICES,
+    ...(GOOGLE_MAPS_API_KEY
+      ? { config: { googleMaps: { apiKey: GOOGLE_MAPS_API_KEY } } }
+      : {}),
     intentFilters: [
       {
         action: 'VIEW',
@@ -172,6 +192,7 @@ const config: ExpoConfig = {
     siteOrigin: `https://${SITE}`,
     androidPackage: ANDROID_PACKAGE,
     googleWebClientId: googleWebClientId(),
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   },
 };
 

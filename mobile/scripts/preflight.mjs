@@ -84,6 +84,19 @@ if (!existsSync(gsPath)) {
   }
 }
 
+// ---- Google Maps ---------------------------------------------------------
+if (!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY) {
+  warnings.push(
+    'EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not set, so the map view in Nearby is\n'
+    + '  hidden and Nearby works as a list. That is deliberate: without a key\n'
+    + '  the map renders blank tiles, which reads as a broken app rather than\n'
+    + '  a missing key.\n'
+    + '  Google Cloud console > APIs & Services > Maps SDK for Android. Restrict\n'
+    + '  the key to com.taziyah.app and the signing certificate fingerprint.\n'
+    + '  Note this is billed separately from Firebase.',
+  );
+}
+
 // ---- the shared modules --------------------------------------------------
 for (const file of ['geo.js', 'model.js', 'verification.js', 'janazah-guide-content.js']) {
   if (!existsSync(resolve(root, '../public/js', file))) {

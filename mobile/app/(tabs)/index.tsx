@@ -24,17 +24,21 @@ import { SearchField } from '../../src/features/home/SearchField';
 import { SectionHeader } from '../../src/features/home/SectionHeader';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { SampleBanner } from '../../src/features/home/SampleBanner';
+import { useLocation } from '../../src/features/nearby/useLocation';
 import { useUpcomingNotices } from '../../src/lib/queries';
+import { nearbyNotices, annotate } from '../../src/lib/nearby';
 import type { Notice } from '../../src/lib/notice';
 import { space, useColors } from '../../src/theme';
 
 /** How many rows each section shows before deferring to its own tab. */
 const UPCOMING_LIMIT = 4;
+const NEAR_LIMIT = 3;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
 
+  const location = useLocation();
   const {
     data, isPending, isError, refetch, isRefetching,
   } = useUpcomingNotices();
@@ -44,6 +48,17 @@ export default function HomeScreen() {
     [data],
   );
   const stale = data?.pages.some((page) => page.stale) ?? false;
+
+  // Distances for every row, and the subset that is actually close. Both are
+  // computed here, on the device, from a point that never leaves it.
+  const distances = useMemo(
+    () => annotate(notices, location.point),
+    [notices, location.point],
+  );
+  const near = useMemo(
+    () => nearbyNotices(notices, location.point, location.prefs.radiusKm),
+    [notices, location.point, location.prefs.radiusKm],
+  );
 
   // Refetched when the tab is focused rather than kept on a live listener.
   // Somebody who backgrounds the app on the way to a masjid and reopens it in
@@ -106,7 +121,11 @@ export default function HomeScreen() {
         {notices.slice(0, UPCOMING_LIMIT).map((notice, index) => (
           <View key={notice.id}>
             {index > 0 ? <Divider inset={space.lg} /> : null}
-            <NoticeRow notice={notice} onPress={open} />
+            <NoticeRow
+              notice={notice}
+              distanceKm={distances.get(notice.id) ?? null}
+              onPress={open}
+            />
           </View>
         ))}
 
@@ -114,15 +133,35 @@ export default function HomeScreen() {
           title="Near you"
           action={{ label: 'Open', onPress: () => router.push('/nearby') }}
         />
-        <View style={{ paddingHorizontal: space.lg }}>
-          {/* One row, not half a screen. The brief was explicit that a
-              disabled state must not take over the page, and this is the
-              state most people will see on first launch. */}
-          <Text variant="callout" tone="muted">
-            Turn on location in Nearby to see which of these are close to you.
-            It stays on your phone.
-          </Text>
-        </View>
+
+        {location.point ? (
+          near.length ? (
+            near.slice(0, NEAR_LIMIT).map(({ notice, km }, index) => (
+              <View key={notice.id}>
+                {index > 0 ? <Divider inset={space.lg} /> : null}
+                <NoticeRow notice={notice} distanceKm={km} onPress={open} />
+              </View>
+            ))
+          ) : (
+            <View style={{ paddingHorizontal: space.lg }}>
+              <Text variant="callout" tone="muted">
+                Nothing within your chosen distance in the days ahead.
+              </Text>
+            </View>
+          )
+        ) : (
+          <View style={{ paddingHorizontal: space.lg }}>
+            {/* One row, not half a screen. The brief was explicit that a
+                disabled state must not take over the page, and this is the
+                state most people see on first launch. The explanation of what
+                location is for lives in Nearby, where the permission is
+                actually requested. */}
+            <Text variant="callout" tone="muted">
+              Turn on location in Nearby to see which of these are close to you.
+              It stays on your phone.
+            </Text>
+          </View>
+        )}
 
         <SectionHeader
           title="Masjids you follow"

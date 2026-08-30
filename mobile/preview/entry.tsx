@@ -26,6 +26,8 @@ import { Empty, ErrorState, StaleBanner, Loading } from '../src/components/State
 import { Field } from '../src/components/Field';
 import { NoticeRow } from '../src/features/notices/NoticeRow';
 import { NoticeDetail } from '../src/features/notices/NoticeDetail';
+import { LocationGate } from '../src/features/nearby/LocationGate';
+import { ViewToggle } from '../src/features/nearby/ViewToggle';
 import type { Notice } from '../src/lib/notice';
 
 const hours = (n: number) => new Date(Date.now() + n * 3600_000);
@@ -159,6 +161,37 @@ function Gallery() {
             />
           </View>
         ))}
+      </Section>
+
+      <Section title="Nearby, before location is on">
+        <LocationGate state="undetermined" busy={false} error={null} onEnable={() => {}} />
+      </Section>
+
+      <Section title="Nearby, permanently denied">
+        {/* The state that matters most to get right: Android will not prompt
+            again, so a button here would silently do nothing. */}
+        <LocationGate state="denied" busy={false} error={null} onEnable={() => {}} />
+      </Section>
+
+      <Section title="Nearby, with a position">
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md,
+                       flexDirection: 'row', alignItems: 'center',
+                       justifyContent: 'space-between' }}>
+          <Button label="Within 10 km" size="compact" />
+          <ViewToggle value="list" onChange={() => {}} mapAvailable />
+        </View>
+        {NOTICES.slice(0, 2).map(({ notice, distanceKm }, i) => (
+          <View key={`near-${notice.id}`}>
+            {i > 0 ? <Divider inset={space.lg} /> : null}
+            <NoticeRow notice={notice} distanceKm={distanceKm ?? null} onPress={() => {}} />
+          </View>
+        ))}
+        <View style={{ padding: space.lg }}>
+          <Text variant="caption" tone="subtle">
+            Distances are worked out on your phone. Your location is not sent to
+            us or to any masjid, and nothing records where you have been.
+          </Text>
+        </View>
       </Section>
 
       <Section title="Notice detail">

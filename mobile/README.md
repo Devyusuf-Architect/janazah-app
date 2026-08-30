@@ -25,6 +25,15 @@ Two things come from the Firebase console and cannot be committed:
 Google sign-in also needs the SHA-1 and SHA-256 fingerprints of the EAS debug
 **and** release keystores added to the Android app in the Firebase console.
 Without them it fails with a developer error and nothing more useful.
+`eas credentials` prints the fingerprints.
+
+**`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`** is optional and enables the map view in
+Nearby. It is a separate key from anything in `google-services.json`, since the
+Maps SDK for Android is billed and restricted independently of Firebase, and it
+should be restricted in Google Cloud to this package name and signing
+certificate. Without it the List/Map toggle is hidden and Nearby works as a
+list, which is deliberate: an unkeyed map renders blank tiles and reads as a
+broken app rather than a missing key.
 
 ## Running it
 
@@ -82,7 +91,14 @@ scripts/             preflight, and the Android images
 - **No user positions, ever.** Nearby matching happens in this process against
   notices already fetched. Nothing about where anyone is may be written to
   Firestore, logged, or sent anywhere. If a change appears to need that, the
-  design has drifted.
+  design has drifted. `test/location.test.ts` enforces this structurally: no
+  module under `src/features/nearby`, and neither `src/lib/location.ts` nor
+  `src/lib/nearby.ts`, may import Firestore or call a write. Do not relax that
+  test to accommodate a change; it is the mobile counterpart of the web
+  suite's end-to-end check, which sets a distinctive position and greps every
+  collection for it.
+- **The stored point is overwritten, never appended to,** and turning location
+  off deletes it. A list of positions is a travel history.
 - **A public notice list query must carry `where('isPublic','==',true)`.**
   Firestore matches a list rule against the query rather than the results, so
   dropping it does not leak anything; it fails outright. `src/lib/collections.ts`
