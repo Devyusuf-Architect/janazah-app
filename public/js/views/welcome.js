@@ -108,7 +108,7 @@ export function renderWelcome(mount) {
           'Nearby alerts are worked out in your own browser, against notices '
           + 'this page has already downloaded. Your position is never sent to '
           + 'us, never sent to a masjid, and no history of where you have been '
-          + 'is kept — only your latest position, on your device, overwritten '
+          + 'is kept: only your latest position, on your device, overwritten '
           + 'each time.'),
         el('ul', { class: 'wel-facts' }, [
           ['No account needed', 'Read every notice, follow masjids, use nearby alerts.'],

@@ -91,65 +91,65 @@ function renderRoute() {
   }
 
   if (/^\/janazahs\/?$/.test(path)) {
-    document.title = "Janazahs — Ta'ziyah";
+    document.title = "Janazahs - Ta'ziyah";
     renderFeed(mount());
     return;
   }
   if (/^\/near-me\/?$/.test(path)) {
-    document.title = "Near me — Ta'ziyah";
+    document.title = "Near me - Ta'ziyah";
     renderFeed(mount(), { initialFilter: 'nearby' });
     return;
   }
   if (/^\/masjids\/?$/.test(path)) {
-    document.title = "Masjids — Ta'ziyah";
+    document.title = "Masjids - Ta'ziyah";
     renderMasjids(mount());
     return;
   }
   if (/^\/register-masjid\/?$/.test(path)) {
-    document.title = "Register your masjid — Ta'ziyah";
+    document.title = "Register your masjid - Ta'ziyah";
     renderRegisterMasjid(mount());
     return;
   }
   if (/^\/janazah-guide\/?$/.test(path)) {
-    document.title = "How to pray Salat al-Janazah — Ta'ziyah";
+    document.title = "How to pray Salat al-Janazah - Ta'ziyah";
     renderJanazahGuide(mount());
     return;
   }
   if (/^\/following\/?$/.test(path)) {
-    document.title = "Following — Ta'ziyah";
+    document.title = "Following - Ta'ziyah";
     renderFollowing(mount());
     return;
   }
   if (/^\/account\/?$/.test(path)) {
     if (!authReady) { mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
-    document.title = "Account — Ta'ziyah";
+    document.title = "Account - Ta'ziyah";
     renderAccount(mount(), { user });
     return;
   }
   if (/^\/welcome\/?$/.test(path)) {
-    document.title = "Ta'ziyah — Janazah notices you can trust";
+    document.title = "Ta'ziyah - Janazah notices you can trust";
     renderWelcome(mount());
     return;
   }
   if (/^\/about\/?$/.test(path)) {
-    document.title = "About — Ta'ziyah";
+    document.title = "About - Ta'ziyah";
     renderAbout(mount());
     return;
   }
   if (/^\/privacy\/?$/.test(path)) {
-    document.title = "Privacy — Ta'ziyah";
+    document.title = "Privacy - Ta'ziyah";
     renderPrivacy(mount());
     return;
   }
   if (/^\/terms\/?$/.test(path)) {
-    document.title = "Terms of service — Ta'ziyah";
+    document.title = "Terms of service - Ta'ziyah";
     renderTerms(mount());
     return;
   }
   if (/^\/signin\/?$/.test(path)) {
     if (user) { history.replaceState(null, '', '/dashboard'); route(); return; }
-    document.title = "Sign in — Ta'ziyah";
+    document.title = "Sign in - Ta'ziyah";
     const initialMode = new URLSearchParams(location.search).get('mode') === 'signup'
       ? 'signup' : 'signin';
     renderAuth(mount(), { variant: 'community', initialMode });
@@ -163,7 +163,7 @@ function renderRoute() {
       return;
     }
     if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
-    document.title = "Dashboard — Ta'ziyah";
+    document.title = "Dashboard - Ta'ziyah";
     renderDashboard(mount(), { user });
     return;
   }
@@ -180,7 +180,7 @@ function renderRoute() {
   // shows the index first and then replaces it.
   if (path === '/' && firstVisit) {
     history.replaceState(null, '', '/welcome');
-    document.title = "Ta'ziyah — Janazah notices you can trust";
+    document.title = "Ta'ziyah - Janazah notices you can trust";
     renderWelcome(mount());
     return;
   }

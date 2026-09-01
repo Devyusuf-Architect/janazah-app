@@ -339,7 +339,7 @@ export async function renderSingleNotice(mount, noticeId) {
 
   document.title = notice.showDeceasedName && notice.deceasedName
     ? `Janazah for ${notice.deceasedName}`
-    : `Janazah notice — ${notice.orgName}`;
+    : `Janazah notice - ${notice.orgName}`;
 
   const following = follows.isFollowing(notice.orgId);
   mount.replaceChildren(

@@ -11,7 +11,7 @@
 
 import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, globSync } from 'node:fs';
 
 const home = readFileSync('public/js/views/home.js', 'utf8');
 const masjids = readFileSync('public/js/views/masjids.js', 'utf8');
@@ -85,6 +85,54 @@ describe('none of this copy uses words that describe an unfinished product', () 
       for (const literal of literals) {
         assert.doesNotMatch(literal, FORBIDDEN_WORDS,
           `${name} contains a forbidden word in: ${literal}`);
+      }
+    });
+  }
+});
+
+// No em dashes in anything a person reads.
+//
+// Not a house-style quibble: the em dash is the one punctuation mark this
+// codebase reaches for by habit in its own commentary, and copy written next
+// to that commentary picks it up. It renders as a stray long rule in a page
+// title, in a table cell standing in for a missing value, and in the middle
+// of a sentence somebody is reading in a hurry at the worst moment of their
+// week. A comma, a colon, a full stop or a plain hyphen all say the same
+// thing and read as ordinary writing.
+//
+// Comments are exempt. They are not copy, this file's authorial voice uses
+// the mark freely, and a guard that fails on a comment is one somebody turns
+// off. So block comments and whole-line // comments are stripped first, and
+// what is left is code: an em dash surviving that is in a string literal or
+// in HTML text, which is to say on somebody's screen.
+describe('no em dash reaches a reader', () => {
+  const SOURCES = [
+    ...globSync('public/js/**/*.js'),
+    ...globSync('public/*.html'),
+  ].sort();
+
+  test('the sweep covers the whole front end, not a handful of files', () => {
+    assert.ok(SOURCES.length >= 40,
+      `only ${SOURCES.length} files scanned; the glob has stopped matching`);
+    for (const expected of [
+      'public/js/feed.js', 'public/js/views/account.js',
+      'public/js/views/admin.js', 'public/js/views/admin/common.js',
+      'public/console.html', 'public/index.html',
+    ]) {
+      assert.ok(SOURCES.includes(expected), `${expected} is not being scanned`);
+    }
+  });
+
+  for (const file of SOURCES) {
+    test(`${file} has no em dash outside its comments`, () => {
+      const code = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('//'));
+      for (const [index, line] of code.entries()) {
+        assert.ok(!line.includes('—'),
+          `${file} line ${index + 1} has an em dash in copy: ${line.trim()}`);
       }
     });
   }

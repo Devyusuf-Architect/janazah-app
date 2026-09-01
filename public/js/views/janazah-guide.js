@@ -53,7 +53,7 @@ function takbirSection(t) {
         }),
         el('p', { class: 'takbir__translit' }, [
           el('strong', { text: t.takbir.transliteration }),
-          el('span', { class: 'muted', text: ` — ${t.takbir.meaning}` }),
+          el('span', { class: 'muted', text: `: ${t.takbir.meaning}` }),
         ]),
       ]),
     ]),

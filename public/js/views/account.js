@@ -235,7 +235,7 @@ function profileSection(panel, ctx, repaint) {
           ? 'Your picture comes from the account you sign in with. Change it '
             + 'there and it changes here.'
           : 'Your initials stand in for a picture. Nobody else on Ta’ziyah '
-            + 'sees this — it appears only to you, in the corner of your own '
+            + 'sees this. It appears only to you, in the corner of your own '
             + 'screen.'),
       el('div', { class: 'field-group' }, [
         el('label', { class: 'label', for: 'displayName', text: 'Display name' }),
@@ -276,7 +276,7 @@ function accountSection(panel, ctx, repaint) {
 
   panel.append(
     group('Account',
-      factRow('Email address', user.email || '—',
+      factRow('Email address', user.email || 'not recorded',
         user.emailVerified ? pill('Confirmed', 'verified') : pill('Not confirmed', 'warn')),
       user.emailVerified ? null : el('div', { class: 'set-actions' }, [verifyButton]),
       factRow('Sign-in method', signInMethodLabel(user)),
@@ -528,7 +528,7 @@ async function startEnrolment(button, repaint) {
     qr
       ? el('div', { class: 'mfa__qr' }, [qr])
       : el('p', { class: 'notice-strip notice-strip--warn' },
-        'The code could not be drawn. Use the setup key below instead — it '
+        'The code could not be drawn. Use the setup key below instead. It '
         + 'works exactly the same way.'),
 
     el('details', { class: 'mfa__manual' }, [
@@ -565,7 +565,7 @@ function showEnabled(repaint) {
     el('p', { class: 'mfa__lede', text: 'Two-factor authentication is on.' }),
     el('p', { class: 'hint' },
       'From now on, signing in will ask for a code from your authenticator '
-      + 'app as well as your password. Keep the app installed — without it '
+      + 'app as well as your password. Keep the app installed. Without it '
       + 'you will not be able to sign in.'),
   ]);
   showModal('Two-factor authentication enabled', body, {

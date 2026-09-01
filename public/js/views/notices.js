@@ -114,10 +114,10 @@ function noticeCard(notice, mount, ctx, org) {
     ]),
     el('dl', { class: 'kv' }, [
       el('dt', { text: 'Prayer' }),
-      el('dd', { text: `${notice.prayerLocation?.name} — ${notice.prayerLocation?.address}` }),
+      el('dd', { text: `${notice.prayerLocation?.name}, ${notice.prayerLocation?.address}` }),
       ...(notice.burialLocation ? [
         el('dt', { text: 'Burial' }),
-        el('dd', { text: `${notice.burialLocation.name} — ${notice.burialLocation.address}` }),
+        el('dd', { text: `${notice.burialLocation.name}, ${notice.burialLocation.address}` }),
       ] : []),
       el('dt', { text: 'Version' }),
       el('dd', { text: String(notice.version || 1) }),
@@ -204,7 +204,7 @@ function duplicateWarning(duplicates) {
         text: notice.showDeceasedName && notice.deceasedName
           ? notice.deceasedName : 'Name not shared',
       }),
-      el('div', { class: 'small', text: `${notice.orgName} — ${formatJanazahTime(notice)}` }),
+      el('div', { class: 'small', text: `${notice.orgName}, ${formatJanazahTime(notice)}` }),
       el('a', {
         class: 'link small', href: `/n/${notice.id}`,
         target: '_blank', rel: 'noopener noreferrer',

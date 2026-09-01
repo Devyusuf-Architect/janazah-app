@@ -49,7 +49,7 @@ export async function renderOrgPage(mount, orgId) {
     return;
   }
 
-  document.title = `${org.name} — Ta'ziyah`;
+  document.title = `${org.name} - Ta'ziyah`;
 
   const list = el('div', { class: 'stack' }, [skeleton(2)]);
 

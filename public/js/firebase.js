@@ -41,7 +41,7 @@ if (unconfigured && !isLocal) {
   // rather than depending on styles.css still being attached afterward.
   document.documentElement.innerHTML = `
     <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ta'ziyah — not configured yet</title>
+    <title>Ta'ziyah - not configured yet</title>
     <style>
       :root { color-scheme: light; }
       * { box-sizing: border-box; }
