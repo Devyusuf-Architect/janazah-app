@@ -616,10 +616,14 @@ export function watchPublicNotices(cb, max = 200) {
     (snap) => cb(sortByTime(withSamples(snap.docs.map(withId), sampleNotices()))),
     (err) => {
       console.error('watchPublicNotices', err);
-      // While the samples are on, a failed read still shows something rather
-      // than an empty site. This is what makes the flag useful before the
-      // security rules have been deployed.
-      if (isSampleMode()) cb(sortByTime(sampleNotices()));
+      // A failed read must still resolve the caller out of "loading" -- every
+      // page that shows this list (home, dashboard, feed, an organization's
+      // page, welcome) otherwise shows its loading skeleton forever, which
+      // reads as a broken page rather than an empty or erroring one. While
+      // samples are on, showing them is strictly better than nothing; once
+      // they are off (production), an empty list at least resolves the UI to
+      // its real empty state instead of hanging silently.
+      cb(isSampleMode() ? sortByTime(sampleNotices()) : []);
     },
   );
 }
