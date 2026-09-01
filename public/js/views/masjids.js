@@ -5,7 +5,7 @@
 // own follow manager uses (views/feed.js), and shares this file's row markup
 // with it, so there is one place that draws "a masjid, with a follow button".
 
-import { el, toast, friendlyError } from '../ui.js';
+import { el, toast } from '../ui.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
 import * as push from '../push.js';
@@ -56,7 +56,13 @@ export function renderMasjids(mount) {
   store.verifiedOrganizations()
     .then((orgs) => paint(mount, orgs))
     .catch((err) => {
-      mount.append(el('p', { class: 'form-error', text: friendlyError(err, 'orgList') }));
+      // Same call home.js and dashboard.js already make: a failed read here
+      // is not something a visitor can act on, and showing an alarming error
+      // for what is, from where they are standing, indistinguishable from
+      // "nobody has joined yet" does not help them. Log it and show the
+      // ordinary empty state; whoever is watching the console still sees it.
+      console.error('verifiedOrganizations', err);
+      paint(mount, []);
     });
 }
 
