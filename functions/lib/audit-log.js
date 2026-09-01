@@ -33,6 +33,8 @@ export const ACTIONS = {
   NOTICE_PUBLISHED: 'notice.published',
   NOTICE_CORRECTED: 'notice.corrected',
   NOTICE_CANCELLED: 'notice.cancelled',
+  NOTICE_UNPUBLISHED: 'notice.unpublished',
+  NOTICE_REPUBLISHED: 'notice.republished',
   NOTICE_DELETED_DRAFT: 'notice.draft_deleted',
   NOTICE_TAKEN_DOWN: 'notice.admin_takedown',
   REPORT_RESOLVED: 'report.resolved',
@@ -83,6 +85,22 @@ export function classifyNoticeChange(before, after, isActorAdmin) {
       action: isActorAdmin ? ACTIONS.NOTICE_TAKEN_DOWN : ACTIONS.NOTICE_CANCELLED,
       actorUid,
     };
+  }
+
+  // A published notice pulled back out of public view, and the same notice
+  // put back. Both are corrections in the loose sense, but they are the two
+  // changes where what happened to the public feed matters more than what
+  // happened to the fields, and an audit trail that records them as plain
+  // corrections cannot answer "why did this disappear for six hours".
+  //
+  // publishedAt is what separates a republish from an ordinary first publish
+  // out of the edit screen: it is stamped on the first publish and kept
+  // afterwards, so a draft that carries one has been public before.
+  if (before.status === 'published' && after.status === 'draft') {
+    return { action: ACTIONS.NOTICE_UNPUBLISHED, actorUid };
+  }
+  if (before.status === 'draft' && after.status === 'published' && before.publishedAt) {
+    return { action: ACTIONS.NOTICE_REPUBLISHED, actorUid };
   }
 
   // Anything else that reached this point is a correction: a draft edited in

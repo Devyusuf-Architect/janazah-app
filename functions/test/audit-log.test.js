@@ -45,6 +45,30 @@ describe('classifyNoticeChange', () => {
     assert.equal(r.action, ACTIONS.NOTICE_CORRECTED);
   });
 
+  test('a published notice pulled back to a draft is recorded as unpublished', () => {
+    const r = classifyNoticeChange(
+      { status: 'published', version: 2, publishedAt: 'earlier' },
+      { status: 'draft', version: 3, publishedAt: 'earlier', lastEditedBy: 'admin' }, true);
+    assert.equal(r.action, ACTIONS.NOTICE_UNPUBLISHED);
+    assert.equal(r.actorUid, 'admin');
+  });
+
+  test('putting it back is a republish, distinct from correcting it', () => {
+    const r = classifyNoticeChange(
+      { status: 'draft', version: 3, publishedAt: 'earlier' },
+      { status: 'published', version: 4, publishedAt: 'earlier', lastEditedBy: 'admin' }, true);
+    assert.equal(r.action, ACTIONS.NOTICE_REPUBLISHED);
+  });
+
+  test('a draft that was never public is still a correction when first published', () => {
+    // publishedAt is what tells the two apart, so this pins the existing
+    // behaviour rather than letting the new republish action swallow it.
+    const r = classifyNoticeChange(
+      { status: 'draft', version: 1 },
+      { status: 'published', version: 2, lastEditedBy: 'u1' }, false);
+    assert.equal(r.action, ACTIONS.NOTICE_CORRECTED);
+  });
+
   test('a published notice corrected stays a correction', () => {
     const r = classifyNoticeChange(
       { status: 'published', version: 2 },

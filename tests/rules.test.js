@@ -363,6 +363,194 @@ describe('platform settings', () => {
   });
 });
 
+describe('the platform settings document the admin portal edits', () => {
+  // /platformSettings/platform holds everything the Platform Settings section
+  // writes. It is deliberately not a free-form document: the field list is
+  // closed, every field is type checked, every number is bounded and every
+  // string has a length limit. Nothing in it decides who may read or write
+  // anything, which is why a platform administrator is allowed to change it
+  // at all.
+
+  const settings = (overrides = {}) => ({
+    notificationRadiusKm: 25,
+    reminderMinutes: 120,
+    organizationTypes: ['masjid', 'funeral_home'],
+    supportEmail: 'support@example.com',
+    privacyEmail: 'privacy@example.com',
+    optionalDeceasedName: true,
+    optionalBurialLocation: true,
+    optionalInstructions: true,
+    announcementEnabled: false,
+    announcementMessage: '',
+    updatedAt: serverTimestamp(),
+    updatedBy: ADMIN,
+    ...overrides,
+  });
+
+  const write = (who, overrides) =>
+    setDoc(doc(as(who), 'platformSettings', 'platform'),
+      settings({ updatedBy: who, ...overrides }));
+
+  test('a platform admin may write a complete, well-formed document', async () => {
+    await assertSucceeds(write(ADMIN));
+  });
+
+  test('anyone may read it, since the announcement shows before sign-in', async () => {
+    await assertSucceeds(write(ADMIN));
+    await assertSucceeds(getDoc(doc(anon(), 'platformSettings', 'platform')));
+  });
+
+  test('nobody but a platform admin may write it', async () => {
+    await assertFails(write(OUTSIDER));
+    await assertFails(write(OWNER));
+    await assertFails(write(STAFF));
+  });
+
+  test('an admin cannot attribute the change to someone else', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ updatedBy: OWNER })));
+  });
+
+  test('an unknown field is rejected outright', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ adminUids: [ADMIN] })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ apiKey: 'secret' })));
+  });
+
+  test('a missing field is rejected: the form always sends the whole document', async () => {
+    const partial = settings();
+    delete partial.supportEmail;
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'), partial));
+  });
+
+  test('every field is type checked', async () => {
+    for (const wrong of [
+      { notificationRadiusKm: '25' },
+      { reminderMinutes: 12.5 },
+      { organizationTypes: 'masjid' },
+      { supportEmail: 42 },
+      { privacyEmail: null },
+      { optionalDeceasedName: 'yes' },
+      { optionalBurialLocation: 1 },
+      { optionalInstructions: null },
+      { announcementEnabled: 'on' },
+      { announcementMessage: 7 },
+    ]) {
+      await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+        settings(wrong)));
+    }
+  });
+
+  test('numbers are bounded, so a setting cannot be driven to nonsense', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ notificationRadiusKm: 0 })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ notificationRadiusKm: 5000 })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ reminderMinutes: -1 })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ reminderMinutes: 100000 })));
+  });
+
+  test('the announcement is a short notice, not a document', async () => {
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ announcementEnabled: true, announcementMessage: 'x'.repeat(280) })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ announcementEnabled: true, announcementMessage: 'x'.repeat(281) })));
+  });
+
+  test('a contact address cannot be an essay either', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ supportEmail: `${'a'.repeat(120)}@example.com` })));
+  });
+
+  test('organization types must come from the enum the org rule accepts', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ organizationTypes: ['masjid', 'charity'] })));
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'platform'),
+      settings({ organizationTypes: [] })));
+  });
+
+  test('it is never deleted', async () => {
+    await assertSucceeds(write(ADMIN));
+    await assertFails(deleteDoc(doc(as(ADMIN), 'platformSettings', 'platform')));
+  });
+
+  test('a settings key nobody knows about cannot be created at all', async () => {
+    await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'somethingElse'),
+      { enabled: true, updatedAt: serverTimestamp(), updatedBy: ADMIN }));
+  });
+});
+
+describe('a platform admin correcting a notice', () => {
+  // The takedown clause was, until now, the only way an administrator could
+  // touch a notice, and it forces a cancellation. These pin the narrower
+  // clause beside it: correct, hide, restore, and nothing else.
+
+  const corrected = (overrides = {}) => noticeDoc({
+    version: 2, lastEditedBy: ADMIN, ...overrides,
+  });
+
+  test('an admin can correct a published notice without cancelling it', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ deceasedName: 'Corrected Name' })));
+  });
+
+  test('an admin can pull a notice back to a draft, and publish it again', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ status: 'draft', isPublic: false })));
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ version: 3, status: 'published', isPublic: true })));
+  });
+
+  test('cancellation stays terminal: a cancelled notice cannot be revived', async () => {
+    await seedNotice('n1', { status: 'cancelled', isPublic: true });
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ status: 'published', isPublic: true })));
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ status: 'draft', isPublic: false })));
+  });
+
+  test('the correcting admin must name themselves', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ lastEditedBy: OWNER })));
+  });
+
+  test('the version counter still has to advance by exactly one', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ version: 1 })));
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ version: 7 })));
+  });
+
+  test('authorship and ownership are still immutable', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ orgId: PENDING_ORG })));
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ createdBy: ADMIN })));
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ createdAt: Timestamp.fromDate(new Date('2020-01-01T00:00:00Z')) })));
+  });
+
+  test('a private field still cannot be smuggled onto the public document', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertFails(setDoc(doc(as(ADMIN), 'notices', 'n1'),
+      corrected({ familyPhone: '416-555-0100' })));
+  });
+
+  test('nobody who is not an admin gets this clause', async () => {
+    await seedNotice('n1', { status: 'published', isPublic: true });
+    await assertFails(setDoc(doc(as(OUTSIDER), 'notices', 'n1'),
+      noticeDoc({ version: 2, lastEditedBy: OUTSIDER })));
+  });
+});
+
 describe('following is a community action, not a coordinator one', () => {
   // Following is stored on the device (public/js/follows.js) and writes
   // nothing, so the only thing it needs from the backend is the ability to

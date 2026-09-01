@@ -377,6 +377,34 @@ service cloud.firestore {
         && request.resource.data.status == 'cancelled'
         && request.resource.data.version == resource.data.version + 1;
 
+      // Platform admin correction, and hiding a notice without cancelling it.
+      //
+      // Additive to the takedown clause above rather than a loosening of it,
+      // and narrower on every axis except the one it exists for. It cannot
+      // touch a cancelled notice, cannot produce a cancelled notice
+      // (cancellation stays the takedown path, and stays terminal), cannot
+      // move a notice between organizations or rewrite its authorship, and
+      // unlike the takedown clause it forces the editing administrator to
+      // name themselves, so the audit trail attributes the change to a real
+      // account.
+      //
+      // Without it, an administrator holding a notice with a wrong time or a
+      // wrong address has exactly one remedy available: cancel a real funeral
+      // notice outright, irreversibly, and tell the community it is off.
+      // Pulling it back to a draft while the masjid is asked what the correct
+      // time is, then publishing it again, is the smaller action, and hiding
+      // it that way reuses the status the app already has rather than
+      // inventing a second, parallel notion of hidden.
+      allow update: if isPlatformAdmin()
+        && validNoticeShape()
+        && request.resource.data.orgId == resource.data.orgId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && resource.data.status != 'cancelled'
+        && request.resource.data.status in ['draft', 'published']
+        && request.resource.data.version == resource.data.version + 1
+        && request.resource.data.lastEditedBy == uid();
+
       // Never hard-delete a published notice; cancel it. Deleting would break
       // the audit trail and leave shared links dead instead of corrected.
       // Sample notices are the exception, for the same reason as sample
@@ -454,15 +482,74 @@ service cloud.firestore {
     //
     // Small operational switches a platform administrator flips from the
     // admin portal. Publicly readable because the app has to know, before
-    // anyone signs in, whether it is showing sample data; there is nothing
-    // here worth hiding, and nothing about any person.
+    // anyone signs in, whether it is showing sample data and whether there is
+    // an announcement to display; there is nothing here worth hiding, and
+    // nothing about any person.
+    //
+    // Exactly two documents are writable, each with its own closed field
+    // allowlist and its own type and range checks. This is deliberately not a
+    // free-form settings document: a platform administrator can change what
+    // the app does, but only along the axes named here, and only within the
+    // bounds named here. Nothing in either document is a secret, a credential,
+    // or a security control: none of it decides who may read or write
+    // anything, so a wrong value is a bad configuration and never a breach.
+    //
+    //   sampleData  the pre-existing switch for the fictional demo records.
+    //   platform    everything the admin portal's Platform Settings section
+    //               edits, written whole so a partial write cannot leave the
+    //               document half-typed.
+
+    function validSampleDataSetting() {
+      return request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
+        && request.resource.data.enabled is bool;
+    }
+
+    function validPlatformSettings() {
+      return request.resource.data.keys().hasOnly(
+             ['notificationRadiusKm', 'reminderMinutes', 'organizationTypes',
+              'supportEmail', 'privacyEmail',
+              'optionalDeceasedName', 'optionalBurialLocation',
+              'optionalInstructions',
+              'announcementEnabled', 'announcementMessage',
+              'updatedAt', 'updatedBy'])
+        // Every field is required as well as allowed: the settings form always
+        // sends the whole document, so a write missing one of these is a
+        // malformed write rather than a partial edit worth honouring.
+        && request.resource.data.notificationRadiusKm is number
+        && request.resource.data.notificationRadiusKm >= 1
+        && request.resource.data.notificationRadiusKm <= 200
+        && request.resource.data.reminderMinutes is int
+        && request.resource.data.reminderMinutes >= 0
+        && request.resource.data.reminderMinutes <= 2880
+        && request.resource.data.organizationTypes is list
+        && request.resource.data.organizationTypes.size() >= 1
+        && request.resource.data.organizationTypes.size() <= 3
+        // Mirrors the enum in validOrgShape(): a type offered on the
+        // registration form that the organization rule would then reject is
+        // a dead end for whoever picks it.
+        && request.resource.data.organizationTypes
+             .hasOnly(['masjid', 'funeral_home', 'other'])
+        && request.resource.data.supportEmail is string
+        && request.resource.data.supportEmail.size() <= 120
+        && request.resource.data.privacyEmail is string
+        && request.resource.data.privacyEmail.size() <= 120
+        && request.resource.data.optionalDeceasedName is bool
+        && request.resource.data.optionalBurialLocation is bool
+        && request.resource.data.optionalInstructions is bool
+        && request.resource.data.announcementEnabled is bool
+        // Bounded hard. This string is shown to every visitor, so it is a
+        // short notice and not a place to publish a document.
+        && request.resource.data.announcementMessage is string
+        && request.resource.data.announcementMessage.size() <= 280;
+    }
+
     match /platformSettings/{key} {
       allow get: if true;
       allow list: if isPlatformAdmin();
       allow create, update: if isPlatformAdmin()
-        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
-        && request.resource.data.enabled is bool
-        && request.resource.data.updatedBy == uid();
+        && request.resource.data.updatedBy == uid()
+        && ((key == 'sampleData' && validSampleDataSetting())
+            || (key == 'platform' && validPlatformSettings()));
       allow delete: if false;
     }
 
