@@ -196,6 +196,22 @@ async function signIn(page, { email, password }) {
   await page.locator('#nav').waitFor({ state: 'visible', timeout: 15000 });
 }
 
+/**
+ * A section of the admin portal, reached from its own sidebar.
+ *
+ * Scoped and exact for two reasons that both bite otherwise. Scoped, because
+ * the portal's content repeats its section names: the dashboard's "Open
+ * reports" tile is a button, and an unscoped search for Reports matches it as
+ * well as the sidebar item. Exact, because "Admin" is a prefix of "Admin
+ * Management", and the console's own nav item is the one those clicks mean.
+ */
+const adminSection = (page, name) =>
+  page.locator('.admin-nav').getByRole('button', { name, exact: true });
+
+/** The console's own sidebar, which is where "Admin" opens the portal. */
+const consoleNavItem = (page, name) =>
+  page.locator('#nav').getByRole('button', { name, exact: true });
+
 // Set once the suite deliberately triggers an enrolment the emulator cannot
 // satisfy, so the 400 it answers with is not mistaken for a real fault
 // anywhere else in the run.
@@ -370,10 +386,15 @@ const run = async () => {
     await signUp(admin, ADMIN, 'Test Admin');
     await grantPlatformAdmin(await uidFor(ADMIN.email), ADMIN.email);
     await admin.reload();
-    await admin.getByRole('button', { name: 'Admin' }).waitFor({ timeout: 15000 });
-    await admin.getByRole('button', { name: 'Admin' }).click();
+    await consoleNavItem(admin, 'Admin').waitFor({ timeout: 15000 });
+    await consoleNavItem(admin, 'Admin').click();
     log('platform admin console reachable');
 
+    // The portal opens on its dashboard now, not on the verification queue,
+    // so the queue is a section the reviewer goes to rather than the whole
+    // screen. Everything after this is unchanged: the same review card, the
+    // same reason prompt, the same disappearance from the queue.
+    await adminSection(admin, 'Verification').click();
     await admin.getByRole('button', { name: 'Approve' }).first().click();
     await admin.locator('#reason-input').fill('Confirmed by phone with the masjid office.');
     await admin.getByRole('button', { name: 'Approve', exact: true }).last().click();
@@ -598,13 +619,21 @@ const run = async () => {
 
     // ---- report triage -----------------------------------------------------
     await admin.reload();
-    await admin.getByRole('button', { name: 'Admin' }).click();
-    await admin.getByRole('button', { name: 'Reports' }).click();
+    await consoleNavItem(admin, 'Admin').click();
+    await adminSection(admin, 'Reports').click();
     await admin.getByText('Details are wrong').first().waitFor({ timeout: 15000 });
 
-    await admin.getByRole('button', { name: 'Resolve' }).first().click();
+    // exact, because the section's status filter is a chip labelled
+    // "Resolved" and it sits above the cards: a substring match for Resolve
+    // finds the filter first and never opens the reason prompt.
+    await admin.getByRole('button', { name: 'Resolve', exact: true }).first().click();
     await admin.locator('#reason-input').fill('Checked with the masjid; time was right.');
     await admin.getByRole('button', { name: 'Resolve', exact: true }).last().click();
+    // The section opens on the open reports, so a resolved one leaves the list
+    // rather than changing its badge in place. Following it to the Resolved
+    // filter asserts the same outcome the old single list did, and one more
+    // thing besides: that the report actually moved queues.
+    await admin.locator('.admin-chips').getByRole('button', { name: 'Resolved' }).click();
     await admin.getByText('resolved', { exact: true }).first().waitFor({ timeout: 15000 });
 
     const resolvedReports = await (await fetch(
@@ -641,20 +670,24 @@ const run = async () => {
     log('family takedown request filed, with the target response time shown before sending');
 
     await admin.reload();
-    await admin.getByRole('button', { name: 'Admin' }).click();
-    await admin.getByRole('button', { name: 'Reports' }).click();
+    await consoleNavItem(admin, 'Admin').click();
+    await adminSection(admin, 'Reports').click();
     await admin.getByText('Family takedown request').first().waitFor({ timeout: 15000 });
 
-    const openReportCards = await admin.locator('.card:has(.badge:text("open"))').all();
+    // .admin-card, not .card: a report in the portal is now the portal's own
+    // card. Everything the assertion below cares about is the same: the open
+    // ones, in the order the section put them in.
+    const openReportCards = await admin.locator('.admin-card:has(.badge:text("open"))').all();
     assert.ok(openReportCards.length >= 2, 'expected both new reports to be open');
     const firstCardText = await openReportCards[0].innerText();
     assert.match(firstCardText, /Family takedown request/,
       'the family takedown request should sort ahead of a general report');
     log('family takedown request sorts ahead of a general report in triage');
 
-    await admin.getByRole('button', { name: 'Resolve' }).first().click();
+    await admin.getByRole('button', { name: 'Resolve', exact: true }).first().click();
     await admin.locator('#reason-input').fill('Confirmed with the family and took the notice down.');
     await admin.getByRole('button', { name: 'Resolve', exact: true }).last().click();
+    await admin.locator('.admin-chips').getByRole('button', { name: 'Resolved' }).click();
     await admin.getByText('Confirmed with the family', { exact: false }).first()
       .waitFor({ timeout: 15000 });
     log('family takedown request resolved, with the outcome recorded');
@@ -1127,6 +1160,55 @@ const run = async () => {
       await geoPage.screenshot({ path: `${SHOT_DIR}/dashboard-mobile-390-location-on.png`, fullPage: true });
       await geoContext.close();
       log(`dashboard screenshots written to ${SHOT_DIR}`);
+
+      // The admin portal, at the three widths its layout actually changes
+      // across: below 900px the sidebar is a drawer, above it a column.
+      //
+      // Not signIn(): that waits for the console's own #nav to be visible,
+      // and below 900px #nav is the drawer, which is deliberately hidden
+      // until somebody opens it. The portal's content panel is the thing
+      // that is on screen at every width.
+      const adminSignIn = async (page) => {
+        await page.goto(`${BASE}/console`);
+        await page.locator('#email').waitFor({ timeout: 15000 });
+        await page.locator('#email').fill(ADMIN.email);
+        await page.locator('#password').fill(ADMIN.password);
+        await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+        await page.locator('.admin-panel').waitFor({ timeout: 20000 });
+      };
+
+      for (const [name, viewport] of [
+        ['mobile-375', { width: 375, height: 812 }],
+        ['tablet-768', { width: 768, height: 1024 }],
+        ['desktop-1280', { width: 1280, height: 900 }],
+      ]) {
+        const shotPage = await newPage({ viewport });
+        await adminSignIn(shotPage);
+        for (const section of ['Dashboard', 'Organizations', 'Verification', 'Reports']) {
+          if (viewport.width <= 900) {
+            await shotPage.locator('.admin-nav__toggle').click();
+          }
+          await adminSection(shotPage, section).click();
+          await shotPage.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 15000 });
+          // The masthead is sticky, so a full-page capture of a page left
+          // part-scrolled pins it over the section heading and reads as a
+          // clipped h1 that is not clipped for anybody.
+          await shotPage.evaluate(() => window.scrollTo(0, 0));
+          await shotPage.waitForTimeout(400);
+          await shotPage.screenshot({
+            path: `${SHOT_DIR}/admin-${section.toLowerCase()}-${name}.png`,
+            fullPage: true,
+          });
+        }
+        // The drawer itself, open, on the widths that have one.
+        if (viewport.width <= 900) {
+          await shotPage.locator('.admin-nav__toggle').click();
+          await shotPage.waitForTimeout(400);
+          await shotPage.screenshot({ path: `${SHOT_DIR}/admin-drawer-${name}.png` });
+        }
+        await shotPage.close();
+      }
+      log(`admin portal screenshots written to ${SHOT_DIR}`);
     }
 
     // ---- the account menu --------------------------------------------------
@@ -1160,8 +1242,10 @@ const run = async () => {
     // ---- the admin portal manages sample data ------------------------------
     // The switch, the records, and the guarantee that removing the records
     // cannot take a real notice with them.
-    await admin.getByRole('button', { name: 'Admin' }).click();
-    await admin.getByRole('button', { name: 'Sample data' }).click();
+    await consoleNavItem(admin, 'Admin').click();
+    // The sample-data controls moved into Platform Settings, which is where
+    // the rest of what an administrator can change about the platform lives.
+    await adminSection(admin, 'Platform Settings').click();
     await admin.getByRole('button', { name: 'Add the built-in examples' })
       .waitFor({ timeout: 15000 });
     await admin.getByRole('button', { name: 'Add the built-in examples' }).click();
@@ -1235,7 +1319,12 @@ const run = async () => {
     await adminPublic.locator('#nav').getByRole('link', { name: 'Admin', exact: true })
       .waitFor({ timeout: 15000 });
     await adminPublic.locator('#nav').getByRole('link', { name: 'Admin', exact: true }).click();
-    await adminPublic.getByRole('button', { name: 'Verification requests' })
+    // The portal itself, not merely the console: its sidebar and the section
+    // it opens on. Previously this waited on the verification queue's tab,
+    // which was the whole portal; the equivalent proof now is that the eleven
+    // sections rendered and the dashboard is the one on screen.
+    await adminSection(adminPublic, 'Verification').waitFor({ timeout: 20000 });
+    await adminPublic.getByRole('heading', { name: 'Dashboard', exact: true })
       .waitFor({ timeout: 20000 });
     assert.ok(!adminPublic.url().includes('tab='),
       `?tab= should be consumed and stripped; got ${adminPublic.url()}`);

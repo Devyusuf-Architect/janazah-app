@@ -61,6 +61,34 @@ export async function writeSampleDataSetting(enabled) {
   });
 }
 
+/**
+ * The settings document the admin portal's Platform Settings section edits.
+ * Publicly readable, so this runs before anyone signs in. Null when it has
+ * never been written, or cannot be read, and the caller falls back to the
+ * built-in defaults rather than failing.
+ */
+export async function readPlatformSettings() {
+  try {
+    const snap = await getDoc(doc(db, 'platformSettings', 'platform'));
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the whole settings document. Always whole, never a merge: the rules
+ * require every field to be present and in range, so a partial write is
+ * rejected rather than leaving the document half-typed.
+ */
+export async function writePlatformSettings(values) {
+  await setDoc(doc(db, 'platformSettings', 'platform'), {
+    ...values,
+    updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser.uid,
+  });
+}
+
 // --------------------------------------------------------------- sample data
 //
 // Written and removed by a platform administrator from the admin portal. Every
@@ -342,8 +370,25 @@ export function watchOrganizationsByStatus(status, cb) {
   );
 }
 
+/**
+ * Every organization, whatever its status. Platform administrators only:
+ * isPlatformAdmin() in the list rule does not depend on the documents
+ * returned, so an unfiltered query is permitted for them and rejected for
+ * everybody else.
+ */
+export function watchAllOrganizations(cb, max = 400) {
+  return onSnapshot(
+    query(collection(db, 'organizations'), limit(max)),
+    (snap) => cb(snap.docs.map(withId).sort((a, b) =>
+      (a.name || '').localeCompare(b.name || ''))),
+    (err) => { console.error('watchAllOrganizations', err); cb(null, err); },
+  );
+}
+
 export async function updateOrganizationProfile(orgId, patch) {
-  const fields = { ...patch, updatedAt: serverTimestamp() };
+  const fields = {
+    ...patch, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid,
+  };
   if (Number.isFinite(patch.lat) && Number.isFinite(patch.lng)) {
     fields.cell = geohash(patch.lat, patch.lng, APP.cellPrecision);
   }
@@ -357,6 +402,10 @@ export async function setVerificationStatus(orgId, status, reason = '') {
     verificationStatus: status,
     statusReason: reason,
     updatedAt: serverTimestamp(),
+    // Pinned to the caller by firestore.rules. Without it a decision to
+    // suspend or decline reaches the audit trail with no actor at all:
+    // verifiedBy is only written on an approval.
+    updatedBy: user.uid,
   };
   if (status === 'verified') {
     patch.verifiedAt = serverTimestamp();
@@ -396,6 +445,7 @@ export async function approveStaffRequest(orgId, requestUid, currentStaffUids) {
     await updateDoc(doc(db, 'organizations', orgId), {
       staffUids: [...currentStaffUids, requestUid],
       updatedAt: serverTimestamp(),
+      updatedBy: user.uid,
     });
   }
   await updateDoc(doc(db, 'organizations', orgId, 'staffRequests', requestUid), {
@@ -418,6 +468,7 @@ export async function removeStaff(orgId, staffUid, currentStaffUids) {
   await updateDoc(doc(db, 'organizations', orgId), {
     staffUids: currentStaffUids.filter((u) => u !== staffUid),
     updatedAt: serverTimestamp(),
+    updatedBy: auth.currentUser.uid,
   });
 }
 
@@ -496,6 +547,71 @@ export async function cancelNotice(noticeId, existing, reason, { asAdmin = false
   });
 }
 
+/**
+ * A platform administrator's edit of somebody else's notice.
+ *
+ * The whole document is rewritten, because the notice rules validate the
+ * resulting document rather than the diff, and the version counter advances
+ * by one so a concurrent edit by the organization fails loudly instead of
+ * being silently overwritten. lastEditedBy names the administrator, which the
+ * rules require for this clause and which is what lets the audit trigger
+ * attribute the change to a real account.
+ *
+ * Not a route around the organization: it cannot touch a cancelled notice,
+ * cannot cancel one (cancelNotice is that path, and stays terminal), and
+ * cannot move a notice between organizations. firestore.rules enforces all
+ * three, not this function.
+ */
+async function adminWriteNotice(noticeId, existing, patch) {
+  const user = auth.currentUser;
+  const { id, ...current } = existing;
+  const payload = {
+    ...current,
+    ...patch,
+    version: (existing.version || 1) + 1,
+    lastEditedBy: user.uid,
+    updatedAt: serverTimestamp(),
+  };
+  // Same guard the coordinator's own path uses: refuse to send a private
+  // field to a public document, before the rules get the chance to.
+  assertPublicNoticeShape(payload);
+  await setDoc(doc(db, 'notices', noticeId), payload);
+}
+
+/** Correct the text of a notice as a platform administrator. */
+export async function adminCorrectNotice(noticeId, existing, fields, note) {
+  const patch = { ...fields };
+  if (note?.trim()) patch.correctionNote = note.trim();
+  await adminWriteNotice(noticeId, existing, patch);
+}
+
+/**
+ * Hide a published notice, or put a hidden one back.
+ *
+ * Hiding reuses the draft status the app already has rather than a second,
+ * parallel notion of hidden: a draft is not public, is not in the feed, and
+ * can be published again, which is exactly what hiding and restoring mean.
+ */
+export async function adminSetNoticeVisibility(noticeId, existing, visible) {
+  await adminWriteNotice(noticeId, existing, {
+    status: visible ? 'published' : 'draft',
+    isPublic: visible,
+  });
+}
+
+/**
+ * Every notice, soonest last. Platform administrators only, for the same
+ * reason watchAllOrganizations is: the admin clause in the list rule does not
+ * depend on the documents returned.
+ */
+export function watchAllNotices(cb, max = 300) {
+  return onSnapshot(
+    query(collection(db, 'notices'), orderBy('janazahAt', 'desc'), limit(max)),
+    (snap) => cb(snap.docs.map(withId)),
+    (err) => { console.error('watchAllNotices', err); cb(null, err); },
+  );
+}
+
 export async function deleteDraft(noticeId) {
   await deleteDoc(doc(db, 'notices', noticeId));
 }
@@ -514,6 +630,17 @@ export async function getNoticePrivate(noticeId) {
   } catch {
     return {};
   }
+}
+
+/** One organization's notices, newest first. Staff and platform admins. */
+export async function listOrgNotices(orgId, max = 50) {
+  const snap = await getDocs(query(
+    collection(db, 'notices'),
+    where('orgId', '==', orgId),
+    orderBy('createdAt', 'desc'),
+    limit(max),
+  ));
+  return snap.docs.map(withId);
 }
 
 /** Everything belonging to one organization, staff view, drafts included. */
@@ -594,6 +721,67 @@ export async function resolveReport(reportId, status, resolution) {
     resolvedBy: user.uid,
     resolvedAt: serverTimestamp(),
   });
+}
+
+/** Every report, newest first. Platform administrators only. */
+export async function listReports(max = 200) {
+  const snap = await getDocs(query(
+    collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(max)));
+  return snap.docs.map(withId);
+}
+
+// ------------------------------------------------------------- audit trail
+//
+// Entries are written only by Cloud Functions triggers through the Admin SDK
+// (functions/index.js). Nothing here writes: firestore.rules closes /auditLog
+// to every client write, which is what makes the trail unforgeable in fact
+// rather than in intent: there is no client code path, correct or malicious,
+// that can produce a document change without a matching entry appearing, or
+// that can write an entry not corresponding to a real change. See
+// functions/lib/audit-log.js for what gets written and why.
+
+/** The whole trail, newest first. Platform administrators only. */
+export async function auditRecent(max = 200) {
+  const snap = await getDocs(query(
+    collection(db, 'auditLog'), orderBy('at', 'desc'), limit(max)));
+  return snap.docs.map(withId);
+}
+
+/** Recent audit entries for one organization. Staff and platform admins only. */
+export async function auditForOrg(orgId, max = 100) {
+  const snap = await getDocs(query(
+    collection(db, 'auditLog'),
+    where('orgId', '==', orgId),
+    orderBy('at', 'desc'),
+    limit(max),
+  ));
+  return snap.docs.map(withId);
+}
+
+/**
+ * The audit history of one notice.
+ *
+ * Filtered in the browser rather than by a second where() clause on purpose:
+ * the orgId + at index already exists, and adding a targetId one would be a
+ * new composite index to deploy for a query that this narrows to a handful of
+ * rows anyway.
+ */
+export async function auditForNotice(orgId, noticeId, max = 200) {
+  const entries = await auditForOrg(orgId, max);
+  return entries.filter((e) => e.targetId === noticeId);
+}
+
+// ------------------------------------------------------ platform admins
+//
+// /admins is read-only from every client: firestore.rules has
+// `allow write: if false` on it, deliberately, so that no bug and no
+// compromised session in this app can grant anybody administrator rights.
+// Adding one is a deliberate act in the Firebase console.
+
+/** The current platform administrators. Platform administrators only. */
+export async function listPlatformAdmins() {
+  const snap = await getDocs(collection(db, 'admins'));
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
 }
 
 /**

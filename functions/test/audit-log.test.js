@@ -158,6 +158,43 @@ describe('classifyOrgChange', () => {
     assert.equal(entries[0].targetUid, 'staff1');
   });
 
+  test('a staff removal names the account that made it', () => {
+    // updatedBy is pinned to the caller by firestore.rules. Before it existed
+    // this entry recorded that access was revoked and nobody revoked it.
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['owner', 'staff1'] },
+      { verificationStatus: 'verified', staffUids: ['owner'], updatedBy: 'admin1' });
+    assert.equal(entries[0].actorUid, 'admin1');
+  });
+
+  test('a suspension names the administrator, not nobody', () => {
+    // verifiedBy is only written on an approval, so it could never answer
+    // this; updatedBy is written on every organization change.
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['owner'] },
+      { verificationStatus: 'suspended', staffUids: ['owner'], updatedBy: 'admin1' });
+    assert.equal(entries[0].action, ACTIONS.ORG_SUSPENDED);
+    assert.equal(entries[0].actorUid, 'admin1');
+  });
+
+  test('an approval is still attributed to whoever approved it', () => {
+    const entries = classifyOrgChange(
+      { verificationStatus: 'pending', staffUids: ['owner'] },
+      {
+        verificationStatus: 'verified', staffUids: ['owner'],
+        verifiedBy: 'admin1', updatedBy: 'admin2',
+      });
+    assert.equal(entries[0].actorUid, 'admin1');
+  });
+
+  test('a profile edit names the account that made it', () => {
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['owner'], phone: '1' },
+      { verificationStatus: 'verified', staffUids: ['owner'], phone: '2', updatedBy: 'owner' });
+    assert.equal(entries[0].action, ACTIONS.ORG_UPDATED);
+    assert.equal(entries[0].actorUid, 'owner');
+  });
+
   test('multiple staff removed in one write each get an entry', () => {
     const entries = classifyOrgChange(
       { verificationStatus: 'verified', staffUids: ['owner', 'a', 'b'] },

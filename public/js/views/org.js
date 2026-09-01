@@ -11,7 +11,7 @@ import {
   findPossibleDuplicates,
 } from '../verification.js';
 import * as store from '../store.js';
-import { auditForOrg } from '../audit.js';
+
 import { sendSignInEmailConfirmation } from './auth.js';
 import { documentProblem, uploadVerificationDocument } from '../upload.js';
 
@@ -138,7 +138,7 @@ function verificationStateScreen(org, ctx, mount) {
       el('dt', { text: 'Address' }),
       el('dd', { text: `${org.address}, ${org.city}, ${org.province}` }),
       el('dt', { text: 'Submitted' }),
-      el('dd', { text: submitted || '—' }),
+      el('dd', { text: submitted || 'not recorded' }),
       el('dt', { text: 'Status' }),
       el('dd', { text: VERIFICATION_STATUS_LABEL[org.verificationStatus] || org.verificationStatus }),
     ]),
@@ -314,7 +314,7 @@ export function renderOrgs(mount, ctx) {
         el('dt', { text: 'Type' }),
         el('dd', { text: ORG_TYPES.find((t) => t.value === org.type)?.label || org.type }),
         el('dt', { text: 'Alert cell' }),
-        el('dd', { class: 'mono', text: org.cell || '—' }),
+        el('dd', { class: 'mono', text: org.cell || 'not recorded' }),
         el('dt', { text: 'Staff' }),
         el('dd', { text: `${org.staffUids?.length || 0} authorized` }),
       ]),
@@ -689,7 +689,7 @@ function renderRegisterForm(mount, ctx) {
     el('p', {
       class: 'muted',
       text: 'This part is private. It is read by platform administrators ' +
-            'reviewing this registration and by nobody else — not the ' +
+            'reviewing this registration and by nobody else: not the ' +
             'community, not other organizations, and not visitors to the ' +
             'public page after approval.',
     }),
@@ -764,8 +764,8 @@ function renderRegisterForm(mount, ctx) {
     el('p', {
       class: 'muted',
       text: 'Pick whatever is true. None of these is required, and a ' +
-            'registration is never approved or declined automatically — ' +
-            'a person reads every one of these.',
+            'registration is never approved or declined automatically. ' +
+            'A person reads every one of these.',
     }),
     el('div', { class: 'check-list' }, methodBoxes),
     field('staffPageUrl', 'Link to a staff or contact page', { type: 'url' },
@@ -834,7 +834,7 @@ function renderRegisterForm(mount, ctx) {
           : 'These may already be registered',
       }),
       el('ul', { class: 'review-list' }, hits.map((o) => el('li', {
-        text: `${o.name} — ${o.address}, ${o.city}`,
+        text: `${o.name} (${o.address}, ${o.city})`,
       }))),
       el('p', {
         text: 'If that is the same organization, ask its existing '
@@ -1289,7 +1289,7 @@ async function viewAudit(org) {
   const body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
   showModal(`Audit trail: ${org.name}`, body, { wide: true });
   try {
-    const entries = await auditForOrg(org.id);
+    const entries = await store.auditForOrg(org.id);
     body.replaceChildren(renderAuditTable(entries));
   } catch (err) {
     body.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err) }));
@@ -1299,7 +1299,7 @@ async function viewAudit(org) {
 export function renderAuditTable(entries) {
   if (!entries.length) return el('p', { class: 'muted', text: 'No entries yet.' });
   const rows = entries.map((e) => {
-    const at = e.at?.toDate ? e.at.toDate().toLocaleString('en-CA') : '—';
+    const at = e.at?.toDate ? e.at.toDate().toLocaleString('en-CA') : 'not recorded';
     const detail = e.details && Object.keys(e.details).length
       ? JSON.stringify(e.details) : '';
     return el('tr', {}, [

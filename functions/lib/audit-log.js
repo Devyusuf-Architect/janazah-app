@@ -140,10 +140,18 @@ export function classifyOrgChange(before, after) {
 
   const entries = [];
 
+  // verifiedBy is only written on an approval, so it cannot be the actor for
+  // a suspension or a decline. updatedBy is written by every client path that
+  // changes an organization and is pinned to the caller by firestore.rules,
+  // which makes it the general answer; verifiedBy stays ahead of it so an
+  // approval is still attributed to whoever actually approved it even if some
+  // other field was carried along in the same write.
+  const orgActor = after.verifiedBy ?? after.updatedBy ?? null;
+
   if (before.verificationStatus !== after.verificationStatus) {
     entries.push({
       action: ORG_STATUS_ACTION[after.verificationStatus] || ACTIONS.ORG_UPDATED,
-      actorUid: after.verifiedBy ?? null,
+      actorUid: orgActor,
     });
   }
 
@@ -153,7 +161,11 @@ export function classifyOrgChange(before, after) {
   const grew = [...afterStaff].some((uid) => !beforeStaff.has(uid));
 
   for (const removedUid of removed) {
-    entries.push({ action: ACTIONS.STAFF_REMOVED, actorUid: null, targetUid: removedUid });
+    entries.push({
+      action: ACTIONS.STAFF_REMOVED,
+      actorUid: after.updatedBy ?? null,
+      targetUid: removedUid,
+    });
   }
 
   if (entries.length === 0 && !grew && JSON.stringify(before) !== JSON.stringify(after)) {
@@ -161,7 +173,7 @@ export function classifyOrgChange(before, after) {
     // profile field (name, address, contact email, and so on). A document
     // that genuinely did not change at all, timestamps included, gets no
     // entry rather than a spurious org.updated.
-    entries.push({ action: ACTIONS.ORG_UPDATED, actorUid: null });
+    entries.push({ action: ACTIONS.ORG_UPDATED, actorUid: after.updatedBy ?? null });
   }
 
   return entries;

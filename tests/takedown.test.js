@@ -1,11 +1,12 @@
 // The family takedown request.
 //
-// feed.js and admin.js cannot be imported directly in a plain Node test: they
-// pull in firebase.js, which expects a browser. That is also true of the
-// existing rules and duplicate-detection tests, which is why this follows the
-// same approach as tests/sample-data.test.js: check the source text for the
-// specific things that must hold, rather than executing the module. The
-// browser end-to-end test is what actually drives this flow in a real page.
+// feed.js and the admin views cannot be imported directly in a plain Node
+// test: they pull in firebase.js, which expects a browser. That is also true
+// of the existing rules and duplicate-detection tests, which is why this
+// follows the same approach as tests/sample-data.test.js: check the source
+// text for the specific things that must hold, rather than executing the
+// module. The browser end-to-end test is what actually drives this flow in a
+// real page.
 
 import { test, describe } from 'node:test';
 import { strict as assert } from 'node:assert';
@@ -30,12 +31,12 @@ describe('the family takedown reason', () => {
   });
 
   test('is labelled distinctly in the admin triage view, not left to the raw value', () => {
-    const source = readFileSync('public/js/views/admin.js', 'utf8');
+    const source = readFileSync('public/js/views/admin/reports.js', 'utf8');
     assert.match(source, /family_takedown:\s*'Family takedown request'/);
   });
 
   test('open family requests are sorted ahead of other open reports', () => {
-    const source = readFileSync('public/js/views/admin.js', 'utf8');
+    const source = readFileSync('public/js/views/admin/reports.js', 'utf8');
     assert.match(source, /family_takedown[\s\S]{0,80}\.sort\(|\.sort\([\s\S]{0,80}family_takedown/);
   });
 

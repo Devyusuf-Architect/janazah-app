@@ -75,7 +75,8 @@ service cloud.firestore {
               'country',
               'lat', 'lng', 'cell', 'contactEmail', 'phone', 'website',
               'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
-              'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt'];
+              'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt',
+              'updatedBy'];
     }
 
     function orgRequiredKeys() {
@@ -104,6 +105,19 @@ service cloud.firestore {
         && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
         && request.resource.data.staffUids is list
         && request.resource.data.staffUids.size() <= 50;
+    }
+
+    // Who made this change, when the writer chose to say.
+    //
+    // Optional, so every existing writer keeps working, and pinned to the
+    // authenticated caller when present, so it is worth something. The
+    // organization document has no lastEditedBy of its own, which meant a
+    // staff removal or a profile edit reached the audit trail with no actor
+    // at all: a record that something happened and nobody did it. This is
+    // what the audit trigger reads to name the account responsible.
+    function pinnedUpdatedBy() {
+      return !('updatedBy' in request.resource.data)
+        || request.resource.data.updatedBy == uid();
     }
 
     match /organizations/{orgId} {
@@ -140,6 +154,7 @@ service cloud.firestore {
       // the client happened to send.
       allow update: if isPlatformAdmin()
         && validOrgShape()
+        && pinnedUpdatedBy()
         && !changed(['ownerUid', 'createdAt', 'createdBy'])
         && (request.resource.data.get('verifiedBy', null) == resource.data.get('verifiedBy', null)
             || request.resource.data.verifiedBy == uid());
@@ -147,12 +162,14 @@ service cloud.firestore {
       // Owner: may edit the profile and manage staff, never the status.
       allow update: if isOrgOwner(orgId)
         && validOrgShape()
+        && pinnedUpdatedBy()
         && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
                      'statusReason', 'ownerUid', 'createdAt', 'createdBy']);
 
       // Non-owner staff: profile edits only, no staff list changes.
       allow update: if isOrgStaff(orgId)
         && validOrgShape()
+        && pinnedUpdatedBy()
         && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
                      'statusReason', 'ownerUid', 'staffUids', 'createdAt',
                      'createdBy']);

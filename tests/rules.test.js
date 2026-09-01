@@ -28,6 +28,12 @@ const OUTSIDER = 'outsider-uid';
 const VERIFIED_ORG = 'org-verified';
 const PENDING_ORG = 'org-pending';
 
+// Fixed, not Timestamp.now(), so a test that rewrites the whole organization
+// document can reproduce createdAt exactly. The update rules pin createdAt,
+// and a freshly generated "now" is a changed createdAt, which is a denial
+// that says nothing about the clause the test is actually there to check.
+const ORG_CREATED_AT = Timestamp.fromDate(new Date('2026-08-01T12:00:00Z'));
+
 const prayerLocation = {
   name: 'Main Prayer Hall',
   address: '100 Example St, Toronto',
@@ -74,7 +80,7 @@ beforeEach(async () => {
       lat: 43.6532, lng: -79.3832, cell: 'dpz83',
       verificationStatus: 'verified',
       ownerUid: OWNER, staffUids: [OWNER, STAFF],
-      createdAt: Timestamp.now(), createdBy: OWNER,
+      createdAt: ORG_CREATED_AT, createdBy: OWNER,
     });
 
     await setDoc(doc(db, 'organizations', PENDING_ORG), {
@@ -480,6 +486,47 @@ describe('the platform settings document the admin portal edits', () => {
   test('a settings key nobody knows about cannot be created at all', async () => {
     await assertFails(setDoc(doc(as(ADMIN), 'platformSettings', 'somethingElse'),
       { enabled: true, updatedAt: serverTimestamp(), updatedBy: ADMIN }));
+  });
+});
+
+describe('updatedBy on an organization', () => {
+  // Optional, so every writer that predates it keeps working, and pinned to
+  // the caller when present, so the audit trigger can name a real account for
+  // a suspension or a staff removal instead of recording that something
+  // happened and nobody did it.
+
+  const orgFields = (overrides = {}) => ({
+    name: 'Test Masjid', type: 'masjid',
+    address: '100 Example St', city: 'Toronto', province: 'ON',
+    lat: 43.6532, lng: -79.3832, cell: 'dpz83',
+    verificationStatus: 'verified',
+    ownerUid: OWNER, staffUids: [OWNER, STAFF],
+    createdAt: ORG_CREATED_AT, createdBy: OWNER,
+    ...overrides,
+  });
+
+  test('an admin may stamp their own uid on a change', async () => {
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { verificationStatus: 'suspended', statusReason: 'x', updatedBy: ADMIN }));
+  });
+
+  test('an admin cannot stamp somebody else on it', async () => {
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { verificationStatus: 'suspended', statusReason: 'x', updatedBy: OWNER }));
+  });
+
+  test('an owner cannot claim an edit was made by an administrator', async () => {
+    await assertFails(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0100', updatedBy: ADMIN }));
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0100', updatedBy: OWNER }));
+  });
+
+  test('leaving it out is still a valid write', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0101' }));
+    await assertSucceeds(setDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      orgFields({ verificationStatus: 'suspended' })));
   });
 });
 
