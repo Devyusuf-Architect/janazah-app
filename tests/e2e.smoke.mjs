@@ -400,9 +400,17 @@ const run = async () => {
     // a stronger place to assert it than a browser click-path.
 
     // ---- publishing is blocked while unverified ----------------------------
+    // The status strip must be honest about an unverified organization
+    // (never a green "verified" badge it has not earned), and the empty
+    // state must say plainly that publishing is not available yet.
     await coord.getByRole('button', { name: 'Notices' }).click();
-    const warning = await coord.locator('.notice-strip--warn').first().textContent();
-    assert.match(warning, /verified yet/i, 'expected an unverified warning');
+    const stripText = await coord.locator('.org-strip').first().innerText();
+    assert.match(stripText, /pending/i, 'expected the real not-verified status on the strip');
+    assert.ok(!stripText.includes('Verified Masjid'),
+      'a pending organization must not show the verified badge');
+    const emptyText = await coord.locator('.empty').first().innerText();
+    assert.match(emptyText, /cannot publish/i,
+      'expected an explanation that publishing is blocked');
     log('publishing correctly blocked while unverified');
 
     // ---- platform admin verifies -------------------------------------------
