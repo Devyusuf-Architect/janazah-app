@@ -165,6 +165,20 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The `hidden` attribute means hidden, whatever else this sheet says.
+ *
+ * The user agent hides [hidden] with `display: none`, but that rule carries
+ * almost no specificity, so any author rule setting `display` on the same
+ * element silently beats it: `.btn { display: inline-flex }` alone was enough
+ * to keep every `hidden: true` button on the registration wizard on screen,
+ * which meant "Submit for verification" sat beside "Continue" from the first
+ * step. The JavaScript was right; the attribute simply had no effect.
+ *
+ * This is the one place that should ever need to know that. Set the attribute
+ * and the element goes away, whatever display it would otherwise have.
+ */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 /* Text size, set from Settings. Everything in this sheet is in rem, so moving

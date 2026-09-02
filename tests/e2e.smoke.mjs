@@ -177,6 +177,19 @@ async function confirmEmail(email) {
   assert.ok(res.ok, `could not confirm ${email}: ${res.status}`);
 }
 
+/**
+ * A control carrying `hidden` must actually be off the screen.
+ *
+ * Checked through isVisible() rather than by reading the attribute back,
+ * because the bug this guards against was CSS winning over the attribute: the
+ * markup said hidden and the button was there to click anyway.
+ */
+async function assertHidden(page, name, where) {
+  const control = page.getByRole('button', { name, exact: true });
+  assert.equal(await control.isVisible(), false,
+    `"${name}" must not be visible on ${where}`);
+}
+
 async function signUp(page, { email, password }, name, { start } = {}) {
   await page.goto(`${BASE}/console${start ? `?start=${start}` : ''}`);
   await page.getByRole('button', { name: 'Create an account' }).click();
@@ -306,6 +319,14 @@ const run = async () => {
     await coord.locator('#phone').fill('+1 416 555 0100');
     await coord.locator('#website').fill('https://example.com');
 
+    // One step's controls at a time. This is a visibility assertion, not a
+    // logic one: the wizard always set `hidden` correctly, but `.btn` sets
+    // `display`, which beat the user agent's own [hidden] rule, so "Submit
+    // for verification" sat beside "Continue" from the very first step and a
+    // half-finished registration looked submittable.
+    await assertHidden(coord, 'Submit for verification', 'the first step');
+    await assertHidden(coord, 'Back', 'the first step');
+
     // ---- step 2: who is filling this in ------------------------------------
     // Nothing about the applicant is asked until the organization itself has
     // been described. Front-loading "prove who you are" on a bereavement
@@ -330,6 +351,9 @@ const run = async () => {
 
     // ---- step 4: read it back ----------------------------------------------
     await coord.getByRole('button', { name: 'Continue' }).click();
+    // ...and on the last step it is Continue that goes away, so the only way
+    // forward is the one that submits.
+    await assertHidden(coord, 'Continue', 'the review step');
     const review = await coord.locator('.review-summary').innerText();
     assert.match(review, /Test Coordinator/, 'the review step must show what was entered');
     assert.match(review, /stay private/i,
