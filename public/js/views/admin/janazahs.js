@@ -260,7 +260,7 @@ async function setVisibility(notice, visible, refresh) {
     refresh();
   } catch (err) {
     console.error('adminSetNoticeVisibility', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
   }
 }
 
@@ -278,7 +278,7 @@ async function takeDown(notice, refresh) {
     toast('Notice cancelled.');
     refresh();
   } catch (err) {
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
   }
 }
 
@@ -388,7 +388,7 @@ function correctNotice(notice, refresh) {
     } catch (err) {
       console.error('adminCorrectNotice', err);
       error.hidden = false;
-      error.textContent = friendlyError(err);
+      error.textContent = friendlyError(err, 'admin');
       save.disabled = false;
     }
   });

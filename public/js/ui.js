@@ -313,6 +313,17 @@ const PERMISSION_DENIED = {
   orgLoad:
     'We could not check which masjids you belong to. That is a problem on our ' +
     'side, not with your account, and it does not stop you registering below.',
+  // An administrator reading the publishing message is being told something
+  // untrue about an action that has nothing to do with publishing. The real
+  // cause is almost always the same one: the rules the project is running are
+  // older than the app making the request, so a field this write includes is
+  // one the deployed rules do not yet allow. That is a deploy, not a mistake
+  // the person clicking can correct, so say which one it is.
+  admin:
+    'That change was refused by the database rules. This usually means the ' +
+    'deployed security rules are older than this version of the app: run ' +
+    'firebase deploy --only firestore:rules from an up to date checkout. ' +
+    'Nothing was changed.',
   default:
     'Permission denied. Your organization may not be verified yet, or you ' +
     'may not be authorized to publish for it.',

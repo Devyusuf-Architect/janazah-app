@@ -343,7 +343,7 @@ async function decideRequest(org, request, approve, actx) {
     actx?.refresh?.();
   } catch (err) {
     console.error('decideStaffRequest', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
   }
 }
 
@@ -362,6 +362,6 @@ async function removeStaff(org, uid, actx) {
     actx?.refresh?.();
   } catch (err) {
     console.error('removeStaff', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
   }
 }

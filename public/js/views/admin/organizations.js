@@ -242,7 +242,7 @@ async function verificationPane(org) {
       await store.saveReviewNotes(org.id, notes.value);
       toast('Notes saved.');
     } catch (err) {
-      toast(friendlyError(err), 'error');
+      toast(friendlyError(err, 'admin'), 'error');
     } finally {
       saveNotes.disabled = false;
     }
@@ -293,7 +293,7 @@ async function verificationPane(org) {
                 '_blank', 'noopener,noreferrer');
             } catch (err) {
               console.error('verificationDocumentUrl', err);
-              toast(friendlyError(err), 'error');
+              toast(friendlyError(err, 'admin'), 'error');
             } finally {
               button.disabled = false;
             }
@@ -402,7 +402,7 @@ export function decisionButtons(org, actx) {
       toast(`${org.name} is now ${VERIFICATION_STATUS_LABEL[nextStatus] || nextStatus}.`);
       actx?.refresh?.();
     } catch (err) {
-      toast(friendlyError(err), 'error');
+      toast(friendlyError(err, 'admin'), 'error');
     }
   };
 

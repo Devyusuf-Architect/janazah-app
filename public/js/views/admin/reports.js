@@ -113,7 +113,7 @@ function reportCard(report, refresh) {
       toast(`Report ${status}.`);
       refresh();
     } catch (err) {
-      toast(friendlyError(err), 'error');
+      toast(friendlyError(err, 'admin'), 'error');
     }
   };
 

@@ -143,7 +143,7 @@ export function renderSettings(panel, actx) {
       renderSettings(panel, actx);
     } catch (err) {
       console.error('writePlatformSettings', err);
-      show(error, friendlyError(err));
+      show(error, friendlyError(err, 'admin'));
       save.disabled = false;
     }
   });

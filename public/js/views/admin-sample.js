@@ -123,7 +123,7 @@ async function toggle(button, panel, ctx, next) {
     renderAdminSample(panel, ctx);
   } catch (err) {
     console.error('writeSampleDataSetting', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
     button.disabled = false;
   }
 }
@@ -138,7 +138,7 @@ async function addRecords(button, panel, ctx) {
     renderAdminSample(panel, ctx);
   } catch (err) {
     console.error('seedSampleData', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
     button.disabled = false;
     button.textContent = original;
   }
@@ -163,7 +163,7 @@ async function removeRecords(button, panel, ctx) {
     renderAdminSample(panel, ctx);
   } catch (err) {
     console.error('removeSampleData', err);
-    toast(friendlyError(err), 'error');
+    toast(friendlyError(err, 'admin'), 'error');
     button.disabled = false;
     button.textContent = 'Remove all sample records';
   }
