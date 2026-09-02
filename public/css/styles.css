@@ -1041,6 +1041,33 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 }
 .row-actions { margin-top: 0; }
 
+/* Compact identity strip atop Notices: who is publishing, as what, and the
+   one primary action, kept to a single row rather than a hero block. */
+.org-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .9rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+.org-strip__id {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.org-strip__name {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.org-strip__role {
+  color: var(--ink-3);
+  font-size: .84rem;
+}
+
 .empty {
   display: grid;
   justify-items: center;
@@ -1700,6 +1727,8 @@ select.field { cursor: pointer; }
 
   .page-head { flex-direction: column; align-items: stretch; }
   .page-head .btn { width: 100%; }
+  .org-strip { flex-direction: column; align-items: stretch; }
+  .org-strip .btn { width: 100%; }
   dl.kv { grid-template-columns: 1fr; gap: .1rem; }
   dl.kv dt { margin-top: .55rem; }
   .form-actions--sticky { flex-direction: column; align-items: stretch; }
@@ -3730,6 +3759,11 @@ body.is-scrolled .masthead {
   gap: .4rem;
   margin-top: .85rem;
 }
+
+/* Granting administration: one short field, kept to a readable measure so it
+   does not stretch to the width of the portal and read as a bulk import. */
+.admin-grant { max-width: 26rem; }
+.admin-grant .hint { margin-top: .35rem; }
 
 .admin-form { display: flex; flex-direction: column; gap: .7rem; }
 .admin-form .field-group { margin-bottom: 0; }

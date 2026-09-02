@@ -1,7 +1,7 @@
 // Notice composition, preview, publishing, correction and cancellation.
 
 import {
-  el, append, icon, toast, readForm, fillForm, friendlyError, askReason, showModal,
+  el, icon, toast, readForm, fillForm, friendlyError, askReason, showModal,
 } from '../ui.js';
 import {
   validateNoticeForm, buildPublicNotice, buildPrivateDetails, noticeToForm,
@@ -9,6 +9,7 @@ import {
 } from '../model.js';
 import { publicNoticeView } from '../notice-view.js';
 import { placePicker } from './place-picker.js';
+import { statusBadge } from './org.js';
 import * as store from '../store.js';
 
 let unwatch = null;
@@ -20,8 +21,6 @@ export function teardownNotices() {
 export function renderNotices(mount, ctx) {
   teardownNotices();
   mount.replaceChildren();
-
-  const publishable = ctx.orgs.filter((o) => o.verificationStatus === 'verified');
 
   if (!ctx.orgs.length) {
     mount.append(el('div', { class: 'empty' }, [
@@ -39,20 +38,13 @@ export function renderNotices(mount, ctx) {
   mount.append(el('div', { class: 'page-head' }, [
     el('div', {}, [
       el('h1', { text: 'Janazah notices' }),
-      el('label', { class: 'label label--inline', for: 'org-picker', text: 'Organization' }),
-      selector,
+      ctx.orgs.length > 1 ? el('label', { class: 'label label--inline', for: 'org-picker', text: 'Organization' }) : null,
+      ctx.orgs.length > 1 ? selector : null,
     ]),
-    el('button', {
-      class: 'btn btn--primary',
-      onclick: () => openComposer(mount, ctx, currentOrg(), null),
-    }, 'New notice'),
   ]));
 
-  if (!publishable.length) {
-    mount.append(el('p', { class: 'notice-strip notice-strip--warn' },
-      'None of your organizations are verified yet. You can save drafts, but ' +
-      'publishing is blocked until a platform administrator approves one.'));
-  }
+  const strip = el('div');
+  mount.append(strip);
 
   const list = el('div', { class: 'stack' });
   mount.append(list);
@@ -64,6 +56,8 @@ export function renderNotices(mount, ctx) {
 
   function subscribe() {
     teardownNotices();
+    strip.replaceChildren(orgStatusStrip(currentOrg(), ctx,
+      () => openComposer(mount, ctx, currentOrg(), null)));
     list.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
     unwatch = store.watchOrgNotices(currentOrgId(), (notices) => {
       list.replaceChildren();
@@ -96,6 +90,33 @@ export function renderNotices(mount, ctx) {
 
   selector.addEventListener('change', subscribe);
   subscribe();
+}
+
+/**
+ * Who is publishing, as what, and the one action a coordinator came here
+ * for. This replaces the old "None of your organizations are verified yet"
+ * banner, which spoke about every organization at once even though only one
+ * is ever selected: this strip is honest about the org actually in view.
+ *
+ * The verified badge copy and styling match janazahRow()/masjidRow() in
+ * home.js, so "Verified Masjid" reads the same wherever it appears. A
+ * not-verified organization gets the real status word from statusBadge()
+ * (org.js), never a green badge it has not earned.
+ */
+function orgStatusStrip(org, ctx, onPost) {
+  const verified = org.verificationStatus === 'verified';
+  const role = org.ownerUid === ctx.user.uid ? 'Owner' : 'Staff';
+  return el('div', { class: 'card org-strip' }, [
+    el('div', { class: 'org-strip__id' }, [
+      verified
+        ? el('span', { class: 'chip chip--verified' },
+          [icon('check', { size: 12 }), el('span', { text: 'Verified Masjid' })])
+        : statusBadge(org.verificationStatus),
+      el('h2', { class: 'org-strip__name', text: org.name }),
+      el('span', { class: 'org-strip__role', text: role }),
+    ]),
+    el('button', { class: 'btn btn--primary', onclick: onPost }, 'Post a Janazah'),
+  ]);
 }
 
 const STATUS_TONE = { draft: 'muted', published: 'ok', cancelled: 'error' };
@@ -234,13 +255,35 @@ function timeZoneSelect(existing) {
     })));
 }
 
+// A short guided sequence rather than one long technical form. Nothing about
+// the fields, validation, or the public/private split changes here: this is
+// the same form, walked through a few screens at a time, on the same
+// stepper/gapIn pattern already established for org.js's registration
+// wizard.
+const NOTICE_STEPS = [
+  { key: 'when', title: 'When & where' },
+  { key: 'who', title: 'Who' },
+  { key: 'details', title: 'Details' },
+  { key: 'review', title: 'Review' },
+];
+
+function noticeStepper(current) {
+  return el('ol', { class: 'stepper' }, NOTICE_STEPS.map((step, i) => el('li', {
+    class: `stepper__item${i === current ? ' is-current' : ''}${i < current ? ' is-done' : ''}`,
+    'aria-current': i === current ? 'step' : null,
+  }, [
+    el('span', { class: 'stepper__num', text: String(i + 1) }),
+    el('span', { class: 'stepper__label', text: step.title }),
+  ])));
+}
+
 async function openComposer(mount, ctx, org, existing) {
   teardownNotices();
   mount.replaceChildren();
 
   const editing = !!existing;
   const error = el('p', { class: 'form-error', hidden: true });
-  const form = el('form', { class: 'card' });
+  const form = el('form', { class: 'card', novalidate: true });
 
   // Both locations are searched, never typed as coordinates. See
   // place-picker.js: these two fields decide whether the notice reaches
@@ -266,66 +309,56 @@ async function openComposer(mount, ctx, org, existing) {
     nameHint: 'The cemetery as mourners would find it signposted.',
   });
 
-  append(form,
-    el('h1', { text: editing ? 'Correct notice' : 'New Janazah notice' }),
-    el('p', { class: 'muted', text: `Publishing as ${org.name}` }),
-
-    el('fieldset', { class: 'fieldset' }, [
-      el('legend', { text: 'Public details' }),
-      el('p', { class: 'hint hint--boxed' },
-        'Everything in this section becomes publicly readable the moment you ' +
-        'publish. Do not put family phone numbers or internal notes here; ' +
-        'there is a private section below for those.'),
-
-      fieldGroup('deceasedName', 'Name of the deceased', { maxlength: 140 }),
-      el('label', { class: 'check' }, [
-        el('input', { type: 'checkbox', name: 'showDeceasedName' }),
-        el('span', { text: 'The family has approved sharing this name publicly' }),
-      ]),
-      el('p', { class: 'hint' },
-        'Leave both blank if the family has not approved. A name entered ' +
-        'without approval is rejected rather than quietly hidden.'),
-
-      el('div', { class: 'field-row' }, [
-        fieldGroup('janazahAt', 'Janazah date and prayer time',
-          { type: 'datetime-local', required: true }),
-        el('div', { class: 'field-group' }, [
-          el('label', { class: 'label', for: 'timeZone', text: 'Time zone' }),
-          timeZoneSelect(existing?.timeZone),
-        ]),
-      ]),
-      fieldGroup('timeLabel', 'Time description (optional)',
-        { maxlength: 60, placeholder: 'After Dhuhr' },
-        'Shown alongside the clock time. Use it when the time is announced ' +
-        'relative to a prayer rather than as a fixed hour.'),
-
-      prayer.node,
-      burial.node,
-
+  const whenStep = el('section', { class: 'step' }, [
+    el('h2', { text: 'When and where is the prayer?' }),
+    el('div', { class: 'field-row' }, [
+      fieldGroup('janazahAt', 'Janazah date and prayer time',
+        { type: 'datetime-local', required: true }),
       el('div', { class: 'field-group' }, [
-        el('label', { class: 'label', for: 'instructions', text: 'Public instructions' }),
-        el('textarea', {
-          class: 'field', id: 'instructions', name: 'instructions', rows: 4,
-          maxlength: 2000,
-          placeholder: 'Parking, entrance to use, whether the burial follows immediately.',
-        }),
+        el('label', { class: 'label', for: 'timeZone', text: 'Time zone' }),
+        timeZoneSelect(existing?.timeZone),
       ]),
     ]),
+    fieldGroup('timeLabel', 'Time description (optional)',
+      { maxlength: 60, placeholder: 'After Dhuhr' },
+      'Shown alongside the clock time. Use it when the time is announced ' +
+      'relative to a prayer rather than as a fixed hour.'),
+    prayer.node,
+  ]);
 
-    el('fieldset', { class: 'fieldset fieldset--private' }, [
-      el('legend', { text: 'Private, staff only' }),
-      el('p', { class: 'hint' },
-        'Stored separately from the public notice and readable only by staff of ' +
-        'this organization and platform administrators. These fields cannot be ' +
-        'written onto the public document.'),
-      fieldGroup('familyContactName', 'Family contact name'),
-      fieldGroup('familyContactPhone', 'Family contact phone', { type: 'tel' }),
-      el('div', { class: 'field-group' }, [
-        el('label', { class: 'label', for: 'internalNotes', text: 'Internal notes' }),
-        el('textarea', { class: 'field', id: 'internalNotes', name: 'internalNotes', rows: 3 }),
-      ]),
+  const whoStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'Who is this Janazah for?' }),
+    fieldGroup('deceasedName', 'Name of the deceased', { maxlength: 140 }),
+    el('label', { class: 'check' }, [
+      el('input', { type: 'checkbox', name: 'showDeceasedName' }),
+      el('span', { text: 'The family has approved sharing this name publicly' }),
     ]),
+    el('p', { class: 'hint' },
+      'Leave both blank if the family has not approved. A name entered ' +
+      'without approval is rejected rather than quietly hidden.'),
+    burial.node,
+  ]);
 
+  const detailsStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'Instructions and family contact' }),
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', for: 'instructions', text: 'Public instructions' }),
+      el('textarea', {
+        class: 'field', id: 'instructions', name: 'instructions', rows: 4,
+        maxlength: 2000,
+        placeholder: 'Parking, entrance to use, whether the burial follows immediately.',
+      }),
+    ]),
+    el('p', { class: 'hint hint--boxed' },
+      'Everything above becomes publicly readable the moment you publish. ' +
+      'What follows is private: readable only by staff of this organization ' +
+      'and platform administrators, and never written onto the public notice.'),
+    fieldGroup('familyContactName', 'Family contact name'),
+    fieldGroup('familyContactPhone', 'Family contact phone', { type: 'tel' }),
+    el('div', { class: 'field-group' }, [
+      el('label', { class: 'label', for: 'internalNotes', text: 'Internal notes' }),
+      el('textarea', { class: 'field', id: 'internalNotes', name: 'internalNotes', rows: 3 }),
+    ]),
     editing ? el('div', { class: 'field-group' }, [
       el('label', { class: 'label', for: 'correctionNote', text: 'What changed' }),
       el('input', {
@@ -334,16 +367,118 @@ async function openComposer(mount, ctx, org, existing) {
       }),
       el('p', { class: 'hint', text: 'Shown to anyone who saw the original.' }),
     ]) : null,
+  ]);
 
+  const reviewSummary = el('div', { class: 'review-summary' });
+  const reviewStep = el('section', { class: 'step', hidden: true }, [
+    el('h2', { text: 'Check this over' }),
+    el('p', { class: 'muted' },
+      'This is a summary, not the public rendering. Preview shows exactly ' +
+      'what the community will see before anything goes out.'),
+    reviewSummary,
+  ]);
+
+  const steps = [whenStep, whoStep, detailsStep, reviewStep];
+  const head = el('div');
+  const back = el('button', { class: 'btn', type: 'button' }, 'Back');
+  const next = el('button', { class: 'btn btn--primary', type: 'button' }, 'Continue');
+  const previewBtn = el('button', { class: 'btn', type: 'button', id: 'preview', hidden: true }, 'Preview');
+  const saveDraftBtn = el('button', { class: 'btn', type: 'button', id: 'save-draft', hidden: true },
+    editing ? 'Save without publishing' : 'Save as draft');
+  const publishBtn = el('button', { class: 'btn btn--primary', type: 'button', id: 'publish', hidden: true },
+    editing ? 'Publish correction' : 'Publish');
+  const cancelLink = el('button', { class: 'btn btn--link', type: 'button', id: 'cancel' }, 'Cancel');
+
+  let at = 0;
+
+  const line = (label, value) => (value
+    ? el('div', { class: 'review-row' }, [el('dt', { text: label }), el('dd', { text: value })])
+    : null);
+
+  function paintReview() {
+    const v = readForm(form);
+    reviewSummary.replaceChildren(
+      ...[
+        line('Deceased', v.showDeceasedName && v.deceasedName ? v.deceasedName : 'Not shared publicly'),
+        v.janazahAt ? line('Janazah', formatJanazahTime({
+          janazahAt: new Date(v.janazahAt),
+          timeZone: v.timeZone,
+          timeLabel: v.timeLabel,
+        })) : null,
+        line('Prayer', v.prayerName ? `${v.prayerName}, ${v.prayerAddress || ''}` : null),
+        line('Burial', v.burialName ? `${v.burialName}, ${v.burialAddress || ''}` : null),
+        line('Family contact', [v.familyContactName, v.familyContactPhone].filter(Boolean).join(', ') || null),
+      ].filter(Boolean),
+    );
+  }
+
+  function show(index) {
+    at = index;
+    steps.forEach((s, i) => { s.hidden = i !== index; });
+    head.replaceChildren(noticeStepper(index));
+    back.hidden = index === 0;
+    next.hidden = index === steps.length - 1;
+    previewBtn.hidden = index !== steps.length - 1;
+    saveDraftBtn.hidden = index !== steps.length - 1;
+    publishBtn.hidden = index !== steps.length - 1;
+    error.hidden = true;
+    if (index === steps.length - 1) paintReview();
+    // A step change is a page change as far as the reader is concerned.
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function stop(gap) {
+    error.hidden = false;
+    error.replaceChildren(el('p', { text: gap.message }));
+    gap.focus?.focus();
+    gap.focus?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /** Name the one thing stopping this step, rather than failing at the end. */
+  function gapIn(index) {
+    if (index === 0) {
+      const dt = form.elements.janazahAt;
+      if (!dt.value) {
+        return { message: 'Enter the Janazah date and prayer time.', focus: dt };
+      }
+      return prayer.missing();
+    }
+    if (index === 1) {
+      const name = form.elements.deceasedName.value.trim();
+      const approved = form.elements.showDeceasedName.checked;
+      if (approved && !name) {
+        return {
+          message: 'You ticked "approved for public sharing" but left the name blank.',
+          focus: form.elements.deceasedName,
+        };
+      }
+      if (!approved && name) {
+        return {
+          message: 'A name was entered but not marked approved for public sharing. ' +
+                   'Either confirm approval or clear the name.',
+          focus: form.elements.showDeceasedName,
+        };
+      }
+      return burial.missing();
+    }
+    return null;
+  }
+
+  next.addEventListener('click', () => {
+    const gap = gapIn(at);
+    if (gap) { stop(gap); return; }
+    show(at + 1);
+  });
+  back.addEventListener('click', () => show(at - 1));
+
+  form.append(
+    el('h1', { text: editing ? 'Correct notice' : 'New Janazah notice' }),
+    el('p', { class: 'muted', text: `Publishing as ${org.name}` }),
+    head,
+    ...steps,
     error,
-
     el('div', { class: 'form-actions form-actions--sticky' }, [
-      el('button', { class: 'btn', type: 'button', id: 'preview' }, 'Preview'),
-      el('button', { class: 'btn', type: 'button', id: 'save-draft' },
-        editing ? 'Save without publishing' : 'Save as draft'),
-      el('button', { class: 'btn btn--primary', type: 'button', id: 'publish' },
-        editing ? 'Publish correction' : 'Publish'),
-      el('button', { class: 'btn btn--link', type: 'button', id: 'cancel' }, 'Back'),
+      back, next, previewBtn, saveDraftBtn, publishBtn, cancelLink,
     ]),
   );
 
@@ -357,19 +492,26 @@ async function openComposer(mount, ctx, org, existing) {
   prayer.hydrate();
   burial.hydrate();
 
+  mount.append(form);
+  show(0);
+
   const collect = () => ({ ...readForm(form), orgId: org.id });
 
   const validate = () => {
+    // Walk every step's own gate first, jumping to and naming whichever one
+    // is unmet, rather than failing generically from the review step.
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const gap = gapIn(i);
+      if (gap) { show(i); stop(gap); return null; }
+    }
     // The pickers name what is missing in the words of the thing they are
     // missing, and put the cursor there. validateNoticeForm still runs after
     // them: it is the mirror of firestore.rules and has the final say.
     for (const picker of [prayer, burial]) {
       const gap = picker.missing();
       if (gap) {
-        error.hidden = false;
-        error.replaceChildren(el('p', { text: gap.message }));
-        gap.focus?.focus();
-        gap.focus?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        show(picker === prayer ? 0 : 1);
+        stop(gap);
         return null;
       }
     }
@@ -377,6 +519,7 @@ async function openComposer(mount, ctx, org, existing) {
     const form_ = collect();
     const errors = validateNoticeForm(form_);
     if (errors.length) {
+      show(steps.length - 1);
       error.hidden = false;
       error.replaceChildren(el('ul', {}, errors.map((m) => el('li', { text: m }))));
       error.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -386,7 +529,7 @@ async function openComposer(mount, ctx, org, existing) {
     return form_;
   };
 
-  form.querySelector('#preview').addEventListener('click', () => {
+  previewBtn.addEventListener('click', () => {
     const data = validate();
     if (!data) return;
     const draft = buildPublicNotice(data, {
@@ -434,12 +577,10 @@ async function openComposer(mount, ctx, org, existing) {
     }
   };
 
-  form.querySelector('#save-draft').addEventListener('click', () => submitWith(false));
-  form.querySelector('#publish').addEventListener('click', () => submitWith(true));
-  form.querySelector('#cancel').addEventListener('click', () => renderNotices(mount, ctx));
+  saveDraftBtn.addEventListener('click', () => submitWith(false));
+  publishBtn.addEventListener('click', () => submitWith(true));
+  cancelLink.addEventListener('click', () => renderNotices(mount, ctx));
   form.addEventListener('submit', (e) => e.preventDefault());
-
-  mount.append(form);
 }
 
 /** Mandatory preview-and-confirm before anything reaches the public. */

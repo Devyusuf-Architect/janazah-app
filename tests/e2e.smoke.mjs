@@ -428,10 +428,11 @@ const run = async () => {
     // ---- coordinator publishes a notice ------------------------------------
     await coord.reload();
     await coord.getByRole('button', { name: 'Notices' }).click();
-    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.getByRole('button', { name: 'Post a Janazah' }).click();
 
-    await coord.locator('#deceasedName').fill('Test Name');
-    await coord.locator('input[name="showDeceasedName"]').check();
+    // Step 1: when and where. The composer is now a short guided sequence
+    // rather than one long form, so each group of fields is filled on its
+    // own step and confirmed forward with Continue.
     await coord.locator('#janazahAt').fill('2026-12-01T13:30');
     // Both locations are searched, never typed as coordinates: a masjid
     // office should not be looking up latitude and longitude in Google Maps
@@ -442,16 +443,25 @@ const run = async () => {
         `${gone} is a visible field again on the notice composer`);
     }
     await pickPlace(coord, 'prayer', 'Main Prayer Hall', '100 Example Street');
-    await pickPlace(coord, 'burial', 'Example Cemetery', '500 Cemetery Road');
     // The address that was picked is confirmed back before publishing.
     assert.match(await coord.locator('.place-picker').first().innerText(),
       /Selected location: /,
       'the chosen prayer address must be confirmed back to the coordinator');
+    await coord.getByRole('button', { name: 'Continue' }).click();
+
+    // Step 2: who.
+    await coord.locator('#deceasedName').fill('Test Name');
+    await coord.locator('input[name="showDeceasedName"]').check();
+    await pickPlace(coord, 'burial', 'Example Cemetery', '500 Cemetery Road');
+    await coord.getByRole('button', { name: 'Continue' }).click();
+
+    // Step 3: instructions and private family contact.
     await coord.locator('#instructions').fill('Parking is available behind the building.');
     await coord.locator('#familyContactPhone').fill('555-0100');
     await coord.locator('#internalNotes').fill('Family prefers no visitors afterwards.');
+    await coord.getByRole('button', { name: 'Continue' }).click();
 
-    // The private fields must not appear in the public preview.
+    // Step 4: review. The private fields must not appear in the public preview.
     await coord.getByRole('button', { name: 'Publish', exact: true }).click();
     const previewText = await coord.locator('.modal .public-notice').textContent();
     assert.ok(!previewText.includes('555-0100'), 'phone number leaked into the public preview');
@@ -544,9 +554,14 @@ const run = async () => {
 
     // A notice not yet published must never appear on the feed.
     await coord.getByRole('button', { name: 'Notices' }).click();
-    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.getByRole('button', { name: 'Post a Janazah' }).click();
     await coord.locator('#janazahAt').fill('2026-12-02T13:30');
     await pickPlace(coord, 'prayer', 'Draft Hall', '9 Draft Street');
+    // The rest of the guided sequence is optional for a draft: Continue
+    // through the remaining steps with nothing filled in on them.
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
     await coord.getByRole('button', { name: 'Save as draft' }).click();
     await coord.locator('.notice-card--draft').waitFor({ timeout: 15000 });
 
@@ -612,10 +627,13 @@ const run = async () => {
     // ---- nearby matching, on the device ------------------------------------
     // A second notice on the other side of the country, so radius filtering
     // has something real to exclude.
-    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.getByRole('button', { name: 'Post a Janazah' }).click();
     await coord.locator('#janazahAt').fill('2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
     await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
     await coord.getByRole('button', { name: 'Publish', exact: true }).click();
     await coord.locator('#confirm-check').check();
     await coord.getByRole('button', { name: 'Publish now' }).click();
@@ -625,10 +643,13 @@ const run = async () => {
     // ---- duplicate warning -------------------------------------------------
     // The same masjid posting again for the same slot is the usual shape of an
     // accidental double announcement.
-    await coord.getByRole('button', { name: 'New notice' }).click();
+    await coord.getByRole('button', { name: 'Post a Janazah' }).click();
     await coord.locator('#janazahAt').fill('2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
     await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
+    await coord.getByRole('button', { name: 'Continue' }).click();
     await coord.getByRole('button', { name: 'Publish', exact: true }).click();
 
     await coord.locator('.dup-warning').waitFor({ timeout: 15000 });
@@ -636,9 +657,11 @@ const run = async () => {
     assert.match(dupText, /similar notice/i);
     log('duplicate warning shown before publishing a likely repeat');
 
-    // It warns; it must not block. Backing out returns to the form.
+    // It warns; it must not block. Backing out returns to the form, and
+    // Cancel (not Back, which now means the previous wizard step) discards
+    // it and returns to the notice list.
     await coord.getByRole('button', { name: 'Back to editing' }).click();
-    await coord.getByRole('button', { name: 'Back' }).click();
+    await coord.getByRole('button', { name: 'Cancel', exact: true }).click();
     await coord.locator('.notice-card').first().waitFor({ timeout: 15000 });
 
     // ---- report triage -----------------------------------------------------
