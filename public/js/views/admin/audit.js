@@ -25,6 +25,11 @@ const GROUPS = [
     label: 'Notifications',
     match: (a) => a.startsWith('notification.'),
   },
+  {
+    value: 'admin',
+    label: 'Administration',
+    match: (a) => a.startsWith('admin.'),
+  },
 ];
 
 export function renderAudit(panel, actx) {

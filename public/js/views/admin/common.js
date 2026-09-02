@@ -9,7 +9,7 @@
 // Nothing in this file reads or writes Firestore. Data access is store.js,
 // for the whole app and for this portal too.
 
-import { el, icon } from '../../ui.js';
+import { el, icon, friendlyError } from '../../ui.js';
 
 /**
  * The top of a section: what it is, one sentence on what it is for, and
@@ -191,3 +191,20 @@ export function uidChip(uid) {
  * than a screen that looks authoritative and quietly is not.
  */
 export const caveat = (text) => el('p', { class: 'admin-caveat' }, text);
+
+/**
+ * What to show an administrator when an action they took did not work.
+ *
+ * A callable Cloud Function writes its own refusals for the person reading
+ * them: "no Ta'ziyah account exists for that address" says exactly what to do
+ * next, and replacing it with a generic line would throw that away. Anything
+ * else, in practice a Firestore write refused by the rules, goes through the
+ * admin message in ui.js, which names the real cause (rules older than the
+ * app) rather than blaming the account.
+ */
+export function actionError(err) {
+  if (typeof err?.code === 'string' && err.code.startsWith('functions/')) {
+    return err.message || 'That did not work. Please try again.';
+  }
+  return friendlyError(err, 'admin');
+}

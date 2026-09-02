@@ -71,9 +71,10 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 ## 7. Make yourself the platform admin
 
-Platform admins are rows in an `/admins/{uid}` collection. There is no server
-code in Phase 1 to write them, and the rules deliberately forbid clients from
-creating them, so the first one is created by hand in the console.
+Platform admins are rows in an `/admins/{uid}` collection. The rules forbid
+clients from writing them, so the first one is created by hand in the console.
+Every one after that can be added from the portal, which calls a Cloud Function
+that uses the Admin SDK; that path needs the functions deployed.
 
 1. Run the app (step 8), go to `/console`, and sign up. This creates your
    auth user.

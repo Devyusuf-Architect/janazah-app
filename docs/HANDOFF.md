@@ -142,6 +142,9 @@ model, and `tests/rules.test.js` is what proves they hold.
   /private/details              STAFF ONLY. Family contacts, internal notes.
 
 /admins/{uid}                   Platform administrators. No client may write.
+                                 Granted and revoked by the grantAdmin and
+                                 revokeAdmin callables (Admin SDK only).
+/emailSends/{id}                Email send markers. Closed to all clients.
 /auditLog/{id}                  No client write at all, of any kind, by anyone.
                                  Written only by Cloud Functions triggers.
 /reports/{id}                   Community and system reports.

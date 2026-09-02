@@ -154,6 +154,49 @@ one.
 
 `functions/.env` is gitignored.
 
+## 8a. Give the functions SMTP credentials, if you want email
+
+Ta'ziyah emails an organization when its registration is approved, declined or
+sent back for more information, and an administrator can send a one-off message
+to one organization from the Organizations section of the portal. Both go
+through your own SMTP account.
+
+The credentials are held in Secret Manager, never in this repository and never
+in `functions/.env`. Set the three of them before you deploy, because a deploy
+of a function that declares a secret fails if the secret does not exist yet:
+
+```bash
+firebase functions:secrets:set SMTP_HOST      # e.g. smtp.postmarkapp.com
+firebase functions:secrets:set SMTP_USER      # the SMTP username
+firebase functions:secrets:set SMTP_PASSWORD  # the SMTP password or API token
+```
+
+Each command prompts for the value and stores it. Nothing is echoed and nothing
+is written to disk.
+
+Two optional settings go in `functions/.env` alongside `SITE_ORIGIN`, because
+neither is secret:
+
+```
+SMTP_PORT=587
+SMTP_FROM=Ta'ziyah <no-reply@your-domain>
+```
+
+`SMTP_PORT` defaults to 587 (STARTTLS); use 465 for implicit TLS. `SMTP_FROM`
+defaults to `SMTP_USER`, which is what most providers require anyway.
+
+If you skip all of this, everything else still works. A project with no SMTP
+credentials approves masjids exactly as before and writes a line to the
+functions log saying no email was sent. Email is never allowed to fail a
+verification decision.
+
+Changing a secret later needs a redeploy of the functions to take effect:
+
+```bash
+firebase functions:secrets:set SMTP_PASSWORD
+firebase deploy --only functions
+```
+
 ## 9. Run the tests before deploying anything
 
 ```bash
@@ -200,10 +243,11 @@ Your site is now at `https://YOUR-PROJECT-ID.web.app`, with the console at
 
 ## 11. Create the first platform administrator
 
-There is no server code that grants administrator rights, and the rules
-deliberately forbid any client from creating an admin record. That is the
-point: nobody can promote themselves through the app. So the first one is made
-by hand.
+The rules forbid any client from writing an admin record, so nobody can promote
+themselves through the app. The **first** administrator therefore has to be made
+by hand. After that, one administrator can add and remove others from the portal
+(Admin → Admin management), which calls a Cloud Function that checks the caller
+server-side. That needs the functions deployed.
 
 1. Go to `https://YOUR-PROJECT-ID.web.app/console` and **sign up** with your
    email.

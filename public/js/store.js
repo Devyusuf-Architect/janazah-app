@@ -8,7 +8,8 @@ import {
 } from 'firebase/firestore';
 
 import { signInAnonymously } from 'firebase/auth';
-import { db, auth } from './firebase.js';
+import { httpsCallable } from 'firebase/functions';
+import { db, auth, functions } from './firebase.js';
 import { geohash } from './geo.js';
 import { APP } from './config.js';
 import {
@@ -773,15 +774,62 @@ export async function auditForNotice(orgId, noticeId, max = 200) {
 
 // ------------------------------------------------------ platform admins
 //
-// /admins is read-only from every client: firestore.rules has
-// `allow write: if false` on it, deliberately, so that no bug and no
-// compromised session in this app can grant anybody administrator rights.
-// Adding one is a deliberate act in the Firebase console.
+// /admins is read-only from every client, and stays that way: firestore.rules
+// has `allow write: if false` on it, deliberately, so that no bug and no
+// compromised session in this app can write an administrator record.
+//
+// Granting and revoking therefore do not happen here at all. They are
+// callable Cloud Functions (functions/index.js) which use the Admin SDK, and
+// which read the caller's own /admins document server-side before doing
+// anything. That is stricter than a rule on a client-writable collection, and
+// it is also the only way to address somebody by email: a browser can look a
+// user up by uid and nothing else.
 
 /** The current platform administrators. Platform administrators only. */
 export async function listPlatformAdmins() {
   const snap = await getDocs(collection(db, 'admins'));
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+}
+
+/**
+ * Make an existing account a platform administrator.
+ *
+ * Rejects with the function's own error when there is no account for the
+ * address, which is the common case and is worth showing verbatim: the person
+ * has to sign up before they can be given anything.
+ *
+ * @param {string} email
+ * @returns {Promise<{uid: string, email: string}>}
+ */
+export async function grantPlatformAdmin(email) {
+  const call = httpsCallable(functions, 'grantAdmin');
+  const { data } = await call({ email });
+  return data;
+}
+
+/**
+ * Remove platform administration from an account.
+ *
+ * The server refuses to act on the caller's own uid, so this cannot be used
+ * to leave the platform with no administrators at all.
+ */
+export async function revokePlatformAdmin(uid, reason = '') {
+  const call = httpsCallable(functions, 'revokeAdmin');
+  const { data } = await call({ uid, reason });
+  return data;
+}
+
+/**
+ * Send one message from the administrators to one organization.
+ *
+ * The address is resolved on the server, from the organization's contact
+ * email or its owner's sign-in address, and is never returned here. This
+ * screen knows that a message went, not where.
+ */
+export async function sendOrganizationMessage(orgId, subject, body) {
+  const call = httpsCallable(functions, 'sendOrganizationMessage');
+  const { data } = await call({ orgId, subject, body });
+  return data;
 }
 
 /**

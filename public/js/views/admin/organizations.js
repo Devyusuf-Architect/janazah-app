@@ -23,7 +23,7 @@ import { verificationDocumentUrl } from '../../upload.js';
 import * as store from '../../store.js';
 import {
   sectionHead, emptyState, loading, errorState, toolbar, searchField, filterChips,
-  dataTable, fmtDate, fmtDateTime, uidChip, caveat,
+  dataTable, fmtDate, fmtDateTime, uidChip, caveat, actionError,
 } from './common.js';
 
 const STATUS_FILTERS = [
@@ -197,8 +197,88 @@ function overviewPane(org, actx) {
       el('dt', { text: label }),
       el('dd', { class: label === 'Owner' || label === 'Coordinates' ? 'mono' : '', text: value }),
     ])),
-    el('div', { class: 'admin-actions' }, decisionButtons(org, actx)),
+    el('div', { class: 'admin-actions' }, [
+      ...decisionButtons(org, actx),
+      messageButton(org),
+    ]),
   ]);
+}
+
+/** Subject and body limits, matching lib/admin-management.js on the server. */
+const MESSAGE_MAX = { subject: 150, body: 4000 };
+
+/**
+ * Write to one organization directly.
+ *
+ * Approvals, declines and requests for information send their own email off
+ * the verification decision. This is for everything else an administrator
+ * needs to say, which is not a status change and should not be made into one.
+ *
+ * The address is never on this screen. It is resolved on the server from the
+ * organization's contact email, or its owner's sign-in address if there is
+ * none, and the reply here says only that it went. Ta'ziyah keeps user email
+ * addresses out of anything a browser can read, and an administrator screen
+ * is still a browser.
+ */
+function messageButton(org) {
+  return el('button', {
+    class: 'btn btn--small',
+    type: 'button',
+    onclick: () => {
+      const subject = el('input', {
+        class: 'field', type: 'text', id: 'org-message-subject',
+        maxlength: String(MESSAGE_MAX.subject),
+      });
+      const body = el('textarea', {
+        class: 'field', rows: 8, id: 'org-message-body',
+        maxlength: String(MESSAGE_MAX.body),
+      });
+      const error = el('p', { class: 'form-error', hidden: true });
+
+      const send = el('button', { class: 'btn btn--primary', type: 'button' }, 'Send');
+      const content = el('div', {}, [
+        el('p', { class: 'muted' },
+          `Sent to ${org.name} at the contact address on its registration, or `
+          + 'to its owner’s account address if it has none. The message is '
+          + 'plain text and is recorded in the audit trail.'),
+        el('label', { class: 'label', for: 'org-message-subject', text: 'Subject' }),
+        subject,
+        el('label', { class: 'label', for: 'org-message-body', text: 'Message' }),
+        body,
+        error,
+      ]);
+
+      const close = showModal(`Message ${org.name}`, content, {
+        actions: [
+          el('button', {
+            class: 'btn', type: 'button', onclick: () => close(),
+          }, 'Back'),
+          send,
+        ],
+      });
+
+      send.addEventListener('click', async () => {
+        error.hidden = true;
+        if (!subject.value.trim() || !body.value.trim()) {
+          error.hidden = false;
+          error.textContent = 'A subject and a message are both needed.';
+          return;
+        }
+        send.disabled = true;
+        try {
+          await store.sendOrganizationMessage(
+            org.id, subject.value.trim(), body.value.trim());
+          close();
+          toast(`Message sent to ${org.name}.`);
+        } catch (err) {
+          error.hidden = false;
+          error.textContent = actionError(err);
+        } finally {
+          send.disabled = false;
+        }
+      });
+    },
+  }, 'Send a message');
 }
 
 /**

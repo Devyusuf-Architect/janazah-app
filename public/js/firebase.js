@@ -9,6 +9,9 @@ import {
 import {
   getFirestore, connectFirestoreEmulator,
 } from 'firebase/firestore';
+import {
+  getFunctions, connectFunctionsEmulator,
+} from 'firebase/functions';
 
 import { firebaseConfig as configured } from './config.js';
 
@@ -89,9 +92,16 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Callable Cloud Functions, in the same region the functions are deployed to
+// (see setGlobalOptions in functions/index.js). Getting the region wrong here
+// does not fail loudly; it fails as a CORS error against a URL that does not
+// exist, so it is pinned in one place rather than repeated per call site.
+export const functions = getFunctions(app, 'northamerica-northeast1');
+
 if (usingEmulator) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   window.__janazahEmulator = true;
   console.info('Connected to Firebase emulators. Append ?live=1 to use production.');
 }
