@@ -11,6 +11,7 @@ import { publicNoticeView } from '../notice-view.js';
 import { placePicker } from './place-picker.js';
 import { dateTimePicker } from './date-time-picker.js';
 import { statusBadge } from './org.js';
+import { sectionHead } from './home.js';
 import * as store from '../store.js';
 
 let unwatch = null;
@@ -60,10 +61,14 @@ export function renderNotices(mount, ctx) {
     strip.replaceChildren(orgStatusStrip(currentOrg(), ctx,
       () => openComposer(mount, ctx, currentOrg(), null)));
     list.replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
-    unwatch = store.watchOrgNotices(currentOrgId(), (notices) => {
+
+    let notifMap = new Map();
+    let followUpScheduled = false;
+
+    const paint = (notices) => {
       list.replaceChildren();
+      const org = currentOrg();
       if (!notices.length) {
-        const org = currentOrg();
         const verified = org.verificationStatus === 'verified';
         list.append(el('div', { class: 'empty' }, [
           icon('clock', { size: 30 }),
@@ -83,14 +88,116 @@ export function renderNotices(mount, ctx) {
         ]));
         return;
       }
-      for (const notice of notices) {
-        list.append(noticeCard(notice, mount, ctx, currentOrg()));
+
+      const { upcoming, past } = splitByTime(notices);
+
+      list.append(sectionHead(`Upcoming (${upcoming.length})`));
+      if (!upcoming.length) {
+        list.append(el('p', { class: 'muted', text: 'Nothing scheduled right now.' }));
+      } else {
+        list.append(el('div', { class: 'stack' },
+          upcoming.map((n) => noticeCard(n, mount, ctx, org, notifMap.get(n.id)))));
       }
+
+      if (past.length) {
+        const pastSection = el('details', { class: 'past-notices' }, [
+          el('summary', { text: `Past (${past.length})` }),
+          el('div', { class: 'stack', style: 'margin-top:.9rem' },
+            past.map((n) => noticeCard(n, mount, ctx, org, notifMap.get(n.id)))),
+        ]);
+        list.append(pastSection);
+      }
+    };
+
+    unwatch = store.watchOrgNotices(currentOrgId(), (notices) => {
+      const orgId = currentOrgId();
+      store.latestNotificationByNotice(orgId).then((map) => {
+        notifMap = map;
+        paint(notices);
+
+        // The fan-out itself runs a moment after the write that put the
+        // notice here, through a Cloud Function trigger this page has no
+        // way to watch directly (it never touches the notice document, so
+        // watchOrgNotices does not re-fire when it lands). One follow-up
+        // read is enough to pick up a notification that finished just after
+        // the first paint, without polling forever.
+        if (!followUpScheduled && notices.some((n) => n.status !== 'draft')) {
+          followUpScheduled = true;
+          setTimeout(() => {
+            store.latestNotificationByNotice(orgId).then((freshMap) => {
+              notifMap = freshMap;
+              paint(notices);
+            });
+          }, 4000);
+        }
+      });
     });
   }
 
   selector.addEventListener('change', subscribe);
   subscribe();
+}
+
+/** A Date for a notice's prayer time, or null if it has none yet. */
+function noticeDate(notice) {
+  const raw = notice.janazahAt;
+  const date = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+/**
+ * Upcoming first, soonest at the top, so a coordinator opening this page
+ * sees what is coming rather than everything that has already happened.
+ * Past is soonest-past-first (most recent first) and is never the majority
+ * of the screen: the caller renders it collapsed.
+ */
+function splitByTime(notices) {
+  const now = Date.now();
+  const upcoming = [];
+  const past = [];
+  for (const notice of notices) {
+    const at = noticeDate(notice);
+    (at && at.getTime() < now ? past : upcoming).push(notice);
+  }
+  const time = (n) => noticeDate(n)?.getTime() ?? 0;
+  upcoming.sort((a, b) => time(a) - time(b));
+  past.sort((a, b) => time(b) - time(a));
+  return { upcoming, past };
+}
+
+const NOTIFICATION_VERB = {
+  'notification.published': 'Notified',
+  'notification.updated': 'Correction sent',
+  'notification.cancelled': 'Cancellation sent',
+};
+
+/**
+ * What onNoticeWritten actually did for this notice, in plain terms.
+ *
+ * Read only from the audit entry it already writes (store.js,
+ * latestNotificationByNotice): topic and failure counts, never a guess at
+ * how many people saw it. A draft is never sent, so it gets no line at all.
+ */
+function notificationStatus(notice, entry) {
+  if (notice.status === 'draft') return null;
+  if (!entry) return { tone: 'muted', text: 'Not yet sent.' };
+
+  if (entry.action === 'notification.suppressed') {
+    return {
+      tone: 'warn',
+      text: 'Notification paused for this organization (rate limit). '
+        + 'The notice itself is published.',
+    };
+  }
+
+  const verb = NOTIFICATION_VERB[entry.action] || 'Notified';
+  const topics = entry.details?.topics ?? 0;
+  const failed = entry.details?.failed ?? 0;
+
+  if (topics === 0) return { tone: 'error', text: 'Published, but nobody could be notified.' };
+  if (failed === 0) return { tone: 'ok', text: `${verb}.` };
+  if (failed === topics) return { tone: 'error', text: 'Published, but the notification failed to send.' };
+  return { tone: 'warn', text: `${verb}, but ${failed} of ${topics} alerts failed to send.` };
 }
 
 /**
@@ -122,9 +229,10 @@ function orgStatusStrip(org, ctx, onPost) {
 
 const STATUS_TONE = { draft: 'muted', published: 'ok', cancelled: 'error' };
 
-function noticeCard(notice, mount, ctx, org) {
+function noticeCard(notice, mount, ctx, org, notifEntry) {
   const isCancelled = notice.status === 'cancelled';
   const isDraft = notice.status === 'draft';
+  const status = notificationStatus(notice, notifEntry);
 
   return el('div', { class: `card notice-card notice-card--${notice.status}` }, [
     el('div', { class: 'card-head' }, [
@@ -152,6 +260,7 @@ function noticeCard(notice, mount, ctx, org) {
       ? el('p', { class: 'notice-strip notice-strip--error' },
           `Cancelled${notice.cancelReason ? `: ${notice.cancelReason}` : '.'}`)
       : null,
+    status ? el('p', { class: `notice-status notice-status--${status.tone}`, text: status.text }) : null,
     el('div', { class: 'card-actions' }, [
       el('button', {
         class: 'btn btn--small',

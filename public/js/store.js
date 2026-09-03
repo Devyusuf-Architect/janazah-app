@@ -772,6 +772,26 @@ export async function auditForNotice(orgId, noticeId, max = 200) {
   return entries.filter((e) => e.targetId === noticeId);
 }
 
+/**
+ * The most recent notification fan-out entry for each of an organization's
+ * notices, keyed by notice id.
+ *
+ * onNoticeWritten (functions/index.js) already writes a `notification.*`
+ * audit entry every time a publish, correction or cancellation goes out (or
+ * is suppressed by the rate limiter); this only reads that back. entries
+ * come from auditForOrg newest-first, so the first `notification.*` row seen
+ * per notice is its latest.
+ */
+export async function latestNotificationByNotice(orgId, max = 300) {
+  const entries = await auditForOrg(orgId, max);
+  const byNotice = new Map();
+  for (const entry of entries) {
+    if (!entry.action?.startsWith('notification.')) continue;
+    if (!byNotice.has(entry.targetId)) byNotice.set(entry.targetId, entry);
+  }
+  return byNotice;
+}
+
 // ------------------------------------------------------ platform admins
 //
 // /admins is read-only from every client, and stays that way: firestore.rules

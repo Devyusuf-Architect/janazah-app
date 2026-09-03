@@ -1695,6 +1695,16 @@ select.field { cursor: pointer; }
 .notice-strip:empty { display: none; }
 .notice-strip p:last-child { margin-bottom: 0; }
 
+/* A one-line, text-only companion to notice-strip: what onNoticeWritten's
+   fan-out actually did for this notice, read back from the audit trail.
+   Deliberately lighter than the boxed strip above -- a status line, not
+   another banner competing for attention on every card. */
+.notice-status { margin: .6rem 0 0; font-size: .82rem; }
+.notice-status--ok { color: var(--accent); }
+.notice-status--warn { color: var(--gold); }
+.notice-status--error { color: var(--danger); }
+.notice-status--muted { color: var(--ink-3); }
+
 /* ---------- lists and tables ---------- */
 
 .list { list-style: none; margin: .6rem 0; padding: 0; }
@@ -2551,6 +2561,23 @@ body.is-scrolled .masthead {
   white-space: nowrap;
 }
 .section-head__link:hover { color: var(--accent); text-decoration: underline; }
+
+/* The past half of an organization's own notice list, collapsed by default
+   so a coordinator opening this page sees what is coming up, not a scroll
+   of everything that already happened. */
+.past-notices { margin-top: 1.6rem; }
+.past-notices > summary {
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  list-style: none;
+}
+.past-notices > summary::-webkit-details-marker { display: none; }
+.past-notices > summary::before { content: '▸ '; color: var(--ink-3); }
+.past-notices[open] > summary::before { content: '▾ '; }
 
 /* ---------- a Janazah, as a row ---------- */
 
