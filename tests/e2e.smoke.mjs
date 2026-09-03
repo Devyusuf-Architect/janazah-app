@@ -164,6 +164,38 @@ async function pickPlace(page, prefix, name, query) {
   await page.locator(`#${prefix}-results`).waitFor({ state: 'hidden', timeout: 5000 });
 }
 
+/**
+ * Drive the custom date-and-time picker standing in for
+ * <input type="datetime-local">.fill(): open it, page forward to the right
+ * month, click the day, then set hour/minute/AM-PM, the way someone using
+ * the real control would, rather than writing the hidden input directly.
+ */
+async function setJanazahAt(page, value) {
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour24, minute] = timePart.split(':').map(Number);
+  const period = hour24 < 12 ? 'AM' : 'PM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const nearestMinute = Math.round(minute / 5) * 5;
+  const targetLabel = new Date(year, month - 1, 1)
+    .toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+
+  await page.locator('#janazahAt').click();
+  const heading = page.locator('.dt-picker__month');
+  for (let i = 0; i < 36 && (await heading.textContent()) !== targetLabel; i += 1) {
+    await page.locator('.dt-picker__nav--next').click();
+  }
+  assert.equal(await heading.textContent(), targetLabel, 'date picker did not reach the target month');
+  await page.locator('.dt-picker__day', { hasText: new RegExp(`^${day}$`) }).first().click();
+  await page.locator('.dt-picker__col[aria-label="Hour"] .dt-picker__option',
+    { hasText: new RegExp(`^${hour12}$`) }).first().click();
+  await page.locator('.dt-picker__col[aria-label="Minute"] .dt-picker__option',
+    { hasText: new RegExp(`^${String(nearestMinute).padStart(2, '0')}$`) }).first().click();
+  await page.locator('.dt-picker__period', { hasText: period }).first().click();
+  await page.locator('.dt-picker__done').click();
+  await page.locator('.dt-picker__panel').waitFor({ state: 'hidden', timeout: 5000 });
+}
+
 /** Mark an emulator account's email as confirmed, as clicking the link would. */
 async function confirmEmail(email) {
   const localId = await uidFor(email);
@@ -438,10 +470,34 @@ const run = async () => {
     await coord.getByRole('button', { name: 'Notices' }).click();
     await coord.getByRole('button', { name: 'Post a Janazah' }).click();
 
+    // The date/time picker open, at the widths and themes it actually has to
+    // work at, saved only when someone asks for it (SCREENSHOT_DIR), same as
+    // the dashboard and admin-portal shots below.
+    if (SHOT_DIR) {
+      const originalViewport = coord.viewportSize();
+      for (const [name, width] of [['375', 375], ['414', 414], ['768', 768], ['1280', 1280]]) {
+        for (const scheme of ['light', 'dark']) {
+          await coord.setViewportSize({ width, height: 900 });
+          await coord.emulateMedia({ colorScheme: scheme });
+          await coord.locator('#janazahAt').click();
+          await coord.locator('.dt-picker__panel').waitFor({ state: 'visible', timeout: 5000 });
+          // Let the open animation (fade on desktop, slide-up on mobile)
+          // finish before capturing, or the shot catches a half-faded frame.
+          await coord.waitForTimeout(400);
+          await coord.screenshot({ path: `${SHOT_DIR}/janazah-picker-${name}-${scheme}.png` });
+          await coord.keyboard.press('Escape');
+          await coord.locator('.dt-picker__panel').waitFor({ state: 'hidden', timeout: 5000 });
+        }
+      }
+      await coord.emulateMedia({ colorScheme: null });
+      if (originalViewport) await coord.setViewportSize(originalViewport);
+      log(`date/time picker screenshots written to ${SHOT_DIR}`);
+    }
+
     // Step 1: when and where. The composer is now a short guided sequence
     // rather than one long form, so each group of fields is filled on its
     // own step and confirmed forward with Continue.
-    await coord.locator('#janazahAt').fill('2026-12-01T13:30');
+    await setJanazahAt(coord, '2026-12-01T13:30');
     // Both locations are searched, never typed as coordinates: a masjid
     // office should not be looking up latitude and longitude in Google Maps
     // to announce a funeral. The composer must have no coordinate fields at
@@ -563,7 +619,7 @@ const run = async () => {
     // A notice not yet published must never appear on the feed.
     await coord.getByRole('button', { name: 'Notices' }).click();
     await coord.getByRole('button', { name: 'Post a Janazah' }).click();
-    await coord.locator('#janazahAt').fill('2026-12-02T13:30');
+    await setJanazahAt(coord, '2026-12-02T13:30');
     await pickPlace(coord, 'prayer', 'Draft Hall', '9 Draft Street');
     // The rest of the guided sequence is optional for a draft: Continue
     // through the remaining steps with nothing filled in on them.
@@ -636,7 +692,7 @@ const run = async () => {
     // A second notice on the other side of the country, so radius filtering
     // has something real to exclude.
     await coord.getByRole('button', { name: 'Post a Janazah' }).click();
-    await coord.locator('#janazahAt').fill('2026-12-03T13:30');
+    await setJanazahAt(coord, '2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
     await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
     await coord.getByRole('button', { name: 'Continue' }).click();
@@ -652,7 +708,7 @@ const run = async () => {
     // The same masjid posting again for the same slot is the usual shape of an
     // accidental double announcement.
     await coord.getByRole('button', { name: 'Post a Janazah' }).click();
-    await coord.locator('#janazahAt').fill('2026-12-03T13:30');
+    await setJanazahAt(coord, '2026-12-03T13:30');
     await coord.locator('#timeZone').selectOption('America/Vancouver');
     await pickPlace(coord, 'prayer', 'Vancouver Prayer Hall', '1 Pacific Street, Vancouver');
     await coord.getByRole('button', { name: 'Continue' }).click();

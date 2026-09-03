@@ -9,6 +9,7 @@ import {
 } from '../model.js';
 import { publicNoticeView } from '../notice-view.js';
 import { placePicker } from './place-picker.js';
+import { dateTimePicker } from './date-time-picker.js';
 import { statusBadge } from './org.js';
 import * as store from '../store.js';
 
@@ -309,11 +310,25 @@ async function openComposer(mount, ctx, org, existing) {
     nameHint: 'The cemetery as mourners would find it signposted.',
   });
 
+  // Pre-filled straight from the notice being corrected, rather than
+  // through the generic fillForm() pass below: fillForm sets the hidden
+  // input's .value directly and has no idea a picker sits in front of it, so
+  // seeding the picker itself here is what makes an edit open already
+  // showing the right day, month and time instead of a blank "Select date
+  // and time" trigger.
+  const janazahPicker = dateTimePicker({
+    id: 'janazahAt',
+    value: existing ? noticeToForm(existing).janazahAt : '',
+    required: true,
+  });
+
   const whenStep = el('section', { class: 'step' }, [
     el('h2', { text: 'When and where is the prayer?' }),
     el('div', { class: 'field-row' }, [
-      fieldGroup('janazahAt', 'Janazah date and prayer time',
-        { type: 'datetime-local', required: true }),
+      el('div', { class: 'field-group' }, [
+        el('label', { class: 'label', for: 'janazahAt', text: 'Janazah date and prayer time' }),
+        janazahPicker.node,
+      ]),
       el('div', { class: 'field-group' }, [
         el('label', { class: 'label', for: 'timeZone', text: 'Time zone' }),
         timeZoneSelect(existing?.timeZone),
@@ -437,9 +452,11 @@ async function openComposer(mount, ctx, org, existing) {
   /** Name the one thing stopping this step, rather than failing at the end. */
   function gapIn(index) {
     if (index === 0) {
-      const dt = form.elements.janazahAt;
-      if (!dt.value) {
-        return { message: 'Enter the Janazah date and prayer time.', focus: dt };
+      if (!janazahPicker.input.value) {
+        return {
+          message: 'Enter the Janazah date and prayer time.',
+          focus: janazahPicker.trigger,
+        };
       }
       return prayer.missing();
     }
