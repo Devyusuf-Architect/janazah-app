@@ -27,7 +27,6 @@ const LINKS = [
   { href: '/following', label: 'Following', icon: 'bookmark', core: true },
   { href: '/masjids', label: 'Masjids', icon: 'building' },
   { href: '/janazah-guide', label: 'Janazah Guide', icon: 'shield' },
-  { href: '/account?section=notifications', label: 'Notifications', icon: 'bell' },
 ];
 
 // The bottom tab bar on a phone. Not a duplicate nav system: it is rendered
