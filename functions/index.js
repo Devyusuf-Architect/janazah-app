@@ -43,6 +43,7 @@ import {
 } from './lib/admin-management.js';
 import {
   smtpSettings, verificationEmail, messageEmail, resolveRecipient,
+  applicationReceivedEmail, staffGrantedEmail, staffRevokedEmail,
   NOTIFIED_STATUSES,
 } from './lib/email.js';
 
@@ -529,12 +530,18 @@ export const onOrgAuditWritten = onDocumentWritten(
       orgId,
     })));
 
-    // Telling the organization what was decided rides on the same trigger as
-    // the audit entry, rather than on a second trigger watching the same
-    // document. One event, one place that reacts to it: two triggers on
-    // organizations/{orgId} would fire and retry independently, and a
-    // duplicate email is worse than a duplicate log line.
-    await notifyVerificationDecision(db, event.id, orgId, before, after);
+    // Telling the organization what was decided, or that a submission was
+    // received, rides on the same trigger as the audit entry, rather than on
+    // a second trigger watching the same document. One event, one place that
+    // reacts to it: two triggers on organizations/{orgId} would fire and
+    // retry independently, and a duplicate email is worse than a duplicate
+    // log line.
+    if (!before && after) {
+      await notifyApplicationReceived(db, event.id, orgId, after);
+    } else {
+      await notifyVerificationDecision(db, event.id, orgId, before, after);
+    }
+    await notifyStaffRemoved(db, event.id, orgId, entries, after);
   });
 
 /**
@@ -605,8 +612,100 @@ async function notifyVerificationDecision(db, eventId, orgId, before, after) {
   }
 }
 
+/**
+ * Tell an applicant their registration arrived, the moment it does.
+ *
+ * Distinct from notifyVerificationDecision below: this fires once, on
+ * creation, before any reviewer has looked at anything, and says only that
+ * the submission was received. It shares the same best-effort contract:
+ * failures here never touch the registration itself.
+ */
+async function notifyApplicationReceived(db, eventId, orgId, after) {
+  try {
+    const marker = db.collection('emailSends').doc(`${eventId}_application`);
+    try {
+      await marker.create({ orgId, at: FieldValue.serverTimestamp() });
+    } catch {
+      logger.info('Application-received email already handled for this event', { orgId });
+      return;
+    }
+
+    const content = applicationReceivedEmail({ orgName: after.name, siteUrl: siteOrigin() });
+    const to = await resolveRecipient({ auth: getAuth() }, after);
+    if (!to) {
+      logger.warn('No address for this organization, so no email was sent', { orgId });
+      return;
+    }
+
+    const result = await sendMail({ to, ...content });
+    logger.info('Application-received email', { orgId, sent: result.sent });
+
+    await writeActorAudit(db, {
+      action: 'org.email_sent', actorUid: 'system', targetType: 'organization',
+      targetId: orgId, orgId,
+      details: { kind: 'application_received', sent: result.sent, reason: result.reason ?? null },
+    });
+  } catch (err) {
+    logger.error('Application-received email step failed; the registration itself stands', {
+      orgId, reason: String(err?.message || err).slice(0, 200),
+    });
+  }
+}
+
+/**
+ * Tell someone their staff access to an organization was removed.
+ *
+ * Reads the same classifyOrgChange() result the audit trigger already
+ * computed, rather than re-deriving it, so this can never disagree with the
+ * audit trail about who was removed. One email per removed uid: a single
+ * write can remove more than one person from staffUids at once.
+ */
+async function notifyStaffRemoved(db, eventId, orgId, entries, after) {
+  const removals = entries.filter((entry) => entry.action === 'staff.removed');
+  if (!removals.length) return;
+
+  for (const [i, entry] of removals.entries()) {
+    try {
+      const marker = db.collection('emailSends').doc(`${eventId}_staffRemoved_${i}`);
+      try {
+        await marker.create({ orgId, targetUid: entry.targetUid, at: FieldValue.serverTimestamp() });
+      } catch {
+        logger.info('Staff-removed email already handled for this event', { orgId });
+        continue;
+      }
+
+      let to = null;
+      try {
+        const user = await getAuth().getUser(entry.targetUid);
+        to = user?.email || null;
+      } catch {
+        to = null;
+      }
+      if (!to) {
+        logger.warn('No address for the removed staff account, so no email was sent', { orgId });
+        continue;
+      }
+
+      const content = staffRevokedEmail({ orgName: after?.name, siteUrl: siteOrigin() });
+      const result = await sendMail({ to, ...content });
+      logger.info('Staff-removed email', { orgId, sent: result.sent });
+
+      await writeActorAudit(db, {
+        action: 'org.email_sent', actorUid: 'system', targetType: 'organization',
+        targetId: orgId, orgId,
+        details: { kind: 'staff_removed', sent: result.sent, reason: result.reason ?? null },
+      });
+    } catch (err) {
+      logger.error('Staff-removed email step failed; the removal itself stands', {
+        orgId, reason: String(err?.message || err).slice(0, 200),
+      });
+    }
+  }
+}
+
 export const onStaffRequestAuditWritten = onDocumentWritten(
-  'organizations/{orgId}/staffRequests/{requestUid}', async (event) => {
+  { document: 'organizations/{orgId}/staffRequests/{requestUid}', secrets: EMAIL_SECRETS },
+  async (event) => {
     const { orgId, requestUid } = event.params;
     const before = event.data?.before?.exists ? event.data.before.data() : null;
     const after = event.data?.after?.exists ? event.data.after.data() : null;
@@ -614,11 +713,52 @@ export const onStaffRequestAuditWritten = onDocumentWritten(
     const result = classifyStaffRequestChange(before, after);
     if (!result) return;
 
-    await writeAuditEntry(getFirestore(), event.id, {
+    const db = getFirestore();
+    await writeAuditEntry(db, event.id, {
       action: result.action, actorUid: result.actorUid,
       targetType: 'staffRequest', targetId: requestUid, orgId,
     });
+
+    if (result.action === 'staff.approved') {
+      await notifyStaffGranted(db, event.id, orgId, after);
+    }
   });
+
+/** Tell someone their staff join request was approved. */
+async function notifyStaffGranted(db, eventId, orgId, after) {
+  try {
+    const marker = db.collection('emailSends').doc(`${eventId}_staffGranted`);
+    try {
+      await marker.create({ orgId, at: FieldValue.serverTimestamp() });
+    } catch {
+      logger.info('Staff-granted email already handled for this event', { orgId });
+      return;
+    }
+
+    const to = trimmedEmail(after?.email);
+    if (!to) {
+      logger.warn('No address on this staff request, so no email was sent', { orgId });
+      return;
+    }
+
+    const org = await db.collection('organizations').doc(orgId).get();
+    const content = staffGrantedEmail({ orgName: org.data()?.name, siteUrl: siteOrigin() });
+    const result = await sendMail({ to, ...content });
+    logger.info('Staff-granted email', { orgId, sent: result.sent });
+
+    await writeActorAudit(db, {
+      action: 'org.email_sent', actorUid: 'system', targetType: 'organization',
+      targetId: orgId, orgId,
+      details: { kind: 'staff_granted', sent: result.sent, reason: result.reason ?? null },
+    });
+  } catch (err) {
+    logger.error('Staff-granted email step failed; the approval itself stands', {
+      orgId, reason: String(err?.message || err).slice(0, 200),
+    });
+  }
+}
+
+const trimmedEmail = (value) => (String(value || '').trim() || null);
 
 export const onReportAuditWritten = onDocumentWritten('reports/{reportId}', async (event) => {
   const reportId = event.params.reportId;

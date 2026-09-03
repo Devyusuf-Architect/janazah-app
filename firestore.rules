@@ -495,6 +495,63 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- email preferences ----------
+    //
+    // A person's own opt-in record for email, keyed to whatever auth uid
+    // their browser currently holds. Ta'ziyah keeps no user document (see
+    // account.js), and this is a narrow, deliberate exception to that: an
+    // email address, held only for someone who chose to give one, reachable
+    // only by the uid that gave it. It reuses the same identity /reports
+    // already keys to (an anonymous Firebase Auth session when there is no
+    // account), rather than inventing a second notion of "who this is".
+    //
+    // The document not existing is itself meaningful: nothing here defaults
+    // to sending mail, so absence must read as "send nothing", never as
+    // "send everything". That is enforced in the functions that read this
+    // collection, not by a rule, but the shape below keeps the one field a
+    // sender would need to promise (email) mandatory whenever this exists at
+    // all.
+
+    function emailPreferencesKeys() {
+      return ['email', 'followedMasjidPosts', 'noticeUpdates', 'nearbyAlerts',
+              'updatedAt', 'updatedBy'];
+    }
+
+    function validEmailPreferencesShape() {
+      return request.resource.data.keys().hasOnly(emailPreferencesKeys())
+        && request.resource.data.keys().hasAll(['email'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 0
+        // Long enough for any real address, short enough that this can never
+        // become a place to stash something other than an email address.
+        && request.resource.data.email.size() <= 254
+        && (!('followedMasjidPosts' in request.resource.data)
+            || request.resource.data.followedMasjidPosts is bool)
+        && (!('noticeUpdates' in request.resource.data)
+            || request.resource.data.noticeUpdates is bool)
+        && (!('nearbyAlerts' in request.resource.data)
+            || request.resource.data.nearbyAlerts is bool);
+    }
+
+    match /emailPreferences/{prefUid} {
+      // Only the person this document is about, ever. Not even a platform
+      // admin: there is no support workflow built on this collection, and
+      // giving one an easy path to read email addresses would undo the
+      // point of keeping them out of every other document.
+      allow get: if isSignedIn() && uid() == prefUid;
+      // Nobody enumerates this collection. A list query would either be
+      // scoped to nothing useful or, unscoped, would be every address on the
+      // platform.
+      allow list: if false;
+      allow create, update: if isSignedIn() && uid() == prefUid
+        && validEmailPreferencesShape()
+        && pinnedUpdatedBy();
+      // Turning off every category and deleting the record amount to the
+      // same thing, so both are offered: withdrawing consent removes the
+      // address rather than leaving it stored with everything unchecked.
+      allow delete: if isSignedIn() && uid() == prefUid;
+    }
+
     // ---------- platform settings ----------
     //
     // Small operational switches a platform administrator flips from the

@@ -1026,6 +1026,94 @@ describe('reports', () => {
   });
 });
 
+describe('email preferences', () => {
+  const prefs = (overrides = {}) => ({
+    email: 'someone@example.com', followedMasjidPosts: true,
+    noticeUpdates: true, updatedAt: serverTimestamp(),
+    updatedBy: OUTSIDER, ...overrides,
+  });
+
+  test('a signed-in person can create their own preferences', async () => {
+    await assertSucceeds(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER), prefs()));
+  });
+
+  test('a person can read and update their own preferences', async () => {
+    await setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER), prefs());
+    await assertSucceeds(getDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER)));
+    await assertSucceeds(updateDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      { nearbyAlerts: true, updatedAt: serverTimestamp(), updatedBy: OUTSIDER }));
+  });
+
+  test('a person can delete their own preferences, withdrawing consent', async () => {
+    await setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER), prefs());
+    await assertSucceeds(deleteDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER)));
+  });
+
+  test('nobody can write another person’s preferences', async () => {
+    await assertFails(setDoc(doc(as(STAFF), 'emailPreferences', OUTSIDER), prefs()));
+  });
+
+  test('nobody, not even a platform admin, can read another person’s preferences', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'emailPreferences', OUTSIDER), prefs());
+    });
+    await assertFails(getDoc(doc(as(STAFF), 'emailPreferences', OUTSIDER)));
+    await assertFails(getDoc(doc(as(ADMIN), 'emailPreferences', OUTSIDER)));
+  });
+
+  test('an unauthenticated visitor cannot write or read a preference record', async () => {
+    await assertFails(setDoc(doc(anon(), 'emailPreferences', OUTSIDER), prefs()));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'emailPreferences', OUTSIDER), prefs());
+    });
+    await assertFails(getDoc(doc(anon(), 'emailPreferences', OUTSIDER)));
+  });
+
+  test('the collection cannot be listed by anyone', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'emailPreferences', OUTSIDER), prefs());
+    });
+    await assertFails(getDocs(collection(as(OUTSIDER), 'emailPreferences')));
+    await assertFails(getDocs(collection(as(ADMIN), 'emailPreferences')));
+  });
+
+  test('an unknown key is rejected', async () => {
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      prefs({ phone: '555-0100' })));
+  });
+
+  test('a preference record with no email address is rejected', async () => {
+    const { email, ...rest } = prefs();
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER), rest));
+  });
+
+  test('an oversized email string is rejected', async () => {
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      prefs({ email: `${'x'.repeat(250)}@example.com` })));
+  });
+
+  test('a category flag must be a boolean, not a string or number', async () => {
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      prefs({ followedMasjidPosts: 'yes' })));
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      prefs({ nearbyAlerts: 1 })));
+  });
+
+  test('updatedBy is pinned to whoever is actually writing', async () => {
+    await assertFails(setDoc(doc(as(OUTSIDER), 'emailPreferences', OUTSIDER),
+      prefs({ updatedBy: STAFF })));
+  });
+
+  test('an anonymous session can create its own preferences, the same as filing a report', async () => {
+    // firestore.rules cannot tell an anonymous Firebase Auth session from any
+    // other: both are simply request.auth with a uid, which is exactly what
+    // makes this collection reachable without an account, the same way
+    // /reports already is.
+    await assertSucceeds(setDoc(doc(as('anon-uid'), 'emailPreferences', 'anon-uid'),
+      prefs({ updatedBy: 'anon-uid' })));
+  });
+});
+
 describe('the public feed needs no account', () => {
   test('a visitor with no account can read the feed', async () => {
     await seedNotice('n1');

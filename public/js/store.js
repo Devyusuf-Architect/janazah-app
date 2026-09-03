@@ -699,6 +699,51 @@ export async function ensureSignedIn() {
   return user;
 }
 
+// ------------------------------------------------------- email preferences
+
+/**
+ * The email preference record for whoever is currently signed in (an
+ * anonymous session or a real account, ensureSignedIn does not care which),
+ * or null if they have never set one.
+ *
+ * Null is the ordinary case, not a missing record to recover from: nobody
+ * has this document until they explicitly give an email address, and its
+ * absence is what every sender treats as "send nothing".
+ */
+export async function getEmailPreferences() {
+  const user = await ensureSignedIn();
+  const snap = await getDoc(doc(db, 'emailPreferences', user.uid));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Save the email preference record for whoever is currently signed in.
+ * Always a whole-document set, matching the rules, which validate the
+ * document as written rather than as a partial patch.
+ */
+export async function saveEmailPreferences({
+  email, followedMasjidPosts, noticeUpdates, nearbyAlerts,
+}) {
+  const user = await ensureSignedIn();
+  await setDoc(doc(db, 'emailPreferences', user.uid), {
+    email: email.trim(),
+    followedMasjidPosts: !!followedMasjidPosts,
+    noticeUpdates: !!noticeUpdates,
+    nearbyAlerts: !!nearbyAlerts,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid,
+  });
+}
+
+/**
+ * Withdraw consent entirely: no address is kept, rather than a record with
+ * every category left unchecked.
+ */
+export async function deleteEmailPreferences() {
+  const user = await ensureSignedIn();
+  await deleteDoc(doc(db, 'emailPreferences', user.uid));
+}
+
 /** Community report of an incorrect or fraudulent notice. */
 export async function submitReport(noticeId, reason, detail) {
   const user = await ensureSignedIn();

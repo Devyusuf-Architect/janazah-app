@@ -45,12 +45,53 @@ export function smtpSettings(env = {}) {
   };
 }
 
-/** Which verification outcomes are worth an email at all. */
-export const NOTIFIED_STATUSES = ['verified', 'rejected', 'needs_information'];
+/**
+ * Which verification outcomes are worth an email at all.
+ *
+ * suspended is here deliberately, alongside the three original decisions: an
+ * organization that stops being able to publish without warning needs to
+ * know that as much as one that was just approved. pending is not, on
+ * either side of it: it is both the very first state a registration ever
+ * has (nothing has been decided yet, so there is nothing to report) and, on
+ * the way back up from rejected or needs_information, an intermediate stop
+ * with no decision of its own. Reinstatement goes straight from suspended to
+ * verified (see decisionButtons in the admin portal), so it is already
+ * covered by the verified case above.
+ */
+export const NOTIFIED_STATUSES = ['verified', 'rejected', 'needs_information', 'suspended'];
 
 const SIGN_OFF = (siteUrl) => `Ta'ziyah\n${siteUrl}`;
+const GREETING = 'Assalamu alaikum,';
 
 const trim = (value) => String(value || '').trim();
+
+/**
+ * Every email this file sends is built from the same three pieces: a fixed
+ * greeting, whatever the caller has to say, and a fixed sign-off naming the
+ * site. Pulling that into one place means a change to the greeting or the
+ * sign-off, should one ever be needed, happens once rather than once per
+ * message, and a new kind of email gets the same shape for free instead of
+ * needing to remember it.
+ *
+ * Paragraphs that are null or empty are dropped, so a caller can build its
+ * list with conditional entries (`note ? '...' : null`) without filtering it
+ * itself.
+ *
+ * @param {string} subject
+ * @param {(string|null|undefined)[]} paragraphs  Body paragraphs, greeting
+ *   and sign-off excluded; both are added here.
+ * @param {string} siteUrl
+ * @returns {{subject: string, text: string}}
+ */
+function composeEmail(subject, paragraphs, siteUrl) {
+  const site = trim(siteUrl) || 'https://taziyah.com';
+  return {
+    subject,
+    text: [GREETING, ...paragraphs, SIGN_OFF(site)]
+      .filter((p) => trim(p).length > 0)
+      .join('\n\n'),
+  };
+}
 
 /**
  * The message for one verification decision, or null when the status is not
@@ -60,7 +101,7 @@ const trim = (value) => String(value || '').trim();
  * marketed to, and the message has one job: say what happened, to which
  * organization, with the reviewer's own words when there are any.
  *
- * @param {string} status  verified, rejected or needs_information.
+ * @param {string} status  verified, rejected, needs_information or suspended.
  * @param {object} ctx
  * @param {string} ctx.orgName
  * @param {string} [ctx.reason]  The reviewer's note (statusReason).
@@ -69,54 +110,88 @@ const trim = (value) => String(value || '').trim();
  */
 export function verificationEmail(status, { orgName, reason = '', siteUrl } = {}) {
   const name = trim(orgName) || 'Your organization';
-  const site = trim(siteUrl) || 'https://taziyah.com';
   const note = trim(reason);
 
   if (status === 'verified') {
-    return {
-      subject: `${name} is verified on Ta'ziyah`,
-      text: [
-        'Assalamu alaikum,',
-        `${name} has been verified on Ta'ziyah. It can now publish Janazah `
-          + 'notices, and it appears in the public directory of masjids.',
-        note ? `Note from the reviewer: ${note}` : null,
-        `Sign in at ${site} to publish.`,
-        SIGN_OFF(site),
-      ].filter(Boolean).join('\n\n'),
-    };
+    return composeEmail(`${name} is verified on Ta'ziyah`, [
+      `${name} has been verified on Ta'ziyah. It can now publish Janazah `
+        + 'notices, and it appears in the public directory of masjids.',
+      note ? `Note from the reviewer: ${note}` : null,
+      `Sign in at ${trim(siteUrl) || 'https://taziyah.com'} to publish.`,
+    ], siteUrl);
   }
 
   if (status === 'rejected') {
-    return {
-      subject: `About the Ta'ziyah registration for ${name}`,
-      text: [
-        'Assalamu alaikum,',
-        `The registration for ${name} on Ta'ziyah was not approved, so it `
-          + 'cannot publish Janazah notices.',
-        note ? `Reason given: ${note}` : null,
-        'If this is a mistake, or you can provide something further, update '
-          + `the registration at ${site} and ask for it to be looked at again.`,
-        SIGN_OFF(site),
-      ].filter(Boolean).join('\n\n'),
-    };
+    return composeEmail(`About the Ta'ziyah registration for ${name}`, [
+      `The registration for ${name} on Ta'ziyah was not approved, so it `
+        + 'cannot publish Janazah notices.',
+      note ? `Reason given: ${note}` : null,
+      'If this is a mistake, or you can provide something further, update '
+        + `the registration at ${trim(siteUrl) || 'https://taziyah.com'} `
+        + 'and ask for it to be looked at again.',
+    ], siteUrl);
   }
 
   if (status === 'needs_information') {
-    return {
-      subject: `More information is needed for ${name}`,
-      text: [
-        'Assalamu alaikum,',
-        `Before ${name} can be verified on Ta'ziyah, the reviewers need more `
-          + 'information. Nothing is wrong with the registration; it is simply '
-          + 'not yet possible to confirm.',
-        note ? `What is needed: ${note}` : null,
-        `Sign in at ${site} to update the registration and reply.`,
-        SIGN_OFF(site),
-      ].filter(Boolean).join('\n\n'),
-    };
+    return composeEmail(`More information is needed for ${name}`, [
+      `Before ${name} can be verified on Ta'ziyah, the reviewers need more `
+        + 'information. Nothing is wrong with the registration; it is simply '
+        + 'not yet possible to confirm.',
+      note ? `What is needed: ${note}` : null,
+      `Sign in at ${trim(siteUrl) || 'https://taziyah.com'} to update the `
+        + 'registration and reply.',
+    ], siteUrl);
+  }
+
+  if (status === 'suspended') {
+    return composeEmail(`Publishing is suspended for ${name}`, [
+      `${name} has been suspended on Ta'ziyah. It can no longer publish `
+        + 'Janazah notices. Notices it already published stay visible, so a '
+        + 'family holding a link is not left with a dead page.',
+      note ? `Reason given: ${note}` : null,
+      `If you believe this is a mistake, sign in at `
+        + `${trim(siteUrl) || 'https://taziyah.com'} and reach the `
+        + 'administrators.',
+    ], siteUrl);
   }
 
   return null;
+}
+
+/**
+ * Sent once, the moment a registration is submitted, so an applicant knows it
+ * was received rather than wondering whether the form worked. It reports
+ * receipt only; the decision itself still comes from verificationEmail
+ * above, whenever a reviewer reaches one.
+ */
+export function applicationReceivedEmail({ orgName, siteUrl } = {}) {
+  const name = trim(orgName) || 'Your organization';
+  return composeEmail(`${name}'s registration was received`, [
+    `Thank you for registering ${name} on Ta'ziyah. A reviewer will check `
+      + 'the application and you will hear back once a decision is made.',
+    `Sign in at ${trim(siteUrl) || 'https://taziyah.com'} at any time to see `
+      + 'where the application stands.',
+  ], siteUrl);
+}
+
+/** Sent to someone whose staff join request was approved. */
+export function staffGrantedEmail({ orgName, siteUrl } = {}) {
+  const name = trim(orgName) || 'the organization';
+  return composeEmail(`You now have staff access to ${name}`, [
+    `Your request to join ${name} on Ta'ziyah has been approved. You can `
+      + 'now publish, correct and cancel its Janazah notices.',
+    `Sign in at ${trim(siteUrl) || 'https://taziyah.com'} to get started.`,
+  ], siteUrl);
+}
+
+/** Sent to someone removed from an organization's staff list. */
+export function staffRevokedEmail({ orgName, siteUrl } = {}) {
+  const name = trim(orgName) || 'the organization';
+  return composeEmail(`Your staff access to ${name} has ended`, [
+    `Your staff access to ${name} on Ta'ziyah has been removed. You can no `
+      + 'longer publish, correct or cancel its notices.',
+    'If this was not expected, reach out to someone else on staff there.',
+  ], siteUrl);
 }
 
 /**
@@ -129,16 +204,10 @@ export function verificationEmail(status, { orgName, reason = '', siteUrl } = {}
  */
 export function messageEmail({ orgName, subject, body, siteUrl } = {}) {
   const name = trim(orgName) || 'your organization';
-  const site = trim(siteUrl) || 'https://taziyah.com';
-  return {
-    subject: trim(subject),
-    text: [
-      'Assalamu alaikum,',
-      trim(body),
-      `This message is from the Ta'ziyah administrators, about ${name}.`,
-      SIGN_OFF(site),
-    ].join('\n\n'),
-  };
+  return composeEmail(trim(subject), [
+    trim(body),
+    `This message is from the Ta'ziyah administrators, about ${name}.`,
+  ], siteUrl);
 }
 
 /**

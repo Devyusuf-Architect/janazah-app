@@ -185,6 +185,46 @@ describe('notification toggles do what they say', () => {
   });
 });
 
+describe('email preferences', () => {
+  test('saving requires the same sign-in a report already uses', () => {
+    // ensureSignedIn signs in anonymously if there is no session yet, the
+    // same call submitReport makes; a second, parallel identity for this
+    // form would be a second thing to keep straight.
+    assert.match(account, /store\.getEmailPreferences\(\)/);
+    assert.match(account, /store\.saveEmailPreferences\(state\)/);
+    const storeSrc = readFileSync('public/js/store.js', 'utf8');
+    assert.match(storeSrc, /export async function getEmailPreferences\(\)[\s\S]{0,120}ensureSignedIn\(\)/);
+    assert.match(storeSrc, /export async function saveEmailPreferences\(/);
+    assert.match(storeSrc, /doc\(db, 'emailPreferences', user\.uid\)/);
+  });
+
+  test('nothing is emailed unless an address is saved', () => {
+    assert.match(account, /Nothing is emailed unless you save an address below\./);
+  });
+
+  test('removing the address is offered, and it deletes rather than blanking the record', () => {
+    assert.match(account, /'Remove my address'/);
+    const storeSrc = readFileSync('public/js/store.js', 'utf8');
+    assert.match(storeSrc, /export async function deleteEmailPreferences\(\)[\s\S]{0,120}deleteDoc\(doc\(db, 'emailPreferences', user\.uid\)\)/);
+  });
+
+  test('the page is honest that the three categories are not wired to any sending yet', () => {
+    // The follow list and a person's location are both device-local (see
+    // follows.js and location.js), so there is currently no server-side
+    // record of who follows which masjid, or of a specific notice someone
+    // was told about, for a Cloud Function to read. Saying otherwise here
+    // would be exactly the kind of promise the writing rules forbid making
+    // without something behind it.
+    assert.match(account, /does not yet send email for the three choices above/);
+  });
+
+  test('the three categories offered match the agreed shape', () => {
+    for (const label of ['Masjids I follow', 'Corrections and cancellations', 'Janazahs near me']) {
+      assert.ok(account.includes(`'${label}'`), `missing category: ${label}`);
+    }
+  });
+});
+
 describe('appearance', () => {
   test('three themes, with the system default kept', () => {
     assert.deepEqual(THEMES.map((t) => t.value), ['system', 'light', 'dark']);

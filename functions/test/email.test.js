@@ -18,6 +18,7 @@ import { strict as assert } from 'node:assert';
 
 import {
   smtpSettings, verificationEmail, messageEmail, resolveRecipient,
+  applicationReceivedEmail, staffGrantedEmail, staffRevokedEmail,
   NOTIFIED_STATUSES,
 } from '../lib/email.js';
 
@@ -78,9 +79,14 @@ describe('smtpSettings', () => {
 describe('verificationEmail', () => {
   const ctx = { orgName: 'Masjid al-Noor', siteUrl: 'https://taziyah.com' };
 
-  test('only the three decisions people are written to about produce mail', () => {
-    assert.deepEqual(NOTIFIED_STATUSES, ['verified', 'rejected', 'needs_information']);
-    for (const status of ['pending', 'suspended', 'unknown', '', null]) {
+  test('only the four decisions people are written to about produce mail', () => {
+    assert.deepEqual(NOTIFIED_STATUSES,
+      ['verified', 'rejected', 'needs_information', 'suspended']);
+    // pending is never in this list: it is both the very first state a
+    // registration has (nothing decided yet) and an intermediate stop on the
+    // way back from rejected or needs_information, so it never names a
+    // decision worth reporting on its own.
+    for (const status of ['pending', 'unknown', '', null]) {
       assert.equal(verificationEmail(status, ctx), null, `${status} must send nothing`);
     }
   });
@@ -138,6 +144,70 @@ describe('verificationEmail', () => {
     const mail = verificationEmail('verified', { siteUrl: 'https://taziyah.com' });
     assert.equal(mail.text.includes('undefined'), false);
     assert.equal(mail.subject.includes('undefined'), false);
+  });
+
+  test('suspension says publishing stops, and that existing notices stay up', () => {
+    const mail = verificationEmail('suspended', ctx);
+    assert.match(mail.text, /can no longer publish/);
+    assert.match(mail.text, /stay visible/);
+  });
+});
+
+describe('every message shares one greeting and one sign-off', () => {
+  const ctx = { orgName: 'Masjid al-Noor', siteUrl: 'https://taziyah.com' };
+
+  test('all of them open the same way and close with the site link', () => {
+    const mails = [
+      verificationEmail('verified', ctx),
+      verificationEmail('rejected', ctx),
+      verificationEmail('needs_information', ctx),
+      verificationEmail('suspended', ctx),
+      applicationReceivedEmail(ctx),
+      staffGrantedEmail(ctx),
+      staffRevokedEmail(ctx),
+      messageEmail({ ...ctx, subject: 'Hello', body: 'Hello.' }),
+    ];
+    for (const mail of mails) {
+      assert.match(mail.text, /^Assalamu alaikum,\n\n/);
+      assert.match(mail.text, /\n\nTa'ziyah\nhttps:\/\/taziyah\.com$/);
+    }
+  });
+});
+
+describe('applicationReceivedEmail', () => {
+  const ctx = { orgName: 'Masjid al-Noor', siteUrl: 'https://taziyah.com' };
+
+  test('says the application was received, not decided', () => {
+    const mail = applicationReceivedEmail(ctx);
+    assert.match(mail.text, /Masjid al-Noor/);
+    assert.match(mail.text, /Thank you for registering/);
+    assert.doesNotMatch(mail.text, /verified|approved|rejected/i);
+  });
+
+  test('no em dash', () => {
+    assert.equal(applicationReceivedEmail(ctx).text.includes('—'), false);
+  });
+});
+
+describe('staffGrantedEmail and staffRevokedEmail', () => {
+  const ctx = { orgName: 'Masjid al-Noor', siteUrl: 'https://taziyah.com' };
+
+  test('granted says what they can now do', () => {
+    const mail = staffGrantedEmail(ctx);
+    assert.match(mail.text, /Masjid al-Noor/);
+    assert.match(mail.text, /publish, correct and cancel/);
+  });
+
+  test('revoked says access ended, without implying wrongdoing', () => {
+    const mail = staffRevokedEmail(ctx);
+    assert.match(mail.text, /Masjid al-Noor/);
+    assert.match(mail.text, /removed/);
+    assert.doesNotMatch(mail.text, /violat|abuse|misconduct/i);
+  });
+
+  test('neither uses an em dash', () => {
+    assert.equal(staffGrantedEmail(ctx).text.includes('—'), false);
+    assert.equal(staffRevokedEmail(ctx).text.includes('—'), false);
   });
 });
 
