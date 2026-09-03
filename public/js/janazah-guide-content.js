@@ -267,7 +267,7 @@ export const AFTER = {
       + 'grave. Graves are kept simple.'],
     ['Dua after burial', 'Stand at the grave afterwards and ask for '
       + 'forgiveness and firmness for the one who has been buried. The '
-      + 'Prophet ط taught that they are questioned at this moment.'],
+      + 'Prophet ﷺ taught that they are questioned at this moment.'],
     ['Consoling the family', 'Offer condolences, and mean them briefly rather '
       + 'than at length. Food is prepared for the bereaved family by others, '
       + 'not by them. Visiting, checking in weeks later, and continuing to '
