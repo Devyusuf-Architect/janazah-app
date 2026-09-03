@@ -7,6 +7,7 @@
 // wrong, and what this platform is not.
 
 import { el } from '../ui.js';
+import { platformSettings } from '../platform-settings.js';
 
 const LAST_UPDATED = '25 August 2026';
 
@@ -104,10 +105,20 @@ export function renderTerms(mount) {
       }),
     ]),
 
-    el('p', { class: 'hint hint--boxed' },
+    el('p', { class: 'hint hint--boxed' }, [
       'Questions about these terms, or about a specific notice, go through ' +
       '“Report a problem” on the notice, or the takedown request ' +
-      'described on the privacy page. A direct contact address will be added ' +
-      'here once one is confirmed.'),
+      'described on the privacy page.',
+      // Left out entirely, rather than a dangling "contact us at:", until a
+      // platform administrator sets a support address in Platform Settings.
+      platformSettings().supportEmail
+        ? el('span', {}, [
+            ' You can also write ',
+            el('a', { class: 'link', href: `mailto:${platformSettings().supportEmail}` },
+              platformSettings().supportEmail),
+            ' directly.',
+          ])
+        : null,
+    ]),
   ]));
 }

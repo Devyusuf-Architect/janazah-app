@@ -117,8 +117,23 @@ export function initialsFor(user) {
  * never been here does not know whether they need an account, and "Create
  * account" sitting beside it answers that without a marketing sentence.
  */
-function renderAccount(mount, { user, path }) {
+function renderAccount(mount, { user, path, authReady = true }) {
   mount.replaceChildren();
+
+  // Firebase reports auth state asynchronously; on first paint it simply has
+  // not answered yet, which is a third state, distinct from both signed in
+  // and signed out. Rendering "Sign in / Create account" here for that brief
+  // window is wrong for a signed-in visitor (it flashes controls that do not
+  // apply to them and vanish a moment later) and the placeholder below is
+  // deliberately empty rather than a disabled control, so there is nothing
+  // in the layout a stray click could land on before it is ready.
+  if (!authReady) {
+    mount.append(el('div', {
+      class: 'account__placeholder', 'aria-hidden': 'true',
+    }));
+    return;
+  }
+
   if (!user) {
     mount.append(
       el('a', {
@@ -200,8 +215,12 @@ function renderAccount(mount, { user, path }) {
  *   portal. Presentation only: what an administrator may actually do is
  *   decided by firestore.rules on every read and write, so hiding or showing
  *   this link changes nobody's permissions.
+ * @param {boolean} [state.authReady] False only during the brief window
+ *   before Firebase has reported auth state for the first time. The account
+ *   control renders neither signed-in nor signed-out controls then, since
+ *   neither is known to be true yet.
  */
-export function renderNav(nav, { path, user, isAdmin = false }) {
+export function renderNav(nav, { path, user, isAdmin = false, authReady = true }) {
   nav.replaceChildren();
   document.body.classList.toggle('is-nav-collapsed', collapsed());
 
@@ -276,7 +295,7 @@ export function renderNav(nav, { path, user, isAdmin = false }) {
   nav.append(collapse);
 
   const account = document.getElementById('account');
-  if (account) renderAccount(account, { user, path });
+  if (account) renderAccount(account, { user, path, authReady });
 
   const bottom = document.getElementById('bottom-nav');
   if (bottom) renderBottomNav(bottom, { path, user });

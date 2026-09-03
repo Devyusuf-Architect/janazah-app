@@ -114,7 +114,13 @@ export function renderFeed(mount, { initialFilter } = {}) {
     // already follows a masjid most likely came here for those, not the full
     // list. Nobody following anything yet sees everything, since an empty
     // "Masjids I follow" would be a worse first screen than a full one.
-    filter = follows.followedOrgIds().length ? 'following' : 'all';
+    // On a phone, though, always land on "All notices" — the smart default
+    // above combines badly with a small screen's limited room to notice and
+    // switch tabs, so a mobile visitor should never open on a filtered view
+    // they did not choose.
+    const isMobile = window.matchMedia?.('(max-width: 900px)').matches
+      ?? window.innerWidth <= 900;
+    filter = isMobile ? 'all' : (follows.followedOrgIds().length ? 'following' : 'all');
   }
 
   mount.append(el('div', { class: 'feed-intro' }, [
@@ -124,7 +130,7 @@ export function renderFeed(mount, { initialFilter } = {}) {
       'needed, and nothing about you is collected to show this page.'),
   ]));
 
-  const tabs = el('div', { class: 'tabs' });
+  const tabs = el('div', { class: 'tabs tabs--plain' });
   // The marker follows whatever paintTabs() rebuilds, so it does not need
   // re-attaching each time the follow count changes the labels.
   stopIndicator?.();
@@ -150,7 +156,7 @@ export function renderFeed(mount, { initialFilter } = {}) {
       tab('following', 'bookmark',
         `Masjids I follow${followed ? ` (${followed})` : ''}`,
         () => { filter = 'following'; paint(); }),
-      tab('manage', 'users', 'Manage', () => openFollowManager()),
+      tab('manage', 'users', 'Manage follows', () => openFollowManager()),
     );
   };
 
@@ -385,9 +391,12 @@ async function shareNotice(notice) {
   if (navigator.share) {
     try {
       await navigator.share({ title, text, url });
+      toast('Shared.');
       return;
     } catch (err) {
-      // A user cancelling the share sheet is not a failure.
+      // A user cancelling the share sheet is not a failure, and not
+      // something worth a toast either: they changed their mind, they did
+      // not hit an error.
       if (err?.name === 'AbortError') return;
     }
   }

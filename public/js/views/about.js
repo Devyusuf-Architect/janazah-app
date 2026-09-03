@@ -2,6 +2,7 @@
 // seen it before and wants the short version before they trust it.
 
 import { el } from '../ui.js';
+import { platformSettings } from '../platform-settings.js';
 
 export function renderAbout(mount) {
   const section = (heading, children) =>
@@ -55,5 +56,18 @@ export function renderAbout(mount) {
       el('a', { class: 'link', href: '/terms', text: 'terms of service' }),
       '.',
     ]),
+
+    // Only appears once a platform administrator has set a support address
+    // in Platform Settings; there is nothing useful to show before then.
+    platformSettings().supportEmail
+      ? section('Support', [
+          el('p', {}, [
+            'Questions about using Ta’ziyah: ',
+            el('a', { class: 'link', href: `mailto:${platformSettings().supportEmail}` },
+              platformSettings().supportEmail),
+            '.',
+          ]),
+        ])
+      : null,
   ]));
 }

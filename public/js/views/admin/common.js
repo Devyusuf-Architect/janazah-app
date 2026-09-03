@@ -9,7 +9,7 @@
 // Nothing in this file reads or writes Firestore. Data access is store.js,
 // for the whole app and for this portal too.
 
-import { el, icon, friendlyError } from '../../ui.js';
+import { el, icon, friendlyError, skeleton } from '../../ui.js';
 
 /**
  * The top of a section: what it is, one sentence on what it is for, and
@@ -43,8 +43,15 @@ export function emptyState(message, action = null) {
   ]);
 }
 
-export function loading(message = 'Loading…') {
-  return el('p', { class: 'admin-loading muted', text: message });
+/**
+ * A section's data has not arrived yet. Reuses the same skeleton-card
+ * pattern the homepage and the public feed already show while a live
+ * subscription is still connecting, rather than the bare "Loading…" text the
+ * admin portal showed before - a screen with no visual weight reads as
+ * broken more than it reads as "wait".
+ */
+export function loading(count = 3) {
+  return el('div', { class: 'admin-loading' }, [skeleton(count)]);
 }
 
 export function errorState(message) {

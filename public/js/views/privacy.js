@@ -8,6 +8,7 @@
 import { el } from '../ui.js';
 import { RETENTION_DAYS } from '../retention-policy.js';
 import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
+import { platformSettings } from '../platform-settings.js';
 
 const LAST_UPDATED = '25 August 2026';
 
@@ -137,10 +138,17 @@ section('Asking for a notice to come down', [
                       'or to ask for a notice to be corrected or removed, use ' +
                       'the “Report a problem” link on the notice, or contact the ' +
                       'masjid that published it.' }),
-      el('p', { class: 'hint hint--boxed' },
-        'Before launch, replace this section with a real contact address and a ' +
-        'named person responsible for privacy. PIPEDA requires an accountable ' +
-        'individual, and a policy without one is incomplete.'),
+      // A platform administrator sets this address in Platform Settings; if
+      // one has not been configured yet, this line is left out rather than
+      // showing an empty "contact us at:" or a leftover placeholder.
+      platformSettings().privacyEmail
+        ? el('p', {}, [
+            'For anything about your own data specifically, you can also write ',
+            el('a', { class: 'link', href: `mailto:${platformSettings().privacyEmail}` },
+              platformSettings().privacyEmail),
+            ' directly.',
+          ])
+        : null,
     ]),
   ]));
 }

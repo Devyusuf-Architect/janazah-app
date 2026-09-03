@@ -85,11 +85,21 @@ export function renderSettings(panel, actx) {
 
     settingsCard('Contact', [
       textField('supportEmail', 'Support contact address', current.supportEmail,
-        CONTACT_EMAIL_MAX, 'Shown to anybody who needs help with the platform.'),
+        CONTACT_EMAIL_MAX, 'Shown to anybody who needs help with the platform.',
+        { placeholder: 'Not set, nothing is shown to visitors until this is filled in' }),
       textField('privacyEmail', 'Privacy contact address', current.privacyEmail,
         CONTACT_EMAIL_MAX,
-        'Shown on the privacy page, for a request about somebody’s own data.'),
+        'Shown on the privacy page, for a request about somebody’s own data.',
+        { placeholder: 'Not set, nothing is shown to visitors until this is filled in' }),
     ]),
+
+    (!current.supportEmail || !current.privacyEmail)
+      ? el('p', { class: 'admin-caveat admin-caveat--warn' },
+          'One or both contact addresses above are not set yet. Until they '
+          + 'are, the pages that would show them (Help & About, Privacy) '
+          + 'simply omit that line rather than showing something broken. '
+          + 'Fill these in with a real address your organization checks.')
+      : null,
 
     settingsCard('Announcement', [
       checkField('announcementEnabled', 'Show an announcement to everybody',
@@ -210,13 +220,21 @@ function numberField(name, label, value, { min, max }, hint) {
   ]);
 }
 
-function textField(name, label, value, maxlength, hint, { textarea = false } = {}) {
+function textField(name, label, value, maxlength, hint, { textarea = false, placeholder } = {}) {
   const input = textarea
     ? el('textarea', { class: 'field', id: name, name, rows: 2, maxlength })
     : el('input', { class: 'field', id: name, name, type: 'text', maxlength });
   input.value = value || '';
+  // An empty configured value and a field that simply has not loaded yet
+  // look identical as a blank box. The placeholder, shown only while the
+  // field is genuinely empty, is what tells them apart.
+  if (placeholder && !value) input.placeholder = placeholder;
   return el('div', { class: 'field-group' }, [
-    el('label', { class: 'label', for: name, text: label }),
+    el('label', { class: 'label', for: name, text: label }, [
+      !value && placeholder
+        ? el('span', { class: 'badge badge--warn field-group__badge', text: 'Not set' })
+        : null,
+    ]),
     input,
     hint ? el('p', { class: 'hint', text: hint }) : null,
   ]);

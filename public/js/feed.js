@@ -9,6 +9,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
 import { $, el, toast } from './ui.js';
 import { isSampleMode, initSampleMode } from './sample-mode.js';
+import { initPlatformSettings } from './platform-settings.js';
 import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import {
@@ -55,7 +56,7 @@ function teardownAll() {
 
 /** Redraws the nav for the current path and sign-in state. */
 function paintNav() {
-  renderNav(nav(), { path: location.pathname, user, isAdmin });
+  renderNav(nav(), { path: location.pathname, user, isAdmin, authReady });
 }
 
 function renderRoute() {
@@ -249,6 +250,14 @@ initSampleMode((enabled) => {
   paintSampleMode();
   route();
 }).catch((err) => console.error('initSampleMode', err));
+
+// Same reasoning: the public pages that show a support or privacy contact
+// address (see privacy.js, terms.js, about.js) read platformSettings(),
+// which starts out at its built-in defaults (both addresses empty) until
+// this resolves. Reading it here, rather than only inside the admin portal,
+// is what lets those pages ever show a real address at all.
+initPlatformSettings(() => route())
+  .catch((err) => console.error('initPlatformSettings', err));
 
 if (usingEmulator) $('#env-banner')?.removeAttribute('hidden');
 
