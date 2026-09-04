@@ -14,20 +14,28 @@
 // So this test checks that every export of the content module is actually
 // rendered. It cannot check that the text is correct, which is a scholar's
 // job, but it can check that none of it was silently left out.
+//
+// It reads the whole guide rather than one file, because the guide is now a
+// front page and four screens behind it. Moving a section one tap away is a
+// layout decision; dropping it is not, and this is what tells the two apart.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '../..');
 
 const content = await import('../../public/js/janazah-guide-content.js');
-const body = readFileSync(
-  resolve(here, '../src/features/guide/GuideBody.tsx'), 'utf8',
-);
+/** Every file the guide is rendered by, concatenated. */
+const body = [
+  ...readdirSync(resolve(here, '../src/features/guide'))
+    .map((entry) => resolve(here, '../src/features/guide', entry)),
+  ...readdirSync(resolve(here, '../app/guide'))
+    .map((entry) => resolve(here, '../app/guide', entry)),
+].map((file) => readFileSync(file, 'utf8')).join('\n');
+
 const recitation = readFileSync(
   resolve(here, '../src/features/guide/Recitation.tsx'), 'utf8',
 );

@@ -1,209 +1,122 @@
-// The Janazah guide's content, as a screen.
+// The Janazah guide.
 //
-// Separated from the route so the design harness can render it (see
-// preview/entry.tsx). Everything here comes from
-// public/js/janazah-guide-content.js through src/shared/guide.ts, unchanged.
-// Read that file's own header before touching anything: it is religious text
-// people read moments before praying over someone who has died, every
-// recitation carries its source, nothing is paraphrased, and where the
-// schools of law differ both are shown.
+// One screen, and the four takbirs are on it without scrolling. Everything
+// else is a tap away.
 //
-// This is a layout, not an edition. Nothing here edits, shortens, reorders or
-// adds to any of it.
+// The previous version was an article: every recitation, every note, both
+// schools' positions and four sections of prose, laid out top to bottom. That
+// is the right shape for a web page and the wrong shape for the moment this
+// screen is actually opened, which is standing in a row thirty seconds before
+// the prayer, trying to remember what comes after the second takbir. Somebody
+// in that position cannot scroll through two thousand words.
+//
+// So: the four takbirs as a stepper, first and above the fold; the istirja
+// under them; and four rows leading to what used to sit below. Nothing was
+// cut. Every recitation, note, source and disclaimer that was on the page is
+// still in the app, reachable in one tap instead of by scrolling past it.
+//
+// Everything comes from public/js/janazah-guide-content.js through
+// src/shared/guide.ts, unchanged. Read that file's own header before touching
+// anything: it is religious text people read moments before praying over
+// someone who has died, every recitation carries its source, nothing is
+// paraphrased, and where the schools of law differ both are shown. This is a
+// layout, not an edition.
 
 import React from 'react';
 import { View } from 'react-native';
+import { router } from 'expo-router';
 
 import { Text } from '../../components/Text';
+import { Row } from '../../components/Row';
 import { Surface, Divider } from '../../components/Surface';
-import { Recitation } from './Recitation';
-import {
-  STEPS, TAKBIRS, PRONOUN_NOTE, QUICK_REFERENCE, AFTER, ISTIRJA,
-  SCHOOLS_NOTE, SCOPE_NOTE,
-  type Pair,
-} from '../../shared/guide';
-import { useColors, radius, space } from '../../theme';
+import { Stepper } from './Stepper';
+import { ISTIRJA } from '../../shared/guide';
+import { useColors, arabic, radius, space } from '../../theme';
 
 export function GuideBody() {
   const colors = useColors();
 
   return (
-        <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
+    <View style={{ gap: space.lg }}>
+      <View style={{ paddingHorizontal: space.lg }}>
+        <Text variant="caption" tone="subtle">
+          Follow your imam. Tap a takbir for what to recite.
+        </Text>
+      </View>
 
-          <View style={{ gap: space.sm }}>
-            <Text variant="display" serif>How to pray Salat al-Janazah</Text>
-            <Text variant="callout" tone="muted">
-              A reminder for anyone who has not prayed one before. Follow your
-              imam; the details below differ between the schools of law, and
-              both are shown where they do.
-            </Text>
-          </View>
+      <Stepper />
 
-          {/* When somebody dies, or when the news reaches you. First because
-              it is the first thing anyone says. */}
-          <Section title="On hearing the news">
-            <Recitation item={ISTIRJA} size="large" />
-          </Section>
-
-          <Section title="The four takbirs, in short">
-            <Surface style={{ overflow: 'hidden' }}>
-              {QUICK_REFERENCE.map((pair: Pair, index: number) => (
-                <View key={pair[0]}>
-                  {index > 0 ? <Divider inset={space.lg} /> : null}
-                  <View style={{ padding: space.lg, gap: 2 }}>
-                    <Text variant="bodyStrong">{pair[0]}</Text>
-                    <Text variant="callout" tone="muted">{pair[1]}</Text>
-                  </View>
-                </View>
-              ))}
-            </Surface>
-          </Section>
-
-          <Section title="Before the prayer">
-            {STEPS.map((step) => (
-              <View key={step.number} style={{ gap: space.md }}>
-                <Text variant="heading">{`${step.number}. ${step.title}`}</Text>
-                {step.lede ? (
-                  <Text variant="body" tone="muted">{step.lede}</Text>
-                ) : null}
-                {step.body ? <Text variant="body">{step.body}</Text> : null}
-                {step.points?.map((point: Pair) => (
-                  <View key={point[0]} style={{ gap: 2 }}>
-                    <Text variant="bodyStrong">{point[0]}</Text>
-                    <Text variant="body" tone="muted">{point[1]}</Text>
-                  </View>
-                ))}
-                {step.aside ? (
-                  <Surface padded level="flat">
-                    <Text variant="callout" tone="muted">{step.aside}</Text>
-                  </Surface>
-                ) : null}
-              </View>
-            ))}
-          </Section>
-
-          <Section title="The prayer">
-            {TAKBIRS.map((takbir) => (
-              <View key={takbir.number} style={{ gap: space.md }}>
-                <Text variant="heading">
-                  {`${takbir.number}. ${takbir.label}`}
-                </Text>
-                {takbir.takbir ? (
-                  <Recitation item={takbir.takbir} />
-                ) : null}
-                {takbir.intro ? (
-                  <Text variant="body" tone="muted">{takbir.intro}</Text>
-                ) : null}
-                {takbir.recitations?.map((recitation, index) => (
-                  <Recitation key={recitation.title ?? index} item={recitation} />
-                ))}
-                {takbir.childNote ? (
-                  <Surface padded level="flat" style={{ gap: space.md }}>
-                    {takbir.childNote.heading ? (
-                      <Text variant="bodyStrong">{takbir.childNote.heading}</Text>
-                    ) : null}
-                    {takbir.childNote.body ? (
-                      <Text variant="body">{takbir.childNote.body}</Text>
-                    ) : null}
-                    <Recitation item={takbir.childNote} />
-                  </Surface>
-                ) : null}
-                {takbir.closing ? (
-                  <View style={{ gap: space.md }}>
-                    {takbir.closing.heading ? (
-                      <Text variant="bodyStrong">{takbir.closing.heading}</Text>
-                    ) : null}
-                    {takbir.closing.body ? (
-                      <Text variant="body">{takbir.closing.body}</Text>
-                    ) : null}
-                    <Recitation item={takbir.closing} />
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </Section>
-
-          <Section title={PRONOUN_NOTE.heading}>
-            <Text variant="body">{PRONOUN_NOTE.body}</Text>
-            <Surface style={{ overflow: 'hidden' }}>
-              {PRONOUN_NOTE.forms.map((form: Pair, index: number) => (
-                <View key={form[0]}>
-                  {index > 0 ? <Divider inset={space.lg} /> : null}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      padding: space.lg,
-                      gap: space.md,
-                    }}
-                  >
-                    <Text variant="body" style={{ flex: 1 }}>{form[0]}</Text>
-                    <Text variant="body" tone="muted" style={{ fontStyle: 'italic' }}>
-                      {form[1]}
-                    </Text>
-                    <Text
-                      accessibilityLanguage="ar"
-                      style={{
-                        fontSize: 22,
-                        lineHeight: 40,
-                        color: colors.ink,
-                        writingDirection: 'rtl',
-                      }}
-                    >
-                      {form[2]}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </Surface>
-            <Text variant="callout" tone="muted">{PRONOUN_NOTE.footnote}</Text>
-          </Section>
-
-          <Section title={AFTER.heading}>
-            {AFTER.body ? <Text variant="body">{AFTER.body}</Text> : null}
-            {AFTER.points?.map((point: Pair) => (
-              <View key={point[0]} style={{ gap: 2 }}>
-                <Text variant="bodyStrong">{point[0]}</Text>
-                <Text variant="body" tone="muted">{point[1]}</Text>
-              </View>
-            ))}
-          </Section>
-
-          {/* Both of these stay, in full, on a phone. The first says the
-              schools of law differ; the second says Ta'ziyah is a
-              notification service and not a religious authority. Cutting
-              either for space would make the guide dishonest rather than
-              merely shorter. */}
-          <View
+      {/* On hearing the news.
+          Below the takbirs rather than above them, which is the one place
+          this layout departs from the order of the source. The istirja is
+          said when the news reaches you, usually hours earlier and somewhere
+          else; the takbirs are what somebody needs in the ten seconds before
+          the prayer. Putting a card above them pushed the fourth step off the
+          screen, and the fourth step is the whole point. */}
+      <View style={{ paddingHorizontal: space.lg }}>
+        <View
+          style={{
+            padding: space.lg,
+            borderRadius: radius.lg,
+            backgroundColor: colors.accentSoft,
+            borderWidth: 1,
+            borderColor: colors.accentLine,
+            gap: space.sm,
+          }}
+        >
+          <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase' }}>
+            On hearing the news
+          </Text>
+          <Text
+            accessibilityLanguage="ar"
             style={{
-              padding: space.lg,
-              borderRadius: radius.lg,
-              backgroundColor: colors.bgSunk,
-              gap: space.md,
+              fontSize: arabic.body.fontSize,
+              lineHeight: arabic.body.lineHeight,
+              color: colors.ink,
+              writingDirection: 'rtl',
+              textAlign: 'right',
             }}
           >
-            <Text variant="callout" tone="muted">{SCHOOLS_NOTE}</Text>
-            <Text variant="callout" tone="muted">{SCOPE_NOTE}</Text>
-          </View>
+            {ISTIRJA.arabic}
+          </Text>
+          <Text variant="callout" tone="muted" style={{ fontStyle: 'italic' }}>
+            {ISTIRJA.transliteration}
+          </Text>
+          <Text variant="callout">{ISTIRJA.english}</Text>
         </View>
-  );
-}
+      </View>
 
-function Section({ title, children }: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={{ gap: space.md, paddingTop: space.md }}>
-      <Text
-        variant="overline"
-        tone="subtle"
-        accessibilityRole="header"
-        style={{ textTransform: 'uppercase' }}
-      >
-        {title}
-      </Text>
-      {children}
+
+      {/* What used to be four more sections of prose. Each opens its own
+          screen, so the guide's front page stays the thing somebody can read
+          in the ten seconds they have. */}
+      <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
+        <Surface style={{ overflow: 'hidden' }}>
+          <Row
+            title="Before the prayer"
+            subtitle="Rows, position, and the intention"
+            onPress={() => router.push('/guide/before')}
+          />
+          <Divider inset={space.lg} />
+          <Row
+            title="After the prayer"
+            subtitle="The funeral, the burial, and consoling the family"
+            onPress={() => router.push('/guide/after')}
+          />
+          <Divider inset={space.lg} />
+          <Row
+            title="One dua, four endings"
+            subtitle="Praying for a man, a woman, or more than one person"
+            onPress={() => router.push('/guide/endings')}
+          />
+          <Divider inset={space.lg} />
+          <Row
+            title="Sources and the schools of law"
+            subtitle="Where they differ, and what this guide is not"
+            onPress={() => router.push('/guide/sources')}
+          />
+        </Surface>
+      </View>
     </View>
   );
 }

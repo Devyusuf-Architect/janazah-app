@@ -34,6 +34,7 @@ import { TimePanel } from '../src/features/notices/TimePanel';
 import { ScreenHeader } from '../src/components/ScreenHeader';
 import { LocationGate } from '../src/features/nearby/LocationGate';
 import { GuideBody } from '../src/features/guide/GuideBody';
+import { Stepper } from '../src/features/guide/Stepper';
 import { BrandGround } from '../src/features/launch/BrandGround';
 import { Mark, Brandmark } from '../src/features/launch/Brandmark';
 import { NoticeSkeletonList } from '../src/components/Skeleton';
@@ -158,6 +159,14 @@ function PreviewTabBar() {
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return <TabBar {...(props as any)} />;
+}
+
+/**
+ * The stepper with its third takbir open, so a screenshot shows the state
+ * that matters. The real one opens on a tap, which a still cannot show.
+ */
+function StepperOpen() {
+  return <Stepper initiallyOpen={3} />;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -342,7 +351,15 @@ function Gallery() {
       </Section>
 
       <Section title="Janazah guide">
-        <GuideBody />
+        <View style={{ paddingBottom: space.lg }}>
+          <GuideBody />
+        </View>
+      </Section>
+
+      <Section title="Janazah guide, a step open">
+        <View style={{ paddingBottom: space.lg }}>
+          <StepperOpen />
+        </View>
       </Section>
 
       <Section title="Type">

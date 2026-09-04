@@ -36,6 +36,13 @@ export const Tabs = () => null;
 export const useFocusEffect = noop;
 export const useLocalSearchParams = () => ({});
 
+// expo-haptics. A browser has no vibration motor worth pretending about, and
+// nothing in the harness is meant to buzz.
+export const selectionAsync = resolved;
+export const notificationAsync = resolved;
+export const impactAsync = resolved;
+export const NotificationFeedbackType = { Success: 'success', Error: 'error' };
+
 // expo-status-bar
 export const StatusBar = () => null;
 export const setStatusBarStyle = noop;
