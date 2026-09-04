@@ -9,6 +9,7 @@
 // Run: npm run test:rules
 
 import { readFileSync } from 'node:fs';
+import { strict as assert } from 'node:assert';
 import { test, before, after, beforeEach, describe } from 'node:test';
 import {
   initializeTestEnvironment, assertSucceeds, assertFails,
@@ -1457,5 +1458,110 @@ describe('needs_information is an administrator-only status', () => {
   test('a made-up status is still refused', async () => {
     await assertFails(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG),
       { verificationStatus: 'super_verified' }));
+  });
+});
+
+describe('archiving an organization', () => {
+  // The archive/restore mutation itself lives entirely in
+  // functions/lib/admin-management.js, called through the Admin SDK, which
+  // bypasses these rules. What belongs here is narrower: 'archived' has to be
+  // an accepted shape wherever validOrgShape() already enumerates statuses,
+  // and nothing here may open a client path into or out of it, because that
+  // would let an administrator hide an organization without its notices ever
+  // being pulled to draft - exactly the gap archiving exists to close.
+
+  test('archived is now an accepted verificationStatus for an ordinary write', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0199' }));
+    // The enum check itself, isolated from the archive/restore transition
+    // guard below: a status of 'archived' is a valid *value* even though
+    // reaching or leaving it through this rule is refused.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG),
+        { verificationStatus: 'archived', statusBeforeArchive: 'verified' });
+    });
+    await assertSucceeds(getDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG)));
+  });
+
+  test('a platform admin cannot set verificationStatus to archived directly', async () => {
+    // Direct client writes cannot also pull the organization's published
+    // notices to draft in the same atomic step, so this stays exclusively a
+    // Cloud Function path (archiveOrganization).
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { verificationStatus: 'archived', statusReason: 'x' }));
+  });
+
+  test('an already-archived organization accepts no ordinary admin update, not even unrelated to status', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG),
+        { verificationStatus: 'archived', statusBeforeArchive: 'verified' });
+    });
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0199' }));
+    // Restoring out of it through this same clause is refused too: that is
+    // restoreOrganization's job, not an ordinary admin write.
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { verificationStatus: 'verified' }));
+  });
+
+  test('an owner may still edit their organization while it is archived', async () => {
+    // Nothing about archiving should make ordinary profile upkeep impossible
+    // for the owner, the same as while suspended today. statusBeforeArchive
+    // sitting on the document unrelated to this edit must not, by itself,
+    // fail the shape check.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG),
+        { verificationStatus: 'archived', statusBeforeArchive: 'verified' });
+    });
+    await assertSucceeds(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG),
+      { phone: '416-555-0199', updatedBy: OWNER }));
+  });
+
+  test('statusBeforeArchive must be one of the recognised statuses', async () => {
+    await assertFails(updateDoc(doc(as(ADMIN), 'organizations', VERIFIED_ORG),
+      { statusReason: 'x', statusBeforeArchive: 'made_up_status' }));
+  });
+
+  test('an archived organization is invisible to the public exactly like an unverified one', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG),
+        { verificationStatus: 'archived', statusBeforeArchive: 'verified' });
+    });
+    await assertFails(getDoc(doc(anon(), 'organizations', VERIFIED_ORG)));
+    // The public directory query is still allowed to run; the archived
+    // organization is simply no longer among what it matches.
+    const feed = await getDocs(query(
+      collection(anon(), 'organizations'), where('verificationStatus', '==', 'verified')));
+    assert.equal(feed.docs.some((d) => d.id === VERIFIED_ORG), false);
+    // Querying for it directly by its new status is refused outright: there
+    // is no public query shape for 'archived'.
+    await assertFails(getDocs(query(
+      collection(anon(), 'organizations'), where('verificationStatus', '==', 'archived'))));
+  });
+
+  test('a notice archiving pulled to draft is unreadable by the public, exactly like any other draft', async () => {
+    // This is the entire point of the feature: before this, a suspended or
+    // otherwise hidden organization's already-published notices kept
+    // appearing in the public feed regardless of the organization's own
+    // status. Proven here rather than assumed, because it is the one thing
+    // archiving exists to fix.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG),
+        { verificationStatus: 'archived', statusBeforeArchive: 'verified' });
+    });
+    await seedNotice('n1', {
+      status: 'draft', isPublic: false, archivedFromPublished: true, version: 2,
+    });
+
+    await assertFails(getDoc(doc(anon(), 'notices', 'n1')));
+    // The public feed query is still allowed to run; the auto-drafted notice
+    // is simply not among what it matches, exactly like any other draft.
+    const feed = await getDocs(query(
+      collection(anon(), 'notices'), where('isPublic', '==', true)));
+    assert.equal(feed.docs.some((d) => d.id === 'n1'), false);
+    // Staff of the now-archived organization can still see their own draft.
+    await assertSucceeds(getDoc(doc(as(STAFF), 'notices', 'n1')));
+    // And a platform administrator, same as any other draft.
+    await assertSucceeds(getDoc(doc(as(ADMIN), 'notices', 'n1')));
   });
 });

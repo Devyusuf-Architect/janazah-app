@@ -40,6 +40,8 @@ import {
 import {
   AdminActionError, ADMIN_ACTIONS, assertCallerIsAdmin, checkMessage,
   grantAdmin as grantAdminAccess, revokeAdmin as revokeAdminAccess,
+  archiveOrganization as archiveOrganizationAccess,
+  restoreOrganization as restoreOrganizationAccess,
 } from './lib/admin-management.js';
 import {
   smtpSettings, verificationEmail, messageEmail, resolveRecipient,
@@ -274,6 +276,55 @@ export const revokeAdmin = onCall(async (request) => {
   try {
     return await revokeAdminAccess(
       { db, writeAudit: (entry) => writeActorAudit(db, entry) },
+      request.auth?.uid || null,
+      request.data || {},
+    );
+  } catch (err) {
+    throw asHttpsError(err);
+  }
+});
+
+/**
+ * Archive a real organization: hide it and pull every notice it has
+ * published back to draft, atomically. See lib/admin-management.js for the
+ * full reasoning; this wrapper only supplies the Firebase handles.
+ *
+ * @param {{orgId: string, reason?: string}} request.data
+ */
+export const archiveOrganization = onCall(async (request) => {
+  const db = getFirestore();
+  try {
+    return await archiveOrganizationAccess(
+      {
+        db,
+        writeAudit: (entry) => writeActorAudit(db, entry),
+        timestamp: () => FieldValue.serverTimestamp(),
+        deleteField: () => FieldValue.delete(),
+      },
+      request.auth?.uid || null,
+      request.data || {},
+    );
+  } catch (err) {
+    throw asHttpsError(err);
+  }
+});
+
+/**
+ * Undo archiveOrganization: restore the organization to its prior status and
+ * republish exactly the notices archiving pulled to draft.
+ *
+ * @param {{orgId: string}} request.data
+ */
+export const restoreOrganization = onCall(async (request) => {
+  const db = getFirestore();
+  try {
+    return await restoreOrganizationAccess(
+      {
+        db,
+        writeAudit: (entry) => writeActorAudit(db, entry),
+        timestamp: () => FieldValue.serverTimestamp(),
+        deleteField: () => FieldValue.delete(),
+      },
       request.auth?.uid || null,
       request.data || {},
     );
@@ -561,6 +612,15 @@ async function notifyVerificationDecision(db, eventId, orgId, before, after) {
   // there are many, must not send the approval email again.
   if (before && before.verificationStatus === status) return;
   if (!before) return;
+  // A restore out of 'archived' lands on whatever status preceded the
+  // archive, which is very often 'verified' or 'suspended' - both of which
+  // are ordinarily worth an email. Here they are not: nothing was decided,
+  // the organization only returned to where it already was, and
+  // archiveOrganization/restoreOrganization send no email of their own for
+  // exactly that reason. Without this guard a restored masjid would get a
+  // "you are verified" or "you have been suspended" email for a status it
+  // already held before being archived.
+  if (before.verificationStatus === 'archived') return;
 
   try {
     // Firestore triggers are at-least-once, so the same decision can arrive

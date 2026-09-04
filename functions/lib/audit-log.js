@@ -25,6 +25,8 @@ export const ACTIONS = {
   ORG_SUSPENDED: 'org.suspended',
   ORG_REINSTATED: 'org.reinstated',
   ORG_DELETED: 'org.deleted',
+  ORG_ARCHIVED: 'org.archived',
+  ORG_RESTORED: 'org.restored',
   STAFF_REQUESTED: 'staff.requested',
   STAFF_APPROVED: 'staff.approved',
   STAFF_REJECTED: 'staff.rejected',
@@ -148,12 +150,24 @@ export function classifyOrgChange(before, after) {
   // other field was carried along in the same write.
   const orgActor = after.verifiedBy ?? after.updatedBy ?? null;
 
-  if (before.verificationStatus !== after.verificationStatus) {
+  const enteringArchive = before.verificationStatus !== 'archived' && after.verificationStatus === 'archived';
+  const leavingArchive = before.verificationStatus === 'archived' && after.verificationStatus !== 'archived';
+
+  if (before.verificationStatus !== after.verificationStatus && !enteringArchive && !leavingArchive) {
     entries.push({
       action: ORG_STATUS_ACTION[after.verificationStatus] || ACTIONS.ORG_UPDATED,
       actorUid: orgActor,
     });
   }
+  // Archiving and restoring are audited by archiveOrganization and
+  // restoreOrganization themselves (functions/lib/admin-management.js), with
+  // a detail this diff cannot see: how many published notices moved with the
+  // organization. A generic entry here would either duplicate that one, or,
+  // on a restore, misdescribe it entirely: after.verificationStatus on a
+  // restore is whatever status preceded the archive, so ORG_STATUS_ACTION
+  // would label a restore back to "verified" as a fresh verification
+  // decision, and back to "suspended" as a fresh suspension. Neither
+  // happened; the organization is only returning to where it was.
 
   const beforeStaff = new Set(before.staffUids || []);
   const afterStaff = new Set(after.staffUids || []);
@@ -168,11 +182,15 @@ export function classifyOrgChange(before, after) {
     });
   }
 
-  if (entries.length === 0 && !grew && JSON.stringify(before) !== JSON.stringify(after)) {
+  if (entries.length === 0 && !grew && !enteringArchive && !leavingArchive
+      && JSON.stringify(before) !== JSON.stringify(after)) {
     // Neither status nor the staff list changed, but something did: a
     // profile field (name, address, contact email, and so on). A document
     // that genuinely did not change at all, timestamps included, gets no
-    // entry rather than a spurious org.updated.
+    // entry rather than a spurious org.updated. Archiving and restoring are
+    // excluded for the same reason the status branch above excludes them:
+    // archiveOrganization/restoreOrganization already write their own,
+    // more detailed entry for exactly this write.
     entries.push({ action: ACTIONS.ORG_UPDATED, actorUid: after.updatedBy ?? null });
   }
 

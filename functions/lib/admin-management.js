@@ -32,10 +32,57 @@ export const ADMIN_ACTIONS = {
   GRANTED: 'admin.granted',
   REVOKED: 'admin.revoked',
   MESSAGE_SENT: 'org.message_sent',
+  ORG_ARCHIVED: 'org.archived',
+  ORG_RESTORED: 'org.restored',
 };
 
 /** Bounds on the one-off message an administrator can send to an organization. */
 export const MESSAGE_LIMITS = { subject: 150, body: 4000, reason: 500 };
+
+/**
+ * Firestore batched writes are capped at 500 operations. archiveOrganization
+ * spends one of those on the organization document itself, and
+ * restoreOrganization could in principle spend one on stamping something
+ * alongside the notices, so every chunk here stays comfortably under the cap
+ * rather than running right up to it.
+ *
+ * Nothing about Ta'ziyah's scale today makes a single organization with more
+ * than a few hundred published notices plausible; this exists so that the
+ * rare organization that does outgrow one batch is handled by looping, not by
+ * failing partway through with no explanation.
+ */
+const BATCH_CHUNK_SIZE = 450;
+
+/** Ordinary statuses an organization can be archived from, and restored to. */
+const RESTORABLE_STATUSES = ['pending', 'needs_information', 'verified', 'rejected', 'suspended'];
+
+const SAMPLE_ID = /^sample-/;
+
+/**
+ * Commit a list of Firestore writes in chunks of at most BATCH_CHUNK_SIZE,
+ * each chunk its own atomic batch.
+ *
+ * A single chunk is exactly as atomic as any other Firestore batch: it
+ * commits whole or not at all. Across chunks it is not, the same as any
+ * multi-batch operation against Firestore has to be: there is no primitive
+ * that makes an arbitrarily large set of writes atomic together. That only
+ * matters once an organization's published notices exceed BATCH_CHUNK_SIZE,
+ * which is not a realistic scale for this app today; the chunking exists so
+ * that day is handled by looping rather than by a write silently failing past
+ * the 500-operation cap.
+ *
+ * @param {object} db  Firestore handle (an Admin SDK Firestore, or a fake
+ *   exposing the same `batch()` shape in tests).
+ * @param {{ref: object, data: object}[]} writes
+ */
+async function commitInChunks(db, writes) {
+  for (let i = 0; i < writes.length; i += BATCH_CHUNK_SIZE) {
+    const chunk = writes.slice(i, i + BATCH_CHUNK_SIZE);
+    const batch = db.batch();
+    for (const { ref, data } of chunk) batch.update(ref, data);
+    await batch.commit();
+  }
+}
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -171,6 +218,197 @@ export async function revokeAdmin(deps, callerUid, data) {
   });
 
   return { uid };
+}
+
+/**
+ * Hide a real organization and everything it has published, in a way that can
+ * be undone.
+ *
+ * Ta'ziyah never permanently deletes a real organization: the audit trail and
+ * every past auditLog entry naming it have to keep resolving to something,
+ * and a genuine Firestore delete cannot be undone if the archiving turns out
+ * to be a mistake. Archiving instead moves the organization to a status the
+ * public directory already treats as invisible, and pulls every one of its
+ * published notices back to draft, which the public feed already treats as
+ * invisible too (see firestore.rules, isPublic). Nothing new is hidden by a
+ * new mechanism; this reuses both.
+ *
+ * Deliberately refuses `sample-` organizations: that prefix has its own
+ * real-delete path (firestore.rules, `orgId.matches('^sample-.*')`), meant for
+ * data this platform created for testing and can simply remove. Sample
+ * organizations have no need of an archive/restore lifecycle.
+ *
+ * @param {object} deps  {db, writeAudit, timestamp, deleteField}
+ * @param {string|null} callerUid
+ * @param {{orgId: string, reason?: string}} data
+ */
+export async function archiveOrganization(deps, callerUid, data) {
+  const { db, writeAudit, timestamp } = deps;
+  await assertCallerIsAdmin(db, callerUid);
+
+  const orgId = typeof data?.orgId === 'string' ? data.orgId.trim() : '';
+  if (!orgId) {
+    throw new AdminActionError('invalid-argument', 'No organization was named.');
+  }
+  if (SAMPLE_ID.test(orgId)) {
+    throw new AdminActionError('failed-precondition',
+      'Sample organizations are removed with the sample-data tool in Platform '
+      + 'Settings, not archived. That prefix has its own permanent-delete path; '
+      + 'it does not need an archive and restore lifecycle.');
+  }
+
+  const orgRef = db.collection('organizations').doc(orgId);
+  const orgSnap = await orgRef.get();
+  if (!orgSnap.exists) {
+    throw new AdminActionError('not-found', 'That organization no longer exists.');
+  }
+  const org = orgSnap.data();
+  if (org.verificationStatus === 'archived') {
+    throw new AdminActionError('failed-precondition',
+      `${org.name || 'This organization'} is already archived.`);
+  }
+
+  const reason = typeof data?.reason === 'string'
+    ? data.reason.trim().slice(0, MESSAGE_LIMITS.reason) : '';
+
+  const publishedNotices = await db.collection('notices')
+    .where('orgId', '==', orgId)
+    .where('status', '==', 'published')
+    .get();
+
+  const writes = [{
+    ref: orgRef,
+    data: {
+      verificationStatus: 'archived',
+      statusBeforeArchive: org.verificationStatus,
+      statusReason: reason,
+      updatedAt: timestamp(),
+      updatedBy: callerUid,
+    },
+  }];
+
+  for (const noticeDoc of publishedNotices.docs) {
+    const notice = noticeDoc.data();
+    writes.push({
+      ref: noticeDoc.ref,
+      data: {
+        status: 'draft',
+        isPublic: false,
+        archivedFromPublished: true,
+        version: (notice.version || 1) + 1,
+        lastEditedBy: callerUid,
+        updatedAt: timestamp(),
+      },
+    });
+  }
+
+  await commitInChunks(db, writes);
+
+  await writeAudit({
+    action: ADMIN_ACTIONS.ORG_ARCHIVED,
+    actorUid: callerUid,
+    targetType: 'organization',
+    targetId: orgId,
+    orgId,
+    details: reason
+      ? { noticesArchived: publishedNotices.docs.length, reason }
+      : { noticesArchived: publishedNotices.docs.length },
+  });
+
+  return { orgId, noticesArchived: publishedNotices.docs.length };
+}
+
+/**
+ * Undo archiveOrganization: put the organization back to whatever status it
+ * held before, and republish exactly the notices archiving pulled to draft.
+ *
+ * Only notices archiving itself touched are republished (those carrying
+ * `archivedFromPublished: true`). A notice that was already a genuine draft
+ * before the organization was archived never gets that marker and is left
+ * exactly as it was; the same is true of a cancelled notice, which is
+ * terminal and was never touched by archiving in the first place.
+ *
+ * @param {object} deps  {db, writeAudit, timestamp, deleteField}
+ * @param {string|null} callerUid
+ * @param {{orgId: string}} data
+ */
+export async function restoreOrganization(deps, callerUid, data) {
+  const { db, writeAudit, timestamp, deleteField } = deps;
+  await assertCallerIsAdmin(db, callerUid);
+
+  const orgId = typeof data?.orgId === 'string' ? data.orgId.trim() : '';
+  if (!orgId) {
+    throw new AdminActionError('invalid-argument', 'No organization was named.');
+  }
+
+  const orgRef = db.collection('organizations').doc(orgId);
+  const orgSnap = await orgRef.get();
+  if (!orgSnap.exists) {
+    throw new AdminActionError('not-found', 'That organization no longer exists.');
+  }
+  const org = orgSnap.data();
+  if (org.verificationStatus !== 'archived') {
+    throw new AdminActionError('failed-precondition',
+      `${org.name || 'This organization'} is not archived, so there is nothing to restore.`);
+  }
+
+  let restoredStatus = org.statusBeforeArchive;
+  if (!RESTORABLE_STATUSES.includes(restoredStatus)) {
+    // Should not normally happen: archiveOrganization always records this.
+    // Falling back to 'verified' rather than refusing means a restore is
+    // never blocked by a missing field, but it is loud about it, because the
+    // fallback is a guess and whoever reads the logs should know one was made.
+    console.warn(
+      `restoreOrganization: ${orgId} has no usable statusBeforeArchive `
+      + `(saw ${JSON.stringify(restoredStatus)}); restoring to 'verified'.`);
+    restoredStatus = 'verified';
+  }
+
+  const archivedNotices = await db.collection('notices')
+    .where('orgId', '==', orgId)
+    .where('archivedFromPublished', '==', true)
+    .get();
+
+  const writes = [{
+    ref: orgRef,
+    data: {
+      verificationStatus: restoredStatus,
+      statusBeforeArchive: deleteField(),
+      updatedAt: timestamp(),
+      updatedBy: callerUid,
+    },
+  }];
+
+  for (const noticeDoc of archivedNotices.docs) {
+    const notice = noticeDoc.data();
+    writes.push({
+      ref: noticeDoc.ref,
+      data: {
+        status: 'published',
+        isPublic: true,
+        archivedFromPublished: deleteField(),
+        version: (notice.version || 1) + 1,
+        lastEditedBy: callerUid,
+        updatedAt: timestamp(),
+      },
+    });
+  }
+
+  await commitInChunks(db, writes);
+
+  await writeAudit({
+    action: ADMIN_ACTIONS.ORG_RESTORED,
+    actorUid: callerUid,
+    targetType: 'organization',
+    targetId: orgId,
+    orgId,
+    details: {
+      noticesRestored: archivedNotices.docs.length,
+      restoredStatus,
+    },
+  });
+
+  return { orgId, restoredStatus, noticesRestored: archivedNotices.docs.length };
 }
 
 /**

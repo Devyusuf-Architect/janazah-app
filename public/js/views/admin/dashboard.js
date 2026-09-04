@@ -40,6 +40,7 @@ export function renderDashboard(panel, actx) {
     const awaiting = state.orgs.filter((o) => o.verificationStatus === 'needs_information');
     const verified = state.orgs.filter((o) => o.verificationStatus === 'verified');
     const suspended = state.orgs.filter((o) => o.verificationStatus === 'suspended');
+    const archived = state.orgs.filter((o) => o.verificationStatus === 'archived');
     const openReports = (state.reports || []).filter((r) => r.status === 'open');
 
     const now = Date.now();
@@ -75,7 +76,10 @@ export function renderDashboard(panel, actx) {
       statTile({
         label: 'Verified organizations',
         value: verified.length,
-        note: suspended.length ? `${suspended.length} suspended` : 'none suspended',
+        note: [
+          suspended.length ? `${suspended.length} suspended` : 'none suspended',
+          archived.length ? `${archived.length} archived` : null,
+        ].filter(Boolean).join(', '),
         onclick: () => actx.go('organizations'),
       }),
       statTile({

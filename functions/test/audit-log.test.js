@@ -233,6 +233,37 @@ describe('classifyOrgChange', () => {
     const same = { verificationStatus: 'verified', staffUids: ['owner'] };
     assert.deepEqual(classifyOrgChange(same, same), []);
   });
+
+  test('entering or leaving archived produces no generic status entry', () => {
+    // archiveOrganization and restoreOrganization
+    // (functions/lib/admin-management.js) audit these transitions themselves,
+    // with the notice count this diff cannot see. A generic entry here would
+    // duplicate that, and on the way out of 'archived' would actively
+    // misdescribe it: after.verificationStatus is whatever status preceded
+    // the archive, so this would label a restore back to 'verified' as a
+    // fresh verification, and back to 'suspended' as a fresh suspension.
+    const entering = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['owner'] },
+      { verificationStatus: 'archived', staffUids: ['owner'], updatedBy: 'admin1' });
+    assert.deepEqual(entering, []);
+
+    for (const restoredTo of ['verified', 'suspended', 'pending']) {
+      const leaving = classifyOrgChange(
+        { verificationStatus: 'archived', staffUids: ['owner'] },
+        { verificationStatus: restoredTo, staffUids: ['owner'], updatedBy: 'admin1' });
+      assert.deepEqual(leaving, [], `restoring to ${restoredTo}`);
+    }
+  });
+
+  test('a staff removal alongside an archive or a restore is still recorded', () => {
+    // Suppressing the archive/restore transition itself must not also
+    // suppress an unrelated fact carried in the same write.
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['owner', 'staff1'] },
+      { verificationStatus: 'archived', staffUids: ['owner'], updatedBy: 'admin1' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, ACTIONS.STAFF_REMOVED);
+  });
 });
 
 describe('classifyStaffRequestChange', () => {

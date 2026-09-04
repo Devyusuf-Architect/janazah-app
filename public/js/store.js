@@ -885,6 +885,34 @@ export async function revokePlatformAdmin(uid, reason = '') {
 }
 
 /**
+ * Archive a real organization and pull every notice it has published back to
+ * draft, atomically, on the server. Never a real delete: statusBeforeArchive
+ * is what restorePlatformOrganization reads to put it back.
+ *
+ * @param {string} orgId
+ * @param {string} [reason]
+ * @returns {Promise<{orgId: string, noticesArchived: number}>}
+ */
+export async function archiveOrganization(orgId, reason = '') {
+  const call = httpsCallable(functions, 'archiveOrganization');
+  const { data } = await call({ orgId, reason });
+  return data;
+}
+
+/**
+ * Undo archiveOrganization: restore the organization to whatever status it
+ * held before, and republish exactly the notices archiving pulled to draft.
+ *
+ * @param {string} orgId
+ * @returns {Promise<{orgId: string, restoredStatus: string, noticesRestored: number}>}
+ */
+export async function restoreOrganization(orgId) {
+  const call = httpsCallable(functions, 'restoreOrganization');
+  const { data } = await call({ orgId });
+  return data;
+}
+
+/**
  * Send one message from the administrators to one organization.
  *
  * The address is resolved on the server, from the organization's contact

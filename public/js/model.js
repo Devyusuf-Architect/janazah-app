@@ -25,6 +25,7 @@ export const VERIFICATION_STATUS_LABEL = {
   verified: 'Verified',
   rejected: 'Declined',
   suspended: 'Suspended',
+  archived: 'Archived',
 };
 
 // Mirror of noticePublicKeys() in firestore.rules.

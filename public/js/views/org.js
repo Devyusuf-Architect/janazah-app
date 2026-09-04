@@ -33,6 +33,11 @@ const STATUS_COPY = {
     tone: 'error',
     text: 'Suspended. Publishing is disabled while this is under review.',
   },
+  archived: {
+    tone: 'error',
+    text: 'Archived. This organization and everything it published are hidden '
+        + 'from Ta’ziyah. A platform administrator can restore it at any time.',
+  },
 };
 
 export function statusBadge(status) {

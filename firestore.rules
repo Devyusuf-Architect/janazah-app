@@ -76,7 +76,18 @@ service cloud.firestore {
               'lat', 'lng', 'cell', 'contactEmail', 'phone', 'website',
               'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
               'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt',
-              'updatedBy'];
+              'updatedBy',
+              // Written only by archiveOrganization/restoreOrganization
+              // (functions/lib/admin-management.js), through the Admin SDK,
+              // which does not go through this allowlist at all. It is listed
+              // here anyway because it sits on the document for the whole
+              // time an organization is archived, and an owner or staff
+              // member may still edit an unrelated profile field during that
+              // window (nothing here forbids that, the same as while
+              // suspended) - without statusBeforeArchive on this list, that
+              // ordinary edit would be rejected by hasOnly() below for a
+              // field it never touched.
+              'statusBeforeArchive'];
     }
 
     function orgRequiredKeys() {
@@ -98,7 +109,13 @@ service cloud.firestore {
         // assume nobody has looked.
         && request.resource.data.verificationStatus
              in ['pending', 'needs_information', 'verified', 'rejected',
-                 'suspended']
+                 'suspended', 'archived']
+        // Set only by archiveOrganization, and only to a status this list
+        // already recognises: what the organization is to be restored to.
+        && (!('statusBeforeArchive' in request.resource.data)
+            || request.resource.data.statusBeforeArchive
+                 in ['pending', 'needs_information', 'verified', 'rejected',
+                     'suspended'])
         && request.resource.data.lat is number
         && request.resource.data.lng is number
         && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
@@ -152,10 +169,27 @@ service cloud.firestore {
       // change: this is what lets the server-written audit trail attribute a
       // verification decision to a real account rather than trusting whatever
       // the client happened to send.
+      //
+      // Archiving and restoring are excluded here on both sides of the
+      // transition, deliberately: archiving a real organization also has to
+      // pull every one of its published notices to draft in the same atomic
+      // step, which nothing available to a client write can do (a batch
+      // spanning the organization and an unbounded number of notice
+      // documents is not one write this rule is evaluated against). Letting
+      // this clause set verificationStatus to 'archived' directly would hide
+      // the organization while leaving every notice it published fully
+      // public, which is the exact gap archiving exists to close. So both
+      // directions go exclusively through archiveOrganization and
+      // restoreOrganization (functions/lib/admin-management.js), which use
+      // the Admin SDK and bypass this rule entirely; an already-archived
+      // organization accepts no update here at all, not even an unrelated
+      // profile edit, until it is restored.
       allow update: if isPlatformAdmin()
         && validOrgShape()
         && pinnedUpdatedBy()
         && !changed(['ownerUid', 'createdAt', 'createdBy'])
+        && resource.data.verificationStatus != 'archived'
+        && request.resource.data.verificationStatus != 'archived'
         && (request.resource.data.get('verifiedBy', null) == resource.data.get('verifiedBy', null)
             || request.resource.data.verifiedBy == uid());
 

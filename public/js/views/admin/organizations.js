@@ -33,6 +33,7 @@ const STATUS_FILTERS = [
   { value: 'verified', label: 'Verified' },
   { value: 'rejected', label: 'Declined' },
   { value: 'suspended', label: 'Suspended' },
+  { value: 'archived', label: 'Archived' },
 ];
 
 const typeLabel = (type) => ORG_TYPES.find((t) => t.value === type)?.label || type;
@@ -489,7 +490,9 @@ export function decisionButtons(org, actx) {
   const actions = [];
   const status = org.verificationStatus;
 
-  if (status !== 'verified') {
+  // An archived organization accepts no ordinary status change at all
+  // (firestore.rules refuses it): it has to be restored first.
+  if (status !== 'verified' && status !== 'archived') {
     actions.push(el('button', {
       class: 'btn btn--primary btn--small',
       onclick: () => decide('verified', {
@@ -555,7 +558,82 @@ export function decisionButtons(org, actx) {
     }, status === 'suspended' ? 'Reinstate' : 'Reconsider and approve'));
   }
 
+  const isSample = org.id.startsWith('sample-');
+
+  if (status === 'archived') {
+    actions.push(el('button', {
+      class: 'btn btn--primary btn--small',
+      onclick: () => restoreOrganizationAction(org, actx),
+    }, 'Restore'));
+  } else if (!isSample) {
+    actions.push(el('button', {
+      class: 'btn btn--danger btn--small',
+      onclick: () => archiveOrganizationAction(org, actx),
+    }, 'Archive'));
+  }
+
   return actions;
+}
+
+/**
+ * Hide a real organization and everything it has already published. Routed
+ * through the archiveOrganization Cloud Function
+ * (functions/lib/admin-management.js) rather than a plain document write,
+ * because archiving also has to pull every one of the organization's
+ * published notices back to draft in the same atomic step, which is not
+ * something a client write to the organization document alone can do.
+ *
+ * A stronger prompt than Suspend on purpose: this also touches every notice
+ * the organization has published, not only the organization itself.
+ */
+async function archiveOrganizationAction(org, actx) {
+  const reason = await askReason({
+    title: 'Archive this organization?',
+    body: `This organization and every notice it has published will stop `
+      + 'appearing anywhere on Ta’ziyah. This can be undone at any time from '
+      + 'here.',
+    label: 'Reason (recorded in the audit trail)',
+    confirmText: 'Archive',
+  });
+  if (reason === null) return;
+  try {
+    const result = await store.archiveOrganization(org.id, reason);
+    toast(result.noticesArchived
+      ? `${org.name} is archived, along with ${result.noticesArchived} published `
+        + `notice${result.noticesArchived === 1 ? '' : 's'}.`
+      : `${org.name} is archived.`);
+    actx?.refresh?.();
+  } catch (err) {
+    toast(actionError(err), 'error');
+  }
+}
+
+/**
+ * Put an archived organization, and exactly the notices archiving pulled to
+ * draft, back the way they were. Lighter friction than Archive: this is the
+ * explicit undo path, not an action that should make an administrator
+ * hesitate.
+ */
+async function restoreOrganizationAction(org, actx) {
+  const confirmed = await askReason({
+    title: 'Restore this organization?',
+    body: `${org.name} and the notices archiving moved to draft will reappear `
+      + 'as they were before.',
+    label: 'Note (optional, recorded in the audit trail)',
+    confirmText: 'Restore',
+    required: false,
+  });
+  if (confirmed === null) return;
+  try {
+    const result = await store.restoreOrganization(org.id);
+    toast(result.noticesRestored
+      ? `${org.name} is restored, along with ${result.noticesRestored} `
+        + `notice${result.noticesRestored === 1 ? '' : 's'}.`
+      : `${org.name} is restored.`);
+    actx?.refresh?.();
+  } catch (err) {
+    toast(actionError(err), 'error');
+  }
 }
 
 /** The review card used by the Verification queue. */
