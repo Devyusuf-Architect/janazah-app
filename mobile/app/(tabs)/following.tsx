@@ -4,11 +4,11 @@
 // the list of masjids themselves so they can be unfollowed without hunting
 // for the page they were followed from.
 //
-// The screen works signed out. Following is a preference on the device, and
-// the account is a mirror rather than a requirement, so somebody who has
-// never made an account gets the whole feature. The only thing signing in
-// adds is that the list travels to their other device, and the one line at
-// the bottom says exactly that rather than nagging.
+// Following is still a preference on the device, mirrored to the account
+// rather than owned by it. That is what lets the same list work on the
+// website, where reading is open to anyone. The mobile app requires an
+// account, so the signed-out path here is only ever the moment between
+// signing out and the gate moving the app back to the door.
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';

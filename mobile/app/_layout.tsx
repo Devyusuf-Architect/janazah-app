@@ -1,9 +1,14 @@
 // The root layout.
 //
 // Everything the app needs before any screen renders: the emulator
-// connection, the theme, the query client and the auth session. Auth resolves
-// asynchronously, and nothing here waits for it, because reading notices
-// needs no account and must not be held up by one.
+// connection, the theme, the query client, and the providers for auth,
+// follows and location.
+//
+// The index route is now the splash, which decides where to send somebody:
+// the welcome panels, sign-in, or the app. The mobile app requires an
+// account, so useAuthGate keeps anyone who signs out or whose session expires
+// from staying inside it. The web site's anonymous browsing is untouched;
+// nothing in the shared modules changed for this.
 
 import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
@@ -17,8 +22,10 @@ import { AuthProvider } from '../src/lib/auth';
 import { FollowsProvider } from '../src/features/following/useFollows';
 import { LocationProvider } from '../src/features/nearby/useLocation';
 import { useNotificationRouting } from '../src/features/alerts/useNotificationRouting';
+import { useAuthGate } from '../src/features/launch/AuthGate';
 import { initSampleMode } from '../src/lib/sample';
 import { ThemeProvider, useTheme } from '../src/theme';
+import { useReduceMotion } from '../src/theme/motion';
 
 // Connected at module scope so it happens before the first query, and only
 // ever once. The function is itself idempotent for Fast Refresh.
@@ -40,10 +47,14 @@ const queryClient = new QueryClient({
 
 function Chrome() {
   const { scheme, colors } = useTheme();
+  const reduce = useReduceMotion();
+
   // Tapping a notification has to open the right notice whether the app was
-  // in the foreground, in the background, or not running at all. Wired here,
-  // once, inside the router.
+  // in the foreground, in the background, or not running at all.
   useNotificationRouting();
+  // The account requirement. See src/features/launch/AuthGate.tsx.
+  useAuthGate();
+
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
@@ -51,19 +62,28 @@ function Chrome() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'slide_from_right',
+          // Reduce motion turns screen transitions off rather than shortening
+          // them. Somebody who asked for no animation asked for no animation.
+          animation: reduce ? 'none' : 'slide_from_right',
+          animationDuration: 260,
         }}
       >
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="n/[id]" options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="search" />
+        {/* The splash, the welcome panels and sign-in. Not behind the gate,
+            because this is where somebody goes to get past it. */}
+        <Stack.Screen name="(launch)" options={{ animation: 'fade' }} />
+
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen
+          name="n/[id]"
+          options={{ animation: reduce ? 'none' : 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="o/[id]" />
         <Stack.Screen name="masjids" />
+        <Stack.Screen name="search" />
         <Stack.Screen name="guide" />
         <Stack.Screen name="about" />
-        <Stack.Screen name="delete-account" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="o/[id]" />
         <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="signin" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="delete-account" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );
@@ -75,8 +95,7 @@ export default function RootLayout() {
   useEffect(() => {
     // Whether the administrator has sample data switched on. Read once, at
     // launch, and defaulting to off: a network failure at startup must never
-    // be the reason a fictional Janazah notice appears. The state flip is
-    // what repaints the banner and the feed if the answer is yes.
+    // be the reason a fictional Janazah notice appears.
     initSampleMode().then(() => setSamplesResolved(true)).catch(() => {});
   }, []);
 

@@ -1,47 +1,56 @@
-// A raised area: a hairline border and a tint, never a drop shadow.
+// A raised area.
 //
-// Shadows on every row are what make an app look like a web page of cards.
-// A border reads as a boundary at arm's length, renders identically across
-// Android versions, and costs nothing.
+// Three levels, matching the elevation tokens. `sunk` is a recessed ground for
+// grouping; `flat` is the default card; `raised` is for the one thing on a
+// screen the eye should land on first. Only `raised` carries a shadow, because
+// a shadow under every card is what makes an interface look busy rather than
+// deep.
 
 import React from 'react';
 import { View, type ViewProps } from 'react-native';
 
-import { useColors, radius, space } from '../theme';
+import { useColors, radius, space, elevation } from '../theme';
 
 type Props = ViewProps & {
-  /** 'flat' sits on the page ground; 'raised' is the default panel. */
-  level?: 'flat' | 'raised';
-  padded?: boolean;
+  level?: 'sunk' | 'flat' | 'raised';
+  padded?: boolean | 'tight';
+  /** Corner radius. `lg` is the default card; `xl` is a hero panel. */
+  round?: keyof typeof radius;
 };
 
 export function Surface({
-  level = 'raised', padded = false, style, ...rest
+  level = 'flat', padded = false, round = 'lg', style, ...rest
 }: Props) {
   const colors = useColors();
+
+  const background = {
+    sunk: colors.bgSunk,
+    flat: colors.surface,
+    raised: colors.surface,
+  }[level];
+
   return (
     <View
       {...rest}
       style={[
         {
-          backgroundColor: level === 'raised' ? colors.surface : colors.bgSunk,
-          borderRadius: radius.lg,
-          borderWidth: level === 'raised' ? 1 : 0,
+          backgroundColor: background,
+          borderRadius: radius[round],
+          borderWidth: level === 'sunk' ? 0 : 1,
           borderColor: colors.line,
         },
-        padded ? { padding: space.lg } : null,
+        level === 'raised' ? elevation.raised : elevation.flat,
+        padded ? { padding: padded === 'tight' ? space.md : space.lg } : null,
         style,
       ]}
     />
   );
 }
 
-/** A full-width hairline between rows in a list. */
+/** A hairline between rows in a list. */
 export function Divider({ inset = 0 }: { inset?: number }) {
   const colors = useColors();
   return (
-    <View
-      style={{ height: 1, marginLeft: inset, backgroundColor: colors.line }}
-    />
+    <View style={{ height: 1, marginLeft: inset, backgroundColor: colors.line }} />
   );
 }

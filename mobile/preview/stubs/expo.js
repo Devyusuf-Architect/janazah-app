@@ -35,3 +35,6 @@ export const Stack = () => null;
 export const Tabs = () => null;
 export const useFocusEffect = noop;
 export const useLocalSearchParams = () => ({});
+
+// expo-status-bar
+export const StatusBar = () => null;

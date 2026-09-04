@@ -73,19 +73,15 @@ export default function ProfileScreen() {
                 />
               </>
             ) : (
+              // The mobile app requires an account, so this branch is only
+              // ever the half-second between tapping sign out and the gate
+              // moving the app back to the door. It is deliberately not an
+              // invitation to browse signed out.
               <>
-                <Text variant="bodyStrong">You are not signed in</Text>
+                <Text variant="bodyStrong">Signing out</Text>
                 <Text variant="callout" tone="muted">
-                  Reading notices, following a masjid and turning on alerts all
-                  work without an account. Signing in carries the masjids you
-                  follow and your alert preferences to your other devices and to
-                  taziyah.com.
+                  One moment.
                 </Text>
-                <Button
-                  label="Sign in"
-                  kind="primary"
-                  onPress={() => router.push('/signin')}
-                />
               </>
             )}
           </Surface>

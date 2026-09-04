@@ -31,6 +31,10 @@ import { NoticeRow } from '../src/features/notices/NoticeRow';
 import { NoticeDetail } from '../src/features/notices/NoticeDetail';
 import { LocationGate } from '../src/features/nearby/LocationGate';
 import { GuideBody } from '../src/features/guide/GuideBody';
+import { BrandGround } from '../src/features/launch/BrandGround';
+import { Mark, Brandmark } from '../src/features/launch/Brandmark';
+import { NoticeSkeletonList } from '../src/components/Skeleton';
+import { Field as PreviewField } from '../src/components/Field';
 import { ViewToggle } from '../src/features/nearby/ViewToggle';
 import type { Notice } from '../src/lib/notice';
 
@@ -153,6 +157,43 @@ function Gallery() {
         <Text variant="callout" tone="muted">Assalamu Alaikum, Yusuf</Text>
         <Text variant="display" serif>Ta’ziyah</Text>
       </View>
+
+      <Section title="Splash">
+        <View style={{ height: 520 }}>
+          <BrandGround>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl }}>
+              <Brandmark size={104} tone="light" />
+              <Text variant="display" serif style={{ color: '#f7f3ec' }}>Ta’ziyah</Text>
+            </View>
+          </BrandGround>
+        </View>
+      </Section>
+
+      <Section title="Welcome panel">
+        <View style={{ height: 560 }}>
+          <BrandGround>
+            <View style={{ flex: 1, paddingHorizontal: space.xl, justifyContent: 'center', gap: space.xl }}>
+              <Mark size={56} tone="light" />
+              <View style={{ gap: space.md }}>
+                <Text variant="hero" serif style={{ color: '#f7f3ec' }}>
+                  Your location stays on your phone
+                </Text>
+                <Text variant="body" style={{ color: '#a8c4b8', lineHeight: 25 }}>
+                  Ta’ziyah can show which Janazahs are near you. That is worked
+                  out on this device. Your location is never sent to us, to any
+                  masjid, or to anyone else, and nothing records where you have
+                  been.
+                </Text>
+              </View>
+              <Button label="Get started" kind="primary" size="large" onBrand full />
+            </View>
+          </BrandGround>
+        </View>
+      </Section>
+
+      <Section title="Loading skeleton">
+        <NoticeSkeletonList count={3} />
+      </Section>
 
       <Section title="Notice rows">
         {NOTICES.map(({ notice, distanceKm }, i) => (

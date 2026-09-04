@@ -52,6 +52,8 @@ await build({
     'expo-secure-store': resolve(here, 'stubs/expo.js'),
     'expo-notifications': resolve(here, 'stubs/expo.js'),
     'expo-router': resolve(here, 'stubs/expo.js'),
+    'expo-status-bar': resolve(here, 'stubs/expo.js'),
+    'react-native-reanimated': resolve(here, 'stubs/reanimated.js'),
   },
   logLevel: 'info',
 });
