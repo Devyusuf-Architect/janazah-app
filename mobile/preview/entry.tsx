@@ -33,6 +33,7 @@ import { NoticeDetail } from '../src/features/notices/NoticeDetail';
 import { TimePanel } from '../src/features/notices/TimePanel';
 import { ScreenHeader } from '../src/components/ScreenHeader';
 import { LocationGate } from '../src/features/nearby/LocationGate';
+import { Disclosure } from '../src/components/Disclosure';
 import { GuideBody } from '../src/features/guide/GuideBody';
 import { Stepper } from '../src/features/guide/Stepper';
 import { BrandGround } from '../src/features/launch/BrandGround';
@@ -414,6 +415,18 @@ function Gallery() {
               Parking is behind the building. Please leave the front row for family.
             </Text>
           </Surface>
+        </View>
+      </Section>
+
+      <Section title="A disclosure">
+        <View style={{ padding: space.lg }}>
+          <Disclosure label="What the verified mark means">
+            <Text variant="callout" tone="muted">
+              A Ta’ziyah administrator confirmed this organization before it
+              could publish anything. The mark is about the masjid, not about
+              this notice.
+            </Text>
+          </Disclosure>
         </View>
       </Section>
 

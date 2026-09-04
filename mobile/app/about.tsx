@@ -45,7 +45,7 @@ export default function AboutScreen() {
       <Stack.Screen options={{ title: 'About' }} />
       <ScreenHeader />
       <ScreenScroll>
-        <PageTitle title="Ta’ziyah" />
+        <PageTitle title="Ta’ziyah" serif />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
           <View style={{ gap: space.sm }}>
             <Text variant="body" tone="muted">

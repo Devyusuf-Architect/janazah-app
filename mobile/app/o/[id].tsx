@@ -72,7 +72,7 @@ export default function OrganizationScreen() {
         {org ? (
           <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
             <View style={{ gap: space.sm }}>
-              <Text accessibilityRole="header" variant="display" serif>
+              <Text accessibilityRole="header" variant="display">
                 {org.name}
               </Text>
               {isVerified(org) ? <VerifiedBadge /> : null}

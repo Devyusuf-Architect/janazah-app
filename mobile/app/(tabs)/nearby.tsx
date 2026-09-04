@@ -200,11 +200,12 @@ export default function NearbyScreen() {
           ))}
 
           {results.length ? (
-            <View style={{ padding: space.lg, gap: space.md }}>
+            // One line, not a paragraph. The full explanation is behind
+            // "How location works" on the gate, and repeating it under every
+            // list is how the claim starts reading as a disclaimer.
+            <View style={{ padding: space.lg, gap: space.md, alignItems: 'flex-start' }}>
               <Text variant="caption" tone="subtle">
-                Distances are worked out on your phone. Your location is not
-                sent to us or to any masjid, and nothing records where you have
-                been.
+                Distances are worked out on this phone.
               </Text>
               <Button
                 label="Turn off location"

@@ -14,15 +14,20 @@
 // device's location?", which is exactly the question somebody should want a
 // reason for, and this is where the reason goes.
 //
-// It is also one screen's worth of text and no more. The brief was explicit
-// that a disabled state must not consume half the screen, and this is the
-// state most people see on their first visit to this tab.
+// What changed: the reason used to be two paragraphs, which is a page of
+// legal text standing between somebody and a feature they have not decided
+// they want yet. It is now two lines and a link. The full explanation did not
+// go anywhere: it is behind "How location works", in the same words, and it
+// is also where the privacy claim is made in full. Shortening the promise
+// would be the one unacceptable version of this change; moving it one tap
+// away, with the headline still on the screen, is not.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '../../components/Text';
 import { Button } from '../../components/Button';
+import { Sheet } from '../../components/Sheet';
 import { Surface } from '../../components/Surface';
 import { space } from '../../theme';
 import { SETTINGS_HINT, type PermissionState } from '../../lib/nearby';
@@ -33,6 +38,8 @@ export function LocationGate({ state, busy, error, onEnable }: {
   error: string | null;
   onEnable: () => void;
 }) {
+  const [explaining, setExplaining] = useState(false);
+
   if (state === 'unavailable') {
     return (
       <Surface padded style={{ margin: space.lg, gap: space.sm }}>
@@ -58,25 +65,53 @@ export function LocationGate({ state, busy, error, onEnable }: {
   }
 
   return (
-    <Surface padded style={{ margin: space.lg, gap: space.md }}>
-      <Text variant="bodyStrong">See which Janazahs are near you</Text>
-      <Text variant="callout" tone="muted">
-        Ta’ziyah compares your location with the masjids that have published a
-        notice, and shows the closest first.
-      </Text>
-      <Text variant="callout" tone="muted">
-        This happens on your phone. Your location is not sent to us, to any
-        masjid, or to anyone else, and no record is kept of where you have
-        been. Only your most recent position is stored, on this device, and
-        turning this off erases it.
-      </Text>
-      {error ? <Text variant="callout" tone="danger">{error}</Text> : null}
-      <Button
-        label="Use my location"
-        kind="primary"
-        busy={busy}
-        onPress={onEnable}
-      />
-    </Surface>
+    <>
+      <Surface padded level="raised" style={{ margin: space.lg, gap: space.md }}>
+        <Text variant="title">Find Janazahs near you</Text>
+        <Text variant="callout" tone="muted">
+          Your location stays on your device and is never sent to Ta’ziyah or
+          to a masjid.
+        </Text>
+        {error ? <Text variant="callout" tone="danger">{error}</Text> : null}
+        <Button
+          label="Use my location"
+          kind="primary"
+          full
+          busy={busy}
+          onPress={onEnable}
+        />
+        <Button
+          label="How location works"
+          kind="plain"
+          onPress={() => setExplaining(true)}
+        />
+      </Surface>
+
+      <Sheet
+        visible={explaining}
+        onClose={() => setExplaining(false)}
+        title="How location works"
+      >
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md }}>
+          <Text variant="body">
+            Ta’ziyah compares your location with the masjids that have
+            published a notice, and shows the closest first.
+          </Text>
+          <Text variant="body">
+            That comparison happens on your phone. Your location is not sent to
+            us, to any masjid, or to anyone else, and no record is kept of
+            where you have been.
+          </Text>
+          <Text variant="body">
+            Only your most recent position is stored, on this device, and
+            turning location off erases it.
+          </Text>
+          <Text variant="callout" tone="muted">
+            Alerts about Janazahs near you work the same way. Your phone
+            subscribes to broad map areas rather than telling us where it is.
+          </Text>
+        </View>
+      </Sheet>
+    </>
   );
 }

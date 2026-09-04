@@ -20,6 +20,7 @@ import React, { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 
 import { Button } from '../../components/Button';
+import { tapped } from '../../lib/haptics';
 import { useColors } from '../../theme';
 import { useFollows } from './useFollows';
 
@@ -50,6 +51,10 @@ export function FollowButton({ orgId, size = 'compact', full = false }: {
         setBusy(true);
         try {
           await toggle(orgId);
+          // The tap confirms the app heard a decision the person made. The
+          // write is local and instant, so this never fires ahead of the
+          // state it is confirming.
+          tapped();
         } finally {
           setBusy(false);
         }

@@ -88,14 +88,20 @@ export function ScreenHeader({ title, onBrand = false, right }: {
 /**
  * The large title under a header.
  *
- * Serif, because that is the brand voice and because a screen title is one of
- * the three things the type scale reserves it for. The optional line under it
- * is for a screen that needs a sentence of explanation, which several of them
- * do: what the masjid directory contains, what the alerts screen will send.
+ * Sans by default. The serif is the brand voice and it is spent on moments,
+ * not on navigation: the name of a person who has died, the time of a prayer,
+ * the wordmark, and the two screens whose titles are themselves the subject
+ * ("Ta'ziyah", "Salat al-Janazah"). A serif "Profile" is the website's
+ * typography wearing an app's clothes.
+ *
+ * The optional line under it is for a screen that needs a sentence of
+ * explanation, which several of them do: what the masjid directory contains,
+ * what the alerts screen will send.
  */
-export function PageTitle({ title, subtitle, right }: {
+export function PageTitle({ title, subtitle, serif = false, right }: {
   title: string;
   subtitle?: string;
+  serif?: boolean;
   right?: React.ReactNode;
 }) {
   return (
@@ -110,7 +116,7 @@ export function PageTitle({ title, subtitle, right }: {
         <Text
           accessibilityRole="header"
           variant="display"
-          serif
+          serif={serif}
           style={{ flex: 1 }}
         >
           {title}

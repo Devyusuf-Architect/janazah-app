@@ -52,14 +52,25 @@ export default function DeleteAccountScreen() {
             paddingHorizontal: space.lg, gap: space.md,
           }}
         >
-          <Text variant="title" serif>
+          <Text variant="title">
             {done ? 'Your account has been deleted' : 'You are not signed in'}
           </Text>
+          {/* The mobile app requires an account, so there is nowhere to go
+              back to. Saying "you can still read notices without an account",
+              which is what this used to say, is true of the website and no
+              longer true here. */}
           <Text variant="body" tone="muted">
-            You can still read Janazah notices, follow masjids and receive
-            alerts on this phone without an account.
+            {done
+              ? 'Nothing of yours is left on Ta’ziyah. You can read notices '
+                + 'at taziyah.com, or make a new account here whenever you '
+                + 'want to.'
+              : 'There is no account signed in on this phone.'}
           </Text>
-          <Button label="Done" kind="primary" onPress={() => router.replace('/')} />
+          <Button
+            label="Done"
+            kind="primary"
+            onPress={() => router.replace('/(launch)/signin')}
+          />
         </View>
       </Screen>
     );

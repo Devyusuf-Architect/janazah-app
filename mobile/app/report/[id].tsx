@@ -43,7 +43,7 @@ export default function ReportScreen() {
             paddingHorizontal: space.lg, gap: space.md,
           }}
         >
-          <Text variant="title" serif>Thank you</Text>
+          <Text variant="title">Thank you</Text>
           <Text variant="body" tone="muted">
             A Ta’ziyah administrator will look at this notice. If it is urgent
             and the prayer is soon, contact the masjid directly as well.

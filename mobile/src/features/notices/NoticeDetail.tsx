@@ -22,7 +22,8 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { Text } from '../../components/Text';
 import { Button } from '../../components/Button';
-import { Surface, Divider } from '../../components/Surface';
+import { Surface } from '../../components/Surface';
+import { Disclosure } from '../../components/Disclosure';
 import { VerifiedBadge } from '../../components/Badge';
 import { FollowButton } from '../following/FollowButton';
 import { ReminderButton } from '../alerts/ReminderButton';
@@ -142,51 +143,47 @@ export function NoticeDetail({
         </View>
       ) : null}
 
-      {/* 7. Who published it, and what the mark means. */}
-      <View>
+      {/* 7. Who published it, and what the mark means.
+          The explanation of the verified badge is behind a disclosure. It is
+          the most important sentence on the screen for trust and the least
+          important for somebody who has ninety minutes to get to a masjid,
+          and leaving it open put four lines of policy between the burial and
+          the follow button. */}
+      <View style={{ gap: space.sm }}>
         <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase' }}>
           Published by
         </Text>
-        <Surface padded style={{ marginTop: space.sm, gap: space.sm }}>
-          <Text variant="bodyStrong">{notice.orgName}</Text>
-          {verified ? (
-            <>
-              <VerifiedBadge />
-              {/* The distinction the web app makes in the same words
-                  (commit b134012). The badge is about the masjid, never
-                  about this particular notice, and blurring the two would
-                  be the most damaging thing this screen could do. */}
-              <Text variant="caption" tone="subtle">
-                A Ta’ziyah administrator confirmed this organization. The badge is
-                about the masjid, not about this notice.
-              </Text>
-            </>
-          ) : (
-            <Text variant="caption" tone="subtle">
-              This organization is not currently shown as verified.
+        <Surface padded style={{ gap: space.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <Text variant="bodyStrong" style={{ flex: 1 }} numberOfLines={2}>
+              {notice.orgName}
             </Text>
-          )}
-          {/* Following from here, because this is where somebody decides a
-              masjid matters to them: they came for one funeral and want to
-              hear about the next. */}
-          <View style={{ paddingTop: space.xs }}>
-            <FollowButton orgId={notice.orgId} size="regular" full />
+            {verified ? <VerifiedBadge /> : null}
           </View>
+          <FollowButton orgId={notice.orgId} size="regular" full />
+          <Disclosure label={verified
+            ? 'What the verified mark means'
+            : 'About this organization'}
+          >
+            {/* The distinction the web app makes in the same words
+                (commit b134012). The badge is about the masjid, never about
+                this particular notice, and blurring the two would be the
+                most damaging thing this screen could do. */}
+            <Text variant="callout" tone="muted">
+              {verified
+                ? 'A Ta\u2019ziyah administrator confirmed this organization '
+                  + 'before it could publish anything. The mark is about the '
+                  + 'masjid, not about this notice.'
+                : 'This organization is not currently shown as verified.'}
+            </Text>
+            <Text variant="callout" tone="muted">
+              Times and places are as the masjid published them. If something
+              looks wrong, report it rather than relying on it.
+            </Text>
+          </Disclosure>
         </Surface>
       </View>
 
-      {/* 8. A reminder, and saying something is wrong. Share is in the
-          header, where a one-tap action belongs. */}
-      <Divider />
-      <View style={{ flexDirection: 'row', gap: space.md, flexWrap: 'wrap' }}>
-        <ReminderButton notice={notice} />
-        <Button label="Report a problem" onPress={onReport} />
-      </View>
-
-      <Text variant="caption" tone="subtle">
-        Times and places are as the masjid published them. If something looks
-        wrong, report it rather than relying on it.
-      </Text>
     </View>
   );
 }

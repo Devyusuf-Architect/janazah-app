@@ -22,7 +22,7 @@ export default function GuideScreen() {
       <Stack.Screen options={{ title: 'Salat al-Janazah' }} />
       <ScreenHeader />
       <ScreenScroll>
-        <PageTitle title="Salat al-Janazah" />
+        <PageTitle title="Salat al-Janazah" serif />
         <GuideBody />
       </ScreenScroll>
     </Screen>

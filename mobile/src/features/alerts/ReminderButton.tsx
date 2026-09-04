@@ -11,6 +11,7 @@ import { View } from 'react-native';
 
 import { Text } from '../../components/Text';
 import { Button } from '../../components/Button';
+import { succeeded, tapped } from '../../lib/haptics';
 import { space } from '../../theme';
 import { set, cancel, isSet, fireAt, LEAD_MINUTES } from './reminders';
 import type { Notice } from '../../lib/notice';
@@ -57,8 +58,13 @@ export function ReminderButton({ notice }: { notice: Notice }) {
             if (on) {
               await cancel(notice.id);
               setOn(false);
+              tapped();
             } else {
-              setOn(await set(notice) === 'set');
+              const ok = await set(notice) === 'set';
+              setOn(ok);
+              // A reminder is a promise the app is making, so it confirms
+              // rather than merely acknowledging.
+              if (ok) succeeded();
             }
           } finally {
             setBusy(false);

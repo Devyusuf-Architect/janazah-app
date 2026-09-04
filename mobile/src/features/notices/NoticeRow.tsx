@@ -1,26 +1,27 @@
 // One notice, in a list.
 //
-// Deliberately not a card. The web app trimmed its feed cards to the
-// essentials for the same reason (commit c1f63f7), and on a phone the pressure
-// is stronger: a column of bordered, shadowed, rounded blocks fits three
-// notices on a screen and reads as marketing. This is a row, with a hairline
-// under it, and it shows five things:
+// Three lines, and it is not a card. A column of bordered, shadowed, rounded
+// blocks fits three notices on a screen and reads as marketing; the web app
+// trimmed its feed cards for the same reason (commit c1f63f7).
 //
-//   the state, but only when it is not the ordinary one
-//   the day and time, first and largest, because that is the question
+// The three lines, in the order somebody actually reads them:
+//
+//   the day and the time, with the state when it is not the ordinary one
 //   who died, when the family made the name public
-//   the masjid, with the verified mark
-//   where, and how far, when the device knows
+//   the masjid, where, and how far, on one line
 //
 // Everything else, including the address, parking and the burial, is on the
 // notice itself. A row that tries to be the notice is how a feed becomes
 // unscannable.
+//
+// The earlier version put the masjid, the place and the distance on separate
+// lines with the time label between them, which made a row five lines tall
+// and a screenful three notices long.
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '../../components/Text';
-import { Badge } from '../../components/Badge';
 import { useColors, space, radius, HIT_SLOP_MIN } from '../../theme';
 import { formatNoticeTime, timeSentence, timeUntil } from '../../lib/time';
 import { displayName, isCancelled, isCorrected, type Notice } from '../../lib/notice';
@@ -41,6 +42,7 @@ export function NoticeRow({ notice, distanceKm, onPress, verified = true }: Prop
   const soon = timeUntil(notice.janazahAt);
   const name = displayName(notice);
   const cancelled = isCancelled(notice);
+  const corrected = isCorrected(notice);
 
   // Not simply the place name: a masjid usually prays at itself, so that is
   // very often the organization's name again, and the row would print the
@@ -50,13 +52,17 @@ export function NoticeRow({ notice, distanceKm, onPress, verified = true }: Prop
   // Read as one phrase rather than as six separate items, and led by the
   // state, because a cancellation announced last would be announced too late.
   const label = [
-    cancelled ? 'Cancelled.' : isCorrected(notice) ? 'Updated.' : '',
+    cancelled ? 'Cancelled.' : corrected ? 'Updated.' : '',
     name ? `Janazah for ${name}.` : 'Janazah.',
     timeSentence(time) + '.',
     notice.orgName + (verified ? ', verified organization' : '') + '.',
     where,
     distanceKm != null ? `${formatDistance(distanceKm)} away` : '',
   ].filter(Boolean).join(' ');
+
+  const struck = cancelled
+    ? { textDecorationLine: 'line-through' as const }
+    : undefined;
 
   return (
     <Pressable
@@ -78,73 +84,91 @@ export function NoticeRow({ notice, distanceKm, onPress, verified = true }: Prop
         importantForAccessibility="no-hide-descendants"
         style={{ gap: space.xs }}
       >
-        {cancelled || isCorrected(notice) ? (
-          <View style={{ flexDirection: 'row', marginBottom: 2 }}>
-            <Badge
-              tone={cancelled ? 'cancelled' : 'corrected'}
-              label={cancelled ? 'Cancelled' : 'Updated'}
-            />
-          </View>
-        ) : null}
-
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
-          <Text
-            variant="bodyStrong"
-            style={cancelled ? { textDecorationLine: 'line-through' } : undefined}
-          >
-            {time.day}
-          </Text>
+          <Text variant="bodyStrong" style={struck}>{time.day}</Text>
           <Text
             variant="bodyStrong"
             tone={cancelled ? 'subtle' : 'default'}
-            style={cancelled ? { textDecorationLine: 'line-through' } : undefined}
+            style={struck}
           >
             {time.time}
           </Text>
           {time.zone ? (
             <Text variant="caption" tone="subtle">{time.zone}</Text>
           ) : null}
-          {soon && !cancelled ? (
+          {/* The masjid's own words for the time, beside the clock time
+              rather than on a line of their own. "after Dhuhr" is how the
+              announcement was made and is often what somebody was told on
+              the phone, so it belongs with the time it qualifies. */}
+          {time.label && !cancelled ? (
+            <Text variant="caption" tone="subtle" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {time.label}
+            </Text>
+          ) : null}
+
+          <View style={{ flex: 1, minWidth: space.sm }} />
+
+          {/* The state sits at the end of the time line rather than on a row
+              of its own above it. It is still the first thing announced to a
+              screen reader, and it no longer costs the list a line per
+              changed notice. */}
+          {cancelled || corrected ? (
+            <Tag
+              text={cancelled ? 'Cancelled' : 'Updated'}
+              fg={cancelled ? colors.danger : colors.gold}
+              bg={cancelled ? colors.dangerSoft : colors.goldSoft}
+              border={cancelled ? colors.dangerLine : colors.goldLine}
+            />
+          ) : soon ? (
             <Text variant="caption" style={{ color: colors.accent }}>{soon}</Text>
           ) : null}
         </View>
-
-        {time.label ? (
-          <Text variant="caption" tone="subtle">{time.label}</Text>
-        ) : null}
 
         {name ? (
           <Text variant="body" serif numberOfLines={1}>{name}</Text>
         ) : null}
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <Text variant="callout" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
-            {notice.orgName}
-          </Text>
+        {/* Masjid, place and distance on one line that never wraps. The
+            distance is pinned to the end and does not shrink: it is three
+            characters, and letting it break onto a second line to save a
+            truncated street name is the wrong trade. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
           {verified ? <VerifiedTick /> : null}
-        </View>
-
-        {where || distanceKm != null ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Text variant="caption" tone="subtle" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {where}
+          <Text
+            variant="caption"
+            tone="subtle"
+            numberOfLines={1}
+            style={{ flex: 1 }}
+          >
+            {[notice.orgName, where].filter(Boolean).join(' · ')}
+          </Text>
+          {distanceKm != null ? (
+            <Text variant="caption" tone="subtle">
+              {formatDistance(distanceKm)}
             </Text>
-            {distanceKm != null ? (
-              <View
-                style={{
-                  paddingHorizontal: space.sm,
-                  paddingVertical: 1,
-                  borderRadius: radius.sm,
-                  backgroundColor: colors.bgSunk,
-                }}
-              >
-                <Text variant="caption" tone="subtle">{formatDistance(distanceKm)}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </View>
     </Pressable>
+  );
+}
+
+function Tag({ text, fg, bg, border }: {
+  text: string; fg: string; bg: string; border: string;
+}) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: space.sm,
+        paddingVertical: 1,
+        borderRadius: radius.sm,
+        backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: border,
+      }}
+    >
+      <Text variant="caption" style={{ color: fg, fontWeight: '600' }}>{text}</Text>
+    </View>
   );
 }
 
@@ -160,8 +184,8 @@ function VerifiedTick() {
   return (
     <View
       style={{
-        width: 14,
-        height: 14,
+        width: 13,
+        height: 13,
         borderRadius: 7,
         alignItems: 'center',
         justifyContent: 'center',
@@ -170,7 +194,7 @@ function VerifiedTick() {
         borderColor: colors.accentLine,
       }}
     >
-      <Text style={{ fontSize: 9, lineHeight: 12, color: colors.accent, fontWeight: '700' }}>
+      <Text style={{ fontSize: 8, lineHeight: 11, color: colors.accent, fontWeight: '700' }}>
         {'✓'}
       </Text>
     </View>

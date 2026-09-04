@@ -17,7 +17,7 @@ export default function NotFound() {
   return (
     <Screen>
       <View style={{ flex: 1, justifyContent: 'center', padding: space.xl, gap: space.md }}>
-        <Text variant="title" serif>That link did not open</Text>
+        <Text variant="title">That link did not open</Text>
         <Text variant="callout" tone="muted">
           It may point at something this version of the app does not show yet.
           You can find it at taziyah.com.

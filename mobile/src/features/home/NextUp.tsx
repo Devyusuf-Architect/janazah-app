@@ -1,25 +1,30 @@
 // The next Janazah.
 //
-// The one thing on Home given any size, and it is still not a giant card: it
-// is a row's worth of information laid out so the time is unmissable, on a
-// raised surface, with the two actions somebody standing in a hallway
-// actually wants.
+// The one thing on Home given any size, and the only card on the screen. It
+// answers, in order and without scrolling: when, who, where, how far, and how
+// do I get there.
 //
-// The time is the largest text in the app. Everything about the layout is in
-// service of somebody reading it at arm's length while being handed a coat.
+// The whole card opens the notice, so there is no "Open notice" button
+// competing with the one action that matters. Directions is the single
+// primary control on Home, which is the point: a person looking at this is
+// usually deciding whether they can get there in time, not browsing.
+//
+// Cancelled notices never reach this card. Home picks the soonest notice that
+// is not cancelled, because a cancellation belongs in the section that says
+// so, not under a heading that says what is happening next.
 
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '../../components/Text';
-import { Surface } from '../../components/Surface';
-import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
+import { Button } from '../../components/Button';
 import { formatNoticeTime, timeSentence, timeUntil } from '../../lib/time';
+import { tapped } from '../../lib/haptics';
 import { displayName, isCorrected, type Notice } from '../../lib/notice';
 import { whereLine } from '../../lib/search';
 import { formatDistance, type MapDestination } from '../../shared/geo';
-import { space, useColors } from '../../theme';
+import { useColors, radius, space, elevation } from '../../theme';
 
 export function NextUp({ notice, distanceKm, onPress, onDirections }: {
   notice: Notice;
@@ -34,57 +39,79 @@ export function NextUp({ notice, distanceKm, onPress, onDirections }: {
   const name = displayName(notice);
   const where = whereLine(notice.orgName, notice.prayerLocation);
   const place = notice.prayerLocation;
+  const hasPlace = !!(place?.address || place?.lat != null);
+
+  const label = [
+    'Next Janazah.',
+    name ? `For ${name}.` : '',
+    timeSentence(time) + '.',
+    notice.orgName + '.',
+    distanceKm != null ? `${formatDistance(distanceKm)} away.` : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <Surface level="raised" padded style={{ gap: space.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-        <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase' }}>
-          Next Janazah
-        </Text>
-        {isCorrected(notice) ? <Badge tone="corrected" label="Updated" /> : null}
-      </View>
-
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
-        <Text variant="timeLarge">{time.day}</Text>
-        <Text variant="timeLarge" style={{ color: colors.accent }}>{time.time}</Text>
-        {time.zone ? <Text variant="caption" tone="subtle">{time.zone}</Text> : null}
-      </View>
-
-      {time.label || soon ? (
-        <Text variant="callout" tone="muted">
-          {[time.label, soon].filter(Boolean).join(' · ')}
-        </Text>
-      ) : null}
-
-      {name ? <Text variant="title" serif numberOfLines={2}>{name}</Text> : null}
-
-      <View style={{ gap: 2 }}>
-        <Text variant="body" numberOfLines={1}>{notice.orgName}</Text>
-        {where ? (
-          <Text variant="callout" tone="muted" numberOfLines={2}>
-            {where}
-            {distanceKm != null ? ` · ${formatDistance(distanceKm)} away` : ''}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Opens the full notice"
+      onPress={() => onPress(notice)}
+      style={({ pressed }) => ({
+        borderRadius: radius.lg,
+        backgroundColor: pressed ? colors.pressed : colors.surface,
+        borderWidth: 1,
+        borderColor: colors.line,
+        padding: space.lg,
+        gap: space.md,
+        ...elevation.raised,
+      })}
+    >
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{ gap: space.md }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase', flex: 1 }}>
+            Next Janazah
           </Text>
+          {isCorrected(notice) ? <Badge tone="corrected" label="Updated" /> : null}
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: space.sm }}>
+          <Text variant="timeLarge" serif>{time.day}</Text>
+          <Text variant="timeLarge" serif style={{ color: colors.accent }}>
+            {time.time}
+          </Text>
+          {time.zone ? <Text variant="caption" tone="subtle">{time.zone}</Text> : null}
+          {soon ? (
+            <Text variant="caption" style={{ color: colors.accent }}>{soon}</Text>
+          ) : null}
+        </View>
+
+        {name ? (
+          <Text variant="title" serif numberOfLines={1}>{name}</Text>
         ) : null}
+
+        {/* Masjid, place and distance on one line. Three lines of metadata
+            under a time is how this card started looking like a document. */}
+        <Text variant="callout" tone="muted" numberOfLines={2}>
+          {[
+            notice.orgName,
+            where,
+            distanceKm != null ? formatDistance(distanceKm) : '',
+          ].filter(Boolean).join(' · ')}
+        </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: space.sm, paddingTop: space.xs }}>
+      {hasPlace ? (
         <Button
-          label="Open notice"
+          label="Directions"
           kind="primary"
-          size="compact"
-          onPress={() => onPress(notice)}
-          accessibilityLabel={`Open the notice. ${timeSentence(time)}`}
+          full
+          onPress={() => { tapped(); onDirections(place); }}
+          accessibilityLabel="Directions to the prayer location, in your maps app"
         />
-        {place?.address || place?.lat != null ? (
-          <Button
-            label="Directions"
-            size="compact"
-            onPress={() => onDirections(place)}
-            accessibilityLabel="Directions to the prayer location, in your maps app"
-          />
-        ) : null}
-      </View>
-    </Surface>
+      ) : null}
+    </Pressable>
   );
 }

@@ -48,9 +48,13 @@ export function TimePanel({ notice, cancelled }: {
       style={{
         padding: space.lg,
         borderRadius: radius.lg,
-        backgroundColor: cancelled ? colors.surfaceAlt : colors.accentSoft,
+        // A cancelled prayer takes the danger tint rather than a neutral
+        // grey. Struck-through text alone is easy to miss at a glance and at
+        // arm's length, and this is the one thing on the screen that must not
+        // be missed.
+        backgroundColor: cancelled ? colors.dangerSoft : colors.accentSoft,
         borderWidth: 1,
-        borderColor: cancelled ? colors.line : colors.accentLine,
+        borderColor: cancelled ? colors.dangerLine : colors.accentLine,
         gap: space.xs,
       }}
     >
@@ -78,7 +82,11 @@ export function TimePanel({ notice, cancelled }: {
         ) : null}
       </View>
 
-      {time.label || soon ? (
+      {cancelled ? (
+        <Text variant="callout" style={{ color: colors.danger, fontWeight: '600' }}>
+          This prayer will not take place as announced
+        </Text>
+      ) : time.label || soon ? (
         <Text variant="callout" style={{ color: colors.accent }}>
           {[time.label, soon].filter(Boolean).join(' · ')}
         </Text>

@@ -51,7 +51,7 @@ export function CoordinatorCard() {
         />
       </View>
 
-      <Text variant="title" serif numberOfLines={2}>{org.name}</Text>
+      <Text variant="title" numberOfLines={2}>{org.name}</Text>
 
       <Text variant="callout" tone="muted">
         {verified

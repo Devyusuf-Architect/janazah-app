@@ -26,6 +26,7 @@ import { useLocation } from '../../src/features/nearby/useLocation';
 import { useAuth } from '../../src/lib/auth';
 import { signOutGoogle } from '../../src/lib/google';
 import { RADIUS_OPTIONS } from '../../src/lib/nearby';
+import { useMyOrganizations } from '../../src/lib/queries';
 import { useTheme, space } from '../../src/theme';
 
 export default function ProfileScreen() {
@@ -34,6 +35,9 @@ export default function ProfileScreen() {
   const follows = useFollows();
   const location = useLocation();
   const { choice } = useTheme();
+  const orgs = useMyOrganizations(
+    user && !isAnonymous ? user.uid : undefined,
+  ).data ?? [];
   const [appearanceOpen, setAppearanceOpen] = useState(false);
 
   const signedIn = ready && !!user && !isAnonymous;
@@ -86,6 +90,27 @@ export default function ProfileScreen() {
               </>
             )}
           </Surface>
+
+          {orgs.length ? (
+            <Surface style={{ overflow: 'hidden' }}>
+              {/* Coordinators reach their masjid from Home and from here.
+                  Both, because Home's card scrolls away behind a busy feed
+                  and Profile is where somebody looks for the thing that
+                  belongs to them. Not a sixth tab. */}
+              {orgs.map((org, index) => (
+                <View key={org.id}>
+                  {index > 0 ? <Divider inset={space.lg} /> : null}
+                  <Row
+                    title={org.name}
+                    subtitle={org.verificationStatus === 'verified'
+                      ? 'Your masjid. Publish at taziyah.com.'
+                      : 'Your masjid. Awaiting verification.'}
+                    onPress={() => router.push(`/o/${org.id}`)}
+                  />
+                </View>
+              ))}
+            </Surface>
+          ) : null}
 
           <Surface style={{ overflow: 'hidden' }}>
             <Row
