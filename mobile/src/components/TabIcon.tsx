@@ -11,7 +11,8 @@
 import React from 'react';
 import Svg, { Path, Circle } from 'react-native-svg';
 
-export type TabIconName = 'home' | 'near' | 'follow' | 'alert' | 'profile';
+export type TabIconName =
+  | 'home' | 'notices' | 'near' | 'follow' | 'alert' | 'profile';
 
 const SIZE = 24;
 
@@ -35,6 +36,14 @@ export function TabIcon({ name, color, focused }: {
         <>
           <Path d="M3.5 10.5 12 4l8.5 6.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z" {...common} />
           <Path d="M9.5 20v-5h5v5" {...common} />
+        </>
+      ) : null}
+
+      {name === 'notices' ? (
+        <>
+          <Path d="M5 4.2h9.2L19 8.6V19a.8.8 0 0 1-.8.8H5a.8.8 0 0 1-.8-.8V5a.8.8 0 0 1 .8-.8z" {...common} />
+          <Path d="M14 4.4v4.4h4.6" {...common} />
+          <Path d="M7.4 12.4h8.2M7.4 16h5.4" {...common} />
         </>
       ) : null}
 

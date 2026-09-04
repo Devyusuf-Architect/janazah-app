@@ -34,6 +34,13 @@ import { GuideBody } from '../src/features/guide/GuideBody';
 import { BrandGround } from '../src/features/launch/BrandGround';
 import { Mark, Brandmark } from '../src/features/launch/Brandmark';
 import { NoticeSkeletonList } from '../src/components/Skeleton';
+import { HomeHeader } from '../src/features/home/HomeHeader';
+import { SearchField } from '../src/features/home/SearchField';
+import { NextUp } from '../src/features/home/NextUp';
+import { GuideLink } from '../src/features/home/GuideLink';
+import { DayHeading } from '../src/features/notices/DayHeading';
+import { SearchBar } from '../src/features/notices/SearchBar';
+import { TabBar } from '../src/components/TabBar';
 import { Field as PreviewField } from '../src/components/Field';
 import { ViewToggle } from '../src/features/nearby/ViewToggle';
 import type { Notice } from '../src/lib/notice';
@@ -128,6 +135,28 @@ const NOTICES: { notice: Notice; distanceKm?: number }[] = [
   },
 ];
 
+/**
+ * The bar without a navigator behind it. Everything it needs is a routes
+ * array and a focused index, so the harness supplies those rather than
+ * standing up react-navigation in a browser.
+ */
+function PreviewTabBar() {
+  const routes = ['index', 'janazahs', 'nearby', 'following', 'profile'];
+  const titles = ['Home', 'Janazahs', 'Nearby', 'Following', 'Profile'];
+  const props = {
+    state: {
+      index: 0,
+      routes: routes.map((name, i) => ({ key: `${name}-${i}`, name })),
+    },
+    descriptors: Object.fromEntries(routes.map((name, i) => [
+      `${name}-${i}`, { options: { title: titles[i] } },
+    ])),
+    navigation: { emit: () => ({ defaultPrevented: false }), navigate: () => {} },
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <TabBar {...(props as any)} />;
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const colors = useColors();
   return (
@@ -189,6 +218,43 @@ function Gallery() {
             </View>
           </BrandGround>
         </View>
+      </Section>
+
+      <Section title="Home header">
+        <HomeHeader>
+          <SearchField />
+        </HomeHeader>
+      </Section>
+
+      <Section title="Home, the next Janazah">
+        <View style={{ padding: space.lg }}>
+          <NextUp notice={base} distanceKm={3.4} onPress={() => {}} onDirections={() => {}} />
+        </View>
+      </Section>
+
+      <Section title="Janazahs, a grouped list">
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
+          <SearchBar value="" onChangeText={() => {}} placeholder="Masjid, city, or a name" />
+        </View>
+        <DayHeading title="Today" />
+        {NOTICES.slice(0, 2).map(({ notice, distanceKm }, i) => (
+          <View key={`grouped-${notice.id}`}>
+            {i > 0 ? <Divider inset={space.lg} /> : null}
+            <NoticeRow notice={notice} distanceKm={distanceKm ?? null} onPress={() => {}} />
+          </View>
+        ))}
+        <DayHeading title="Monday, October 5" />
+        <NoticeRow notice={NOTICES[3]!.notice} onPress={() => {}} />
+      </Section>
+
+      <Section title="The guide link">
+        <View style={{ padding: space.lg }}>
+          <GuideLink />
+        </View>
+      </Section>
+
+      <Section title="The tab bar">
+        <PreviewTabBar />
       </Section>
 
       <Section title="Loading skeleton">

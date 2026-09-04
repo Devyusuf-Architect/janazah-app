@@ -37,9 +37,12 @@ import { adminRef } from './collections';
 
 export type Role = {
   isAdmin: boolean;
-  /** Organizations this account is staff of. Empty for a community member. */
-  staffOrgIds: string[];
 };
+
+// Which organizations an account is staff of is deliberately NOT here. It is
+// a Firestore query rather than a claim, it is only needed by one card on
+// Home, and putting it in the auth context would mean every screen in the app
+// waiting on it. See useMyOrganizations in src/lib/queries.ts.
 
 type AuthValue = {
   user: User | null;
@@ -58,7 +61,7 @@ type AuthValue = {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-const EMPTY_ROLE: Role = { isAdmin: false, staffOrgIds: [] };
+const EMPTY_ROLE: Role = { isAdmin: false };
 
 /**
  * Sign in, preserving an anonymous session's work where the provider allows.
@@ -128,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // The rules allow reading only your own admin row; a denial means no.
         isAdmin = false;
       }
-      if (!cancelled) setRole({ isAdmin, staffOrgIds: [] });
+      if (!cancelled) setRole({ isAdmin });
     })();
 
     return () => { cancelled = true; };

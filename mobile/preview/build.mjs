@@ -54,6 +54,9 @@ await build({
     'expo-router': resolve(here, 'stubs/expo.js'),
     'expo-status-bar': resolve(here, 'stubs/expo.js'),
     'react-native-reanimated': resolve(here, 'stubs/reanimated.js'),
+    // Same problem as react-native-svg: the web build reaches into React
+    // Native's codegen internals. A browser page has no notch either way.
+    'react-native-safe-area-context': resolve(here, 'stubs/safe-area.js'),
   },
   logLevel: 'info',
 });

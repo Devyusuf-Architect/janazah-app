@@ -17,19 +17,19 @@ import { ScrollView, Switch, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Screen } from '../../src/components/Screen';
-import { Text } from '../../src/components/Text';
-import { Button } from '../../src/components/Button';
-import { Surface, Divider } from '../../src/components/Surface';
-import { Row } from '../../src/components/Row';
-import { Loading, Empty } from '../../src/components/States';
-import { useAlerts } from '../../src/features/alerts/useAlerts';
-import { useLocation } from '../../src/features/nearby/useLocation';
-import { useFollows } from '../../src/features/following/useFollows';
-import { RadiusSheet } from '../../src/features/nearby/RadiusSheet';
-import { SETTINGS_HINT } from '../../src/lib/notifications';
-import { RADIUS_OPTIONS } from '../../src/lib/nearby';
-import { space, useColors } from '../../src/theme';
+import { Screen } from '../src/components/Screen';
+import { Text } from '../src/components/Text';
+import { Button } from '../src/components/Button';
+import { Surface, Divider } from '../src/components/Surface';
+import { Row } from '../src/components/Row';
+import { Loading, Empty } from '../src/components/States';
+import { useAlerts } from '../src/features/alerts/useAlerts';
+import { useLocation } from '../src/features/nearby/useLocation';
+import { useFollows } from '../src/features/following/useFollows';
+import { RadiusSheet } from '../src/features/nearby/RadiusSheet';
+import { SETTINGS_HINT } from '../src/lib/notifications';
+import { RADIUS_OPTIONS } from '../src/lib/nearby';
+import { space, useColors } from '../src/theme';
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();

@@ -79,7 +79,6 @@ function Chrome() {
         />
         <Stack.Screen name="o/[id]" />
         <Stack.Screen name="masjids" />
-        <Stack.Screen name="search" />
         <Stack.Screen name="guide" />
         <Stack.Screen name="about" />
         <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />

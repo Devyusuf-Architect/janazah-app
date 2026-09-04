@@ -70,7 +70,10 @@ export const pressSpring: WithSpringConfig = motion.press;
  * somebody is scrolling towards.
  */
 export function enterRow(index: number, reduce: boolean) {
-  if (reduce) return undefined;
+  // A negative index means "do not animate this one": used for rows that
+  // mount because somebody scrolled to them, where an entrance is an entrance
+  // the reader has already scrolled past.
+  if (reduce || index < 0) return undefined;
   const delay = Math.min(index, 7) * motion.stagger;
   return FadeInDown.duration(motion.base).delay(delay).easing(easeOut);
 }

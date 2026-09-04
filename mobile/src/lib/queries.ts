@@ -20,7 +20,7 @@ import { getDoc, getDocs } from '@react-native-firebase/firestore';
 
 import {
   upcomingNoticesQuery, orgNoticesQuery, chunkOrgIds, MAX_IN_VALUES,
-  verifiedOrganizationsQuery, noticeRef, organizationRef,
+  verifiedOrganizationsQuery, myOrganizationsQuery, noticeRef, organizationRef,
   type DocSnapshot,
 } from './collections';
 import { toNotice, toOrganization, type Notice, type Organization } from './notice';
@@ -163,6 +163,35 @@ export function useVerifiedOrganizations() {
       const live = snapshot.docs.map(toOrganization).filter(notNull);
       return withSamples(live, sampleOrganizations())
         .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+}
+
+/**
+ * The organizations the signed-in user is staff of.
+ *
+ * Used to show a coordinator the way to their own masjid, and for nothing
+ * else. Reading this grants no authority: what a coordinator may publish is
+ * decided by firestore.rules, which this app cannot and does not change.
+ *
+ * A denial returns an empty list rather than an error. Somebody who is not
+ * staff of anything is the ordinary case, not a failure.
+ */
+export function useMyOrganizations(
+  uid: string | undefined,
+): UseQueryResult<Organization[]> {
+  return useQuery({
+    queryKey: ['organizations', 'mine', uid ?? null],
+    enabled: !!uid,
+    staleTime: 30 * 60 * 1000,
+    queryFn: async () => {
+      try {
+        const snapshot = await getDocs(myOrganizationsQuery(uid!));
+        return snapshot.docs.map(toOrganization).filter(notNull)
+          .sort((a, b) => a.name.localeCompare(b.name));
+      } catch {
+        return [];
+      }
     },
   });
 }

@@ -38,3 +38,4 @@ export const useLocalSearchParams = () => ({});
 
 // expo-status-bar
 export const StatusBar = () => null;
+export const setStatusBarStyle = noop;

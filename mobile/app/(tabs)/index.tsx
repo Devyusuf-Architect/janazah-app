@@ -1,44 +1,51 @@
 // Home.
 //
-// Not a landing page. Somebody opening this has usually just been told, by
-// text message or in a phone call, that a Janazah is happening, often today.
-// The screen has one job at that moment: what is happening, where, and how do
-// I get there.
+// Somebody opening this has usually just been told, by text message or in a
+// phone call, that a Janazah is happening, often today. The screen has one
+// job at that moment: what is happening, where, and how do I get there.
 //
-// So: a one-line greeting, a search field, and then notices. Four upcoming,
-// three nearby, and whatever the masjids they follow have published. Each
-// section defers to its own tab rather than growing, because a home screen
-// that tries to be every tab is a home screen nobody scrolls to the bottom of.
+// The first version answered it with four sections of four rows each, which
+// is a website's home page. This one leads with the next Janazah and with
+// anything that has changed, then thins out: three near you, three from the
+// masjids you follow, and the guide. Everything defers to its own tab rather
+// than growing, because a home screen that tries to be every tab is a home
+// screen nobody scrolls to the bottom of.
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
-import { Loading, Empty, ErrorState, StaleBanner } from '../../src/components/States';
-import { Greeting } from '../../src/features/home/Greeting';
+import { Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { NoticeSkeletonList } from '../../src/components/Skeleton';
+import { RowIn } from '../../src/components/Motion';
+import { HomeHeader } from '../../src/features/home/HomeHeader';
 import { SearchField } from '../../src/features/home/SearchField';
 import { SectionHeader } from '../../src/features/home/SectionHeader';
-import { NoticeRow } from '../../src/features/notices/NoticeRow';
+import { CoordinatorCard } from '../../src/features/home/CoordinatorCard';
+import { NextUp } from '../../src/features/home/NextUp';
+import { GuideLink } from '../../src/features/home/GuideLink';
 import { SampleBanner } from '../../src/features/home/SampleBanner';
+import { NoticeRow } from '../../src/features/notices/NoticeRow';
+import { DirectionsSheet } from '../../src/features/notices/DirectionsSheet';
 import { useLocation } from '../../src/features/nearby/useLocation';
 import { useFollows } from '../../src/features/following/useFollows';
 import { useUpcomingNotices, useNoticesFromOrgs } from '../../src/lib/queries';
 import { nearbyNotices, annotate } from '../../src/lib/nearby';
-import type { Notice } from '../../src/lib/notice';
+import { isCancelled, isCorrected, type Notice } from '../../src/lib/notice';
+import type { MapDestination } from '../../src/shared/geo';
 import { space, useColors } from '../../src/theme';
 
 /** How many rows each section shows before deferring to its own tab. */
-const UPCOMING_LIMIT = 4;
 const NEAR_LIMIT = 3;
-const FOLLOWED_LIMIT = 4;
+const FOLLOWED_LIMIT = 3;
+const UPDATE_LIMIT = 3;
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
   const colors = useColors();
+  const [destination, setDestination] = useState<MapDestination | null>(null);
 
   const location = useLocation();
   const follows = useFollows();
@@ -64,6 +71,21 @@ export default function HomeScreen() {
     [notices, location.point, location.prefs.radiusKm],
   );
 
+  // A cancellation or a moved time is the one thing on this screen somebody
+  // needs to see even if they saw the notice yesterday, so it is pulled out
+  // of the feed rather than left in date order among unchanged notices.
+  const updates = useMemo(
+    () => notices.filter((n) => isCancelled(n) || isCorrected(n)),
+    [notices],
+  );
+
+  // The soonest one, and it is the only thing on Home given any size.
+  const next = notices.find((n) => !isCancelled(n)) ?? null;
+  const rest = useMemo(
+    () => notices.filter((n) => n !== next && !isCancelled(n)).slice(0, 3),
+    [notices, next],
+  );
+
   // Refetched when the tab is focused rather than kept on a live listener.
   // Somebody who backgrounds the app on the way to a masjid and reopens it in
   // the car park gets the current time; a socket held open all night does not
@@ -75,73 +97,101 @@ export default function HomeScreen() {
   return (
     <Screen>
       <ScreenScroll
-        contentContainerStyle={{ paddingTop: insets.top + space.md }}
+        contentContainerStyle={{ paddingTop: 0 }}
         refreshControl={(
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
             tintColor={colors.accent}
             colors={[colors.accent]}
+            progressBackgroundColor={colors.surface}
           />
         )}
       >
-        <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Greeting />
+        <HomeHeader>
           <SearchField />
-        </View>
+        </HomeHeader>
 
         <SampleBanner />
 
         {stale ? (
-          <View style={{ paddingTop: space.lg }}>
+          <View style={{ paddingTop: space.md }}>
             <StaleBanner onRetry={refetch} />
           </View>
         ) : null}
 
-        <SectionHeader
-          title="Upcoming"
-          action={notices.length > UPCOMING_LIMIT
-            ? { label: 'See all', onPress: () => router.push('/search') }
-            : undefined}
-        />
+        <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.lg }}>
+          <CoordinatorCard />
 
-        {isPending ? <Loading label="Loading notices" /> : null}
-
-        {isError ? (
-          <View style={{ paddingHorizontal: space.lg }}>
+          {isError ? (
             <ErrorState
               message="Notices could not be loaded. You may be offline."
               onRetry={refetch}
             />
-          </View>
-        ) : null}
+          ) : null}
 
-        {!isPending && !isError && notices.length === 0 ? (
-          <View style={{ paddingHorizontal: space.lg }}>
+          {isPending ? null : next ? (
+            <RowIn index={0}>
+              <NextUp
+                notice={next}
+                distanceKm={distances.get(next.id) ?? null}
+                onPress={open}
+                onDirections={setDestination}
+              />
+            </RowIn>
+          ) : !isError ? (
             <Empty message="No Janazah notices have been published for the days ahead." />
-          </View>
+          ) : null}
+        </View>
+
+        {isPending ? <NoticeSkeletonList count={4} /> : null}
+
+        {updates.length ? (
+          <>
+            <SectionHeader title="Changed or cancelled" />
+            {updates.slice(0, UPDATE_LIMIT).map((notice, index) => (
+              <View key={`update-${notice.id}`}>
+                {index > 0 ? <Divider inset={space.lg} /> : null}
+                <NoticeRow
+                  notice={notice}
+                  distanceKm={distances.get(notice.id) ?? null}
+                  onPress={open}
+                />
+              </View>
+            ))}
+          </>
         ) : null}
 
-        {notices.slice(0, UPCOMING_LIMIT).map((notice, index) => (
-          <View key={notice.id}>
-            {index > 0 ? <Divider inset={space.lg} /> : null}
-            <NoticeRow
-              notice={notice}
-              distanceKm={distances.get(notice.id) ?? null}
-              onPress={open}
+        {rest.length ? (
+          <>
+            <SectionHeader
+              title="Also coming up"
+              action={{ label: 'See all', onPress: () => router.push('/(tabs)/janazahs') }}
             />
-          </View>
-        ))}
+            {rest.map((notice, index) => (
+              <View key={notice.id}>
+                {index > 0 ? <Divider inset={space.lg} /> : null}
+                <RowIn index={index + 1}>
+                  <NoticeRow
+                    notice={notice}
+                    distanceKm={distances.get(notice.id) ?? null}
+                    onPress={open}
+                  />
+                </RowIn>
+              </View>
+            ))}
+          </>
+        ) : null}
 
         <SectionHeader
           title="Near you"
-          action={{ label: 'Open', onPress: () => router.push('/nearby') }}
+          action={{ label: 'Open', onPress: () => router.push('/(tabs)/nearby') }}
         />
 
         {location.point ? (
           near.length ? (
             near.slice(0, NEAR_LIMIT).map(({ notice, km }, index) => (
-              <View key={notice.id}>
+              <View key={`near-${notice.id}`}>
                 {index > 0 ? <Divider inset={space.lg} /> : null}
                 <NoticeRow notice={notice} distanceKm={km} onPress={open} />
               </View>
@@ -155,11 +205,9 @@ export default function HomeScreen() {
           )
         ) : (
           <View style={{ paddingHorizontal: space.lg }}>
-            {/* One row, not half a screen. The brief was explicit that a
-                disabled state must not take over the page, and this is the
-                state most people see on first launch. The explanation of what
-                location is for lives in Nearby, where the permission is
-                actually requested. */}
+            {/* One line, not half a screen. This is the state most people see
+                on first launch, and the explanation of what location is for
+                lives in Nearby, where the permission is actually requested. */}
             <Text variant="callout" tone="muted">
               Turn on location in Nearby to see which of these are close to you.
               It stays on your phone.
@@ -171,7 +219,9 @@ export default function HomeScreen() {
           title="Masjids you follow"
           action={{
             label: follows.ids.length ? 'Open' : 'Find one',
-            onPress: () => router.push(follows.ids.length ? '/following' : '/masjids'),
+            onPress: () => router.push(
+              follows.ids.length ? '/(tabs)/following' : '/masjids',
+            ),
           }}
         />
 
@@ -200,7 +250,16 @@ export default function HomeScreen() {
             </View>
           ))
         )}
+
+        <View style={{ paddingHorizontal: space.lg, paddingTop: space.xl }}>
+          <GuideLink />
+        </View>
       </ScreenScroll>
+
+      <DirectionsSheet
+        destination={destination}
+        onClose={() => setDestination(null)}
+      />
     </Screen>
   );
 }

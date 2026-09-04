@@ -1,65 +1,43 @@
 // Bottom navigation.
 //
-// Five tabs, chosen because they are the five things a community member
-// actually does, and because a sixth would start pushing labels into
-// ellipses at large font sizes. Everything else lives under Profile, which is
-// what the brief asked for and what keeps this bar readable.
+// Five tabs: Home, Janazahs, Nearby, Following, Profile. They are the five
+// things a community member does, and a sixth would start pushing labels into
+// ellipses at large font sizes.
 //
-// Coordinator and administrator functions are deliberately absent. They are
-// not hidden for security (firestore.rules decides that, not this file); they
-// are absent because publishing a notice is a desk job and the web console
-// does it better.
+// Alerts used to be the fourth tab and is not any more. It is a settings
+// screen, opened perhaps twice in a year, and it was taking a fifth of the
+// most valuable row of pixels in the app. It now lives behind the bell in the
+// Home header and as a row in Profile, which is where people look for
+// settings anyway.
+//
+// Coordinator and administrator functions are still deliberately absent from
+// the bar. Somebody who runs a masjid reaches their organization from Home,
+// where a card appears for them and nobody else; publishing a notice remains
+// a desk job that the web console does better.
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
 
-import { useColors, type } from '../../src/theme';
-import { TabIcon, type TabIconName } from '../../src/components/TabIcon';
+import { TabBar } from '../../src/components/TabBar';
 
-const TABS: { name: string; title: string; icon: TabIconName }[] = [
-  { name: 'index', title: 'Home', icon: 'home' },
-  { name: 'nearby', title: 'Nearby', icon: 'near' },
-  { name: 'following', title: 'Following', icon: 'follow' },
-  { name: 'alerts', title: 'Alerts', icon: 'alert' },
-  { name: 'profile', title: 'Profile', icon: 'profile' },
+const TABS: { name: string; title: string }[] = [
+  { name: 'index', title: 'Home' },
+  { name: 'janazahs', title: 'Janazahs' },
+  { name: 'nearby', title: 'Nearby' },
+  { name: 'following', title: 'Following' },
+  { name: 'profile', title: 'Profile' },
 ];
 
 export default function TabsLayout() {
-  const colors = useColors();
-
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.ink3,
-        tabBarStyle: {
-          backgroundColor: colors.chrome,
-          borderTopColor: colors.chromeLine,
-          // A hairline, not the default heavier rule, which reads as a seam.
-          borderTopWidth: 1,
-          height: Platform.OS === 'android' ? 62 : undefined,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          fontSize: type.caption.fontSize,
-          fontWeight: '500',
-          marginBottom: 6,
-        },
-      }}
+      // The bar is drawn by src/components/TabBar.tsx. See the note there for
+      // why the default one was not enough.
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      {TABS.map(({ name, title, icon }) => (
-        <Tabs.Screen
-          key={name}
-          name={name}
-          options={{
-            title,
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon name={icon} color={String(color)} focused={focused} />
-            ),
-          }}
-        />
+      {TABS.map(({ name, title }) => (
+        <Tabs.Screen key={name} name={name} options={{ title }} />
       ))}
     </Tabs>
   );
