@@ -141,6 +141,12 @@ const config: ExpoConfig = {
   },
 
   plugins: [
+    // FIRST on purpose, which looks backwards and is not. Config plugin mods
+    // run in reverse registration order: the last one listed runs first. This
+    // one rewrites an element expo-notifications creates, so it has to be
+    // registered before it in order to run after it.
+    // See plugins/with-notification-color-fix.js.
+    './plugins/with-notification-color-fix',
     'expo-router',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
