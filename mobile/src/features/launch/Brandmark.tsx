@@ -31,6 +31,8 @@ export function Mark({ size = 96, tone = 'brand' }: {
   size?: number;
   tone?: 'brand' | 'light';
 }) {
+  // Literals, not theme tokens. A logo is the same colour in light and dark;
+  // a mark that changed shade with the scheme would be two logos.
   const disc = tone === 'brand' ? '#14503f' : '#faf7f2';
   const figure = tone === 'brand' ? '#faf7f2' : '#14503f';
 

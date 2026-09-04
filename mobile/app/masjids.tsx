@@ -16,11 +16,12 @@ import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
+import { ScreenHeader, PageTitle } from '../src/components/ScreenHeader';
+import { NoticeSkeletonList } from '../src/components/Skeleton';
+import { SearchBar } from '../src/features/notices/SearchBar';
 import { Text } from '../src/components/Text';
-import { Field } from '../src/components/Field';
-import { Button } from '../src/components/Button';
 import { Divider } from '../src/components/Surface';
-import { Loading, Empty, ErrorState } from '../src/components/States';
+import { Empty, ErrorState } from '../src/components/States';
 import { FollowButton } from '../src/features/following/FollowButton';
 import { useVerifiedOrganizations } from '../src/lib/queries';
 import { fold } from '../src/lib/search';
@@ -45,30 +46,21 @@ export default function MasjidsScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Masjids' }} />
-      <View style={{ paddingTop: insets.top + space.md }}>
-        <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          />
-          <Text variant="display" serif>Masjids</Text>
-          <Text variant="callout" tone="muted">
-            Organizations a Ta’ziyah administrator has verified. Follow one to
-            hear about its Janazah notices.
-          </Text>
-          <Field
-            label="Find a masjid"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Name or city"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+      <ScreenHeader />
+      <PageTitle
+        title="Masjids"
+        subtitle={'Organizations a Ta’ziyah administrator has verified. Follow '
+          + 'one to hear about its Janazah notices.'}
+      />
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Name or city"
+        />
       </View>
 
-      {isPending ? <Loading label="Loading masjids" /> : null}
+      {isPending ? <NoticeSkeletonList count={4} /> : null}
 
       {isError ? (
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg }}>

@@ -15,6 +15,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../../src/components/Screen';
+import { PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Button } from '../../src/components/Button';
 import { Divider } from '../../src/components/Surface';
@@ -70,37 +71,32 @@ export default function NearbyScreen() {
 
   return (
     <Screen>
-      <View
-        style={{
-          paddingTop: insets.top + space.lg,
-          paddingHorizontal: space.lg,
-          paddingBottom: space.md,
-          gap: space.md,
-        }}
-      >
-        <Text variant="display" serif>Nearby</Text>
+      <View style={{ paddingTop: insets.top + space.lg }}>
+        <PageTitle title="Nearby" />
 
-        {location.point ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: space.md,
-            }}
-          >
-            <Button
-              label={`Within ${radiusLabel}`}
-              size="compact"
-              onPress={() => setRadiusOpen(true)}
-            />
-            <ViewToggle
-              value={view}
-              onChange={setView}
-              mapAvailable={mapAvailable()}
-            />
-          </View>
-        ) : null}
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
+          {location.point ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: space.md,
+              }}
+            >
+              <Button
+                label={`Within ${radiusLabel}`}
+                size="compact"
+                onPress={() => setRadiusOpen(true)}
+              />
+              <ViewToggle
+                value={view}
+                onChange={setView}
+                mapAvailable={mapAvailable()}
+              />
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {!location.ready ? <Loading label="Checking location" /> : null}

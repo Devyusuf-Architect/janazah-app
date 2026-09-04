@@ -23,6 +23,7 @@ import { router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../src/components/Screen';
+import { ScreenHeader, PageTitle } from '../src/components/ScreenHeader';
 import { Text } from '../src/components/Text';
 import { Button } from '../src/components/Button';
 import { Surface } from '../src/components/Surface';
@@ -67,16 +68,10 @@ export default function DeleteAccountScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Delete account' }} />
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
+      <ScreenHeader />
+      <ScreenScroll>
+        <PageTitle title="Delete my account" />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          />
-
-          <Text variant="display" serif>Delete my account</Text>
-
           <Surface padded style={{ gap: space.md }}>
             <Text variant="bodyStrong">What is removed</Text>
             <Text variant="callout" tone="muted">

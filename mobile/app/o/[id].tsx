@@ -12,14 +12,14 @@
 import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../../src/components/Screen';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import { Text } from '../../src/components/Text';
-import { Button } from '../../src/components/Button';
 import { Surface, Divider } from '../../src/components/Surface';
 import { VerifiedBadge } from '../../src/components/Badge';
-import { Loading, Empty, ErrorState } from '../../src/components/States';
+import { Empty, ErrorState } from '../../src/components/States';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { FollowButton } from '../../src/features/following/FollowButton';
 import { useLocation } from '../../src/features/nearby/useLocation';
@@ -30,7 +30,6 @@ import { space } from '../../src/theme';
 
 export default function OrganizationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
   const location = useLocation();
 
   const { data: org, isPending, isError, refetch } = useOrganization(id);
@@ -46,16 +45,9 @@ export default function OrganizationScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: org?.name ?? 'Masjid' }} />
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
-        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/masjids'))}
-          />
-        </View>
-
-        {isPending ? <Loading label="Loading" /> : null}
+      <ScreenHeader />
+      <ScreenScroll>
+        {isPending ? <NoticeSkeletonList count={3} /> : null}
 
         {isError ? (
           <View style={{ paddingHorizontal: space.lg }}>
@@ -80,16 +72,16 @@ export default function OrganizationScreen() {
         {org ? (
           <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
             <View style={{ gap: space.sm }}>
-              <Text variant="display" serif>{org.name}</Text>
+              <Text accessibilityRole="header" variant="display" serif>
+                {org.name}
+              </Text>
               {isVerified(org) ? <VerifiedBadge /> : null}
               <Text variant="callout" tone="muted">
                 {[org.address, org.city, org.province].filter(Boolean).join(', ')}
               </Text>
             </View>
 
-            <View style={{ flexDirection: 'row' }}>
-              <FollowButton orgId={org.id} size="regular" />
-            </View>
+            <FollowButton orgId={org.id} size="regular" full />
 
             {isVerified(org) ? (
               <Surface padded>
@@ -118,7 +110,7 @@ export default function OrganizationScreen() {
 
         {org ? (
           <>
-            {notices.isPending ? <Loading label="Loading notices" /> : null}
+            {notices.isPending ? <NoticeSkeletonList count={2} /> : null}
             {notices.data && notices.data.notices.length === 0 ? (
               <View style={{ paddingHorizontal: space.lg }}>
                 <Empty message="Nothing upcoming from this masjid." />

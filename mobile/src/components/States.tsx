@@ -12,8 +12,9 @@
 
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
-import { useColors, space } from '../theme';
+import { useColors, radius, space } from '../theme';
 import { Text } from './Text';
 import { Button } from './Button';
 
@@ -30,13 +31,46 @@ export function Loading({ label = 'Loading' }: { label?: string }) {
   );
 }
 
+/**
+ * Nothing here, said without taking over the screen.
+ *
+ * The mark is a quiet crescent in a soft disc rather than an illustration.
+ * The rule from the brief still holds: this is a glyph and a line, not a
+ * half-page of artwork apologising for an empty list.
+ */
 export function Empty({ message, action }: {
   message: string;
   action?: { label: string; onPress: () => void };
 }) {
+  const colors = useColors();
+
   return (
-    <View style={{ paddingVertical: space.lg, gap: space.md }}>
-      <Text tone="muted" variant="callout">{message}</Text>
+    <View style={{ paddingVertical: space.xl, gap: space.md, alignItems: 'center' }}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: radius.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.surfaceAlt,
+          borderWidth: 1,
+          borderColor: colors.line,
+        }}
+      >
+        <Svg width={26} height={26} viewBox="0 0 24 24">
+          <Path
+            d="M16.8 15.6A6.2 6.2 0 0 1 9 7.3a6.6 6.6 0 1 0 7.8 8.3z"
+            stroke={colors.ink3} strokeWidth={1.5}
+            strokeLinejoin="round" fill="none"
+          />
+        </Svg>
+      </View>
+      <Text tone="muted" variant="callout" style={{ textAlign: 'center' }}>
+        {message}
+      </Text>
       {action
         ? <Button label={action.label} onPress={action.onPress} size="compact" />
         : null}
@@ -44,13 +78,22 @@ export function Empty({ message, action }: {
   );
 }
 
+/**
+ * Something went wrong, said in the same shape as Empty.
+ *
+ * Centred so the two read as siblings: a reader who sees one on Monday and
+ * the other on Tuesday should not feel the app has changed layout underneath
+ * them.
+ */
 export function ErrorState({ message, onRetry }: {
   message: string;
   onRetry?: () => void;
 }) {
   return (
-    <View style={{ paddingVertical: space.lg, gap: space.md }}>
-      <Text tone="muted" variant="callout">{message}</Text>
+    <View style={{ paddingVertical: space.xl, gap: space.md, alignItems: 'center' }}>
+      <Text tone="muted" variant="callout" style={{ textAlign: 'center' }}>
+        {message}
+      </Text>
       {onRetry
         ? <Button label="Try again" onPress={onRetry} size="compact" />
         : null}

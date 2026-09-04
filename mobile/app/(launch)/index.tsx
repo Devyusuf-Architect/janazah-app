@@ -29,7 +29,7 @@ import { Text } from '../../src/components/Text';
 import { hasOnboarded } from '../../src/features/launch/onboarding-state';
 import { useAuth } from '../../src/lib/auth';
 import { motion, timing, useReduceMotion } from '../../src/theme/motion';
-import { space } from '../../src/theme';
+import { space, palettes } from '../../src/theme';
 
 /** Below this the mark reads as a flicker rather than as a brand. */
 const MINIMUM_MS = 650;
@@ -77,7 +77,10 @@ export default function SplashScreen() {
           <Text
             variant="display"
             serif
-            style={{ color: '#f7f3ec', textAlign: 'center' }}
+            // The launch ground is deep green in both schemes, so the
+            // wordmark takes the light palette's onBrand rather than the
+            // current scheme's ink.
+            style={{ color: palettes.light.onBrand, textAlign: 'center' }}
           >
             Ta’ziyah
           </Text>

@@ -6,9 +6,14 @@
 // chevron in a circular target on the left, a title that can shrink, and room
 // for one action on the right.
 //
-// The title is optional. On a notice it is left out entirely, because the
-// screen's own heading is the time and repeating "Janazah notice" above it
-// costs a line at the top of the most important screen in the app.
+// The title in the row is optional and usually left out, because the screen's
+// own large title sits just underneath it. PageTitle below is that title, and
+// pairing the two is the standard shape for every screen in the app that is
+// not a tab root: a chevron row, then a serif heading, then the content.
+//
+// On a notice both are left out. The screen's own heading is the time, and
+// repeating "Janazah notice" above it costs a line at the top of the most
+// important screen in the app.
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
@@ -76,6 +81,45 @@ export function ScreenHeader({ title, onBrand = false, right }: {
       </View>
 
       {right}
+    </View>
+  );
+}
+
+/**
+ * The large title under a header.
+ *
+ * Serif, because that is the brand voice and because a screen title is one of
+ * the three things the type scale reserves it for. The optional line under it
+ * is for a screen that needs a sentence of explanation, which several of them
+ * do: what the masjid directory contains, what the alerts screen will send.
+ */
+export function PageTitle({ title, subtitle, right }: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: space.lg,
+        paddingBottom: space.md,
+        gap: space.sm,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <Text
+          accessibilityRole="header"
+          variant="display"
+          serif
+          style={{ flex: 1 }}
+        >
+          {title}
+        </Text>
+        {right}
+      </View>
+      {subtitle ? (
+        <Text variant="callout" tone="muted">{subtitle}</Text>
+      ) : null}
     </View>
   );
 }

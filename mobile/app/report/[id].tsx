@@ -11,6 +11,7 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../../src/components/Screen';
+import { ScreenHeader, PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Field } from '../../src/components/Field';
 import { Button } from '../../src/components/Button';
@@ -56,22 +57,15 @@ export default function ReportScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Report a problem' }} />
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
+      <ScreenHeader />
+      <ScreenScroll>
+        <PageTitle
+          title="Report a problem"
+          subtitle={'This goes to a Ta’ziyah administrator, not to the masjid. '
+            + 'Nothing about you is sent except that the report came from this '
+            + 'app.'}
+        />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          />
-
-          <View style={{ gap: space.sm }}>
-            <Text variant="display" serif>Report a problem</Text>
-            <Text variant="callout" tone="muted">
-              This goes to a Ta’ziyah administrator, not to the masjid. Nothing
-              about you is sent except that the report came from this app.
-            </Text>
-          </View>
-
           <Surface style={{ overflow: 'hidden' }}>
             {REPORT_REASONS.map((option, index) => (
               <View key={option.value}>

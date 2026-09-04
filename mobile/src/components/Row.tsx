@@ -19,7 +19,6 @@ type Props = {
   note?: string;
   onPress?: () => void;
   leading?: React.ReactNode;
-  last?: boolean;
 };
 
 export function Row({ title, subtitle, note, onPress, leading }: Props) {

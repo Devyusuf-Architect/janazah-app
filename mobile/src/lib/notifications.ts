@@ -96,6 +96,9 @@ export async function ensureChannel(): Promise<void> {
     importance: Notifications.AndroidImportance.HIGH,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     vibrationPattern: [0, 250, 250, 250],
+    // The notification LED and accent. A literal because the system reads it
+    // when the app is not running and there is no theme to ask; it matches
+    // the accent in app.config.ts and the tint the server sends.
     lightColor: '#14503f',
   });
 }

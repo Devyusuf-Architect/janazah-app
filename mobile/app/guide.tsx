@@ -9,28 +9,20 @@
 // moments before praying.
 
 import React from 'react';
-import { View } from 'react-native';
-import { router, Stack } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 
 import { Screen, ScreenScroll } from '../src/components/Screen';
-import { Button } from '../src/components/Button';
+import { ScreenHeader } from '../src/components/ScreenHeader';
 import { GuideBody } from '../src/features/guide/GuideBody';
-import { space } from '../src/theme';
 
 export default function GuideScreen() {
-  const insets = useSafeAreaInsets();
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Salat al-Janazah' }} />
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
-        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          />
-        </View>
+      <ScreenHeader />
+      {/* The guide carries its own title, at the top of GuideBody, so this
+          screen deliberately does not add a second one. */}
+      <ScreenScroll>
         <GuideBody />
       </ScreenScroll>
     </Screen>

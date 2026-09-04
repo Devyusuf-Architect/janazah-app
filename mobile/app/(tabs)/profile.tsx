@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../../src/components/Screen';
+import { PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Surface, Divider } from '../../src/components/Surface';
 import { Button } from '../../src/components/Button';
@@ -43,8 +44,8 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.lg }}>
+        <PageTitle title="Profile" />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Text variant="display" serif>Profile</Text>
 
           <Surface padded style={{ gap: space.md }}>
             {signedIn ? (

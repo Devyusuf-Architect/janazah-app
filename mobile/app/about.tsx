@@ -15,14 +15,13 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen, ScreenScroll } from '../src/components/Screen';
+import { ScreenHeader, PageTitle } from '../src/components/ScreenHeader';
 import { Text } from '../src/components/Text';
-import { Button } from '../src/components/Button';
 import { Surface, Divider } from '../src/components/Surface';
 import { Row } from '../src/components/Row';
 import { space } from '../src/theme';
@@ -39,22 +38,16 @@ const open = (path: string) =>
   WebBrowser.openBrowserAsync(`${SITE}${path}`).catch(() => {});
 
 export default function AboutScreen() {
-  const insets = useSafeAreaInsets();
   const version = Constants.expoConfig?.version ?? '';
 
   return (
     <Screen>
       <Stack.Screen options={{ title: 'About' }} />
-      <ScreenScroll contentContainerStyle={{ paddingTop: insets.top + space.md }}>
+      <ScreenHeader />
+      <ScreenScroll>
+        <PageTitle title="Ta’ziyah" />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Button
-            label="Back"
-            size="compact"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          />
-
           <View style={{ gap: space.sm }}>
-            <Text variant="display" serif>Ta’ziyah</Text>
             <Text variant="body" tone="muted">
               Janazah information is scattered across group chats, masjid
               announcements and word of mouth. People miss funerals they would

@@ -16,6 +16,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../../src/components/Screen';
+import { PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Button } from '../../src/components/Button';
 import { Surface, Divider } from '../../src/components/Surface';
@@ -81,8 +82,8 @@ export default function FollowingScreen() {
           />
         )}
       >
+        <PageTitle title="Following" />
         <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
-          <Text variant="display" serif>Following</Text>
 
           {follows.ids.length ? (
             <View

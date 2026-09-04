@@ -18,6 +18,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
+import { ScreenHeader, PageTitle } from '../src/components/ScreenHeader';
 import { Text } from '../src/components/Text';
 import { Button } from '../src/components/Button';
 import { Surface, Divider } from '../src/components/Surface';
@@ -46,15 +47,15 @@ export default function AlertsScreen() {
 
   return (
     <Screen>
+      <ScreenHeader />
       <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + space.lg,
-          paddingBottom: insets.bottom + space.xxl,
-        }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + space.xxl }}
       >
+        <PageTitle
+          title="Alerts"
+          subtitle="What reaches this phone, and where it comes from."
+        />
         <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
-          <Text variant="display" serif>Alerts</Text>
-
           {!alerts.ready ? <Loading label="Loading" /> : null}
 
           {alerts.ready && !alerts.on ? (

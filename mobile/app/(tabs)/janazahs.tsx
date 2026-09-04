@@ -22,6 +22,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../../src/components/Screen';
+import { PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
 import { Empty, ErrorState } from '../../src/components/States';
@@ -102,22 +103,16 @@ export default function JanazahsScreen() {
 
   return (
     <Screen>
-      <View
-        style={{
-          paddingTop: insets.top + space.md,
-          paddingHorizontal: space.lg,
-          paddingBottom: space.md,
-          gap: space.md,
-          backgroundColor: colors.bg,
-        }}
-      >
-        <Text variant="display" serif>Janazahs</Text>
-        <SearchBar
-          ref={input}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Masjid, city, or a name"
-        />
+      <View style={{ paddingTop: insets.top + space.lg, backgroundColor: colors.bg }}>
+        <PageTitle title="Janazahs" />
+        <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
+          <SearchBar
+            ref={input}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Masjid, city, or a name"
+          />
+        </View>
       </View>
 
       <ConnectionBanner
