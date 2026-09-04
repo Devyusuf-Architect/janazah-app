@@ -15,6 +15,7 @@ import { Stack } from 'expo-router';
 import { Screen, ScreenScroll } from '../../src/components/Screen';
 import { ScreenHeader, PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
+import { FadeInView } from '../../src/components/Motion';
 import { Surface } from '../../src/components/Surface';
 import { STEPS, type Pair } from '../../src/shared/guide';
 import { space } from '../../src/theme';
@@ -26,7 +27,7 @@ export default function GuideBeforeScreen() {
       <ScreenHeader />
       <ScreenScroll>
         <PageTitle title="Before the prayer" />
-        <View style={{ paddingHorizontal: space.lg, gap: space.xl }}>
+        <FadeInView style={{ paddingHorizontal: space.lg, gap: space.xl }}>
           {STEPS.map((step) => (
             <View key={step.number} style={{ gap: space.md }}>
               <Text variant="heading">{step.title}</Text>
@@ -47,7 +48,7 @@ export default function GuideBeforeScreen() {
               ) : null}
             </View>
           ))}
-        </View>
+        </FadeInView>
       </ScreenScroll>
     </Screen>
   );

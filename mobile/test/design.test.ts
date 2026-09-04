@@ -123,6 +123,18 @@ test('no screen ships its own back button any more', () => {
   assert.deepEqual(offenders, []);
 });
 
+test('the development banner cannot reach a release build', () => {
+  // It names the backend and the emulator host, which is useful in
+  // development and noise on a shipped app. The guard has to be an early
+  // return on __DEV__ so the minifier drops the branch entirely.
+  const banner = read(resolve(root, 'src/components/DevBanner.tsx'));
+  assert.match(banner, /if \(!__DEV__[^)]*\) return null;/);
+
+  // And nothing else renders it conditionally on something weaker.
+  const layout = read(resolve(root, 'app/_layout.tsx'));
+  assert.ok(layout.includes('<DevBanner />'), 'the banner is no longer mounted');
+});
+
 test('no screen builds its own bottom sheet', () => {
   // src/components/Sheet.tsx owns the scrim, the grabber and the
   // reduce-motion behaviour. Three screens had drifting copies of it once.

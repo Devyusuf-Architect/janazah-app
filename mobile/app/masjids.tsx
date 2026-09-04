@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../src/components/Screen';
 import { ScreenHeader, PageTitle } from '../src/components/ScreenHeader';
 import { NoticeSkeletonList } from '../src/components/Skeleton';
+import { RowIn } from '../src/components/Motion';
 import { SearchBar } from '../src/features/notices/SearchBar';
 import { Text } from '../src/components/Text';
 import { Divider } from '../src/components/Surface';
@@ -90,8 +91,9 @@ export default function MasjidsScreen() {
               />
             </View>
           )}
-          renderItem={({ item }) => (
-            <View
+          renderItem={({ item, index }) => (
+            <RowIn
+              index={index < 8 ? index : -1}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -113,7 +115,7 @@ export default function MasjidsScreen() {
                 </Text>
               </View>
               <FollowButton orgId={item.id} />
-            </View>
+            </RowIn>
           )}
         />
       ) : null}

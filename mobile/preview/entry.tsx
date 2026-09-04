@@ -170,6 +170,41 @@ function StepperOpen() {
   return <Stepper initiallyOpen={3} />;
 }
 
+/**
+ * The dev banner's two states, drawn directly.
+ *
+ * The real component returns null unless __DEV__, which the harness bundle
+ * sets true, but it also positions itself absolutely over the status bar. It
+ * is reproduced here inline so both states can sit in the gallery.
+ */
+function DevStrip({ live }: { live: boolean }) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        paddingVertical: 3,
+        paddingHorizontal: space.md,
+        alignItems: 'center',
+        backgroundColor: live ? colors.accent : colors.gold,
+      }}
+    >
+      <Text
+        numberOfLines={1}
+        style={{
+          fontSize: 11,
+          lineHeight: 14,
+          fontWeight: '700',
+          color: live ? colors.onAccent : colors.goldSoft,
+        }}
+      >
+        {live
+          ? 'DEV BUILD · live Firebase project'
+          : 'DEV BUILD · emulators at 10.0.2.2 · not live data'}
+      </Text>
+    </View>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const colors = useColors();
   return (
@@ -263,6 +298,17 @@ function Gallery() {
       <Section title="The guide link">
         <View style={{ padding: space.lg }}>
           <GuideLink />
+        </View>
+      </Section>
+
+      <Section title="The development banner">
+        {/* Rendered here at its two states. In the app it appears only in a
+            development build and only at the very top of the screen. */}
+        <View style={{ height: 44, justifyContent: 'center' }}>
+          <DevStrip live={false} />
+        </View>
+        <View style={{ height: 44, justifyContent: 'center' }}>
+          <DevStrip live />
         </View>
       </Section>
 

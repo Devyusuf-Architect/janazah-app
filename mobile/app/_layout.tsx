@@ -24,9 +24,10 @@ import { FollowsProvider } from '../src/features/following/useFollows';
 import { LocationProvider } from '../src/features/nearby/useLocation';
 import { useNotificationRouting } from '../src/features/alerts/useNotificationRouting';
 import { useAuthGate } from '../src/features/launch/AuthGate';
+import { DevBanner } from '../src/components/DevBanner';
 import { initSampleMode } from '../src/lib/sample';
 import { ThemeProvider, useTheme } from '../src/theme';
-import { useReduceMotion } from '../src/theme/motion';
+import { motion, useReduceMotion } from '../src/theme/motion';
 
 // Connected at module scope so it happens before the first query, and only
 // ever once. The function is itself idempotent for Fast Refresh.
@@ -81,14 +82,32 @@ function Chrome() {
           // Reduce motion turns screen transitions off rather than shortening
           // them. Somebody who asked for no animation asked for no animation.
           animation: reduce ? 'none' : 'slide_from_right',
-          animationDuration: 260,
+          animationDuration: motion.slow,
+          // The screen behind travels a little as the new one covers it,
+          // rather than sitting still under a sliding sheet. It is what makes
+          // a push read as one movement instead of two surfaces.
+          animationTypeForReplace: 'push',
+          gestureEnabled: !reduce,
+          // A screen that is not visible stops re-rendering. Firestore
+          // listeners and timers are already scoped to focus; this covers the
+          // rest.
+          freezeOnBlur: true,
         }}
       >
         {/* The splash, the welcome panels and sign-in. Not behind the gate,
             because this is where somebody goes to get past it. */}
-        <Stack.Screen name="(launch)" options={{ animation: 'fade' }} />
+        <Stack.Screen
+          name="(launch)"
+          options={{ animation: 'fade', animationDuration: motion.slow }}
+        />
 
-        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        {/* Entering and leaving the app itself fades rather than slides.
+            There is no "back" from the splash to sign-in, so a horizontal
+            movement would imply a stack that does not exist. */}
+        <Stack.Screen
+          name="(tabs)"
+          options={{ animation: 'fade', animationDuration: motion.slow }}
+        />
         <Stack.Screen
           name="n/[id]"
           options={{ animation: reduce ? 'none' : 'slide_from_bottom' }}
@@ -100,6 +119,12 @@ function Chrome() {
         <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="delete-account" options={{ presentation: 'modal' }} />
       </Stack>
+
+      {/* Development only, and it says which backend is connected. See
+          src/components/DevBanner.tsx: a dev build talks to the local
+          emulators by default, and with none running that is
+          indistinguishable from a broken app. */}
+      <DevBanner />
     </>
   );
 }

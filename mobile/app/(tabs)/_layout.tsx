@@ -19,6 +19,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 
 import { TabBar } from '../../src/components/TabBar';
+import { motion, useReduceMotion } from '../../src/theme/motion';
 
 const TABS: { name: string; title: string }[] = [
   { name: 'index', title: 'Home' },
@@ -29,12 +30,29 @@ const TABS: { name: string; title: string }[] = [
 ];
 
 export default function TabsLayout() {
+  const reduce = useReduceMotion();
+
   return (
     <Tabs
       // The bar is drawn by src/components/TabBar.tsx. See the note there for
       // why the default one was not enough.
       tabBar={(props) => <TabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        // A cross-fade rather than a slide. Tabs are siblings, not a
+        // hierarchy, and sliding between them implies a direction that does
+        // not exist. Short, because this happens more often than any other
+        // transition in the app.
+        animation: reduce ? 'none' : 'fade',
+        // An inactive tab stops re-rendering. Five tabs stay mounted once
+        // visited, and four of them re-rendering behind a cross-fade is
+        // exactly the kind of thing that costs frames on a mid-range phone.
+        freezeOnBlur: true,
+        transitionSpec: {
+          animation: 'timing',
+          config: { duration: motion.fast },
+        },
+      }}
     >
       {TABS.map(({ name, title }) => (
         <Tabs.Screen key={name} name={name} options={{ title }} />

@@ -17,7 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useColors, radius, space } from '../theme';
-import { useReduceMotion } from '../theme/motion';
+import { exitScreen, useReduceMotion } from '../theme/motion';
 
 const SWEEP_MS = 1400;
 
@@ -74,11 +74,19 @@ export function NoticeSkeleton() {
   );
 }
 
-/** A screenful of them. */
+/**
+ * A screenful of them.
+ *
+ * It fades out as it is replaced rather than vanishing on the frame the data
+ * arrives. The rows that take its place fade in with a stagger (RowIn), so
+ * the handoff reads as one movement instead of a flash of empty background
+ * between two layouts.
+ */
 export function NoticeSkeletonList({ count = 4 }: { count?: number }) {
   const colors = useColors();
+  const reduce = useReduceMotion();
   return (
-    <View>
+    <Animated.View exiting={exitScreen(reduce)}>
       {Array.from({ length: count }).map((_, index) => (
         <View key={index}>
           {index > 0 ? (
@@ -89,7 +97,7 @@ export function NoticeSkeletonList({ count = 4 }: { count?: number }) {
           <NoticeSkeleton />
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 

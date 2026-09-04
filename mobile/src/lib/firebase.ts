@@ -25,7 +25,7 @@ import { getFirestore, connectFirestoreEmulator } from '@react-native-firebase/f
  * A real device on the same network needs the machine's LAN address instead,
  * which is what EXPO_PUBLIC_EMULATOR_HOST is for.
  */
-const emulatorHost = process.env.EXPO_PUBLIC_EMULATOR_HOST
+export const emulatorHost = process.env.EXPO_PUBLIC_EMULATOR_HOST
   ?? (Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1');
 
 export const usingEmulator =

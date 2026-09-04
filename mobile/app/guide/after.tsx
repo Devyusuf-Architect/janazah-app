@@ -14,6 +14,7 @@ import { Stack } from 'expo-router';
 import { Screen, ScreenScroll } from '../../src/components/Screen';
 import { ScreenHeader, PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
+import { FadeInView } from '../../src/components/Motion';
 import { AFTER, type Pair } from '../../src/shared/guide';
 import { space } from '../../src/theme';
 
@@ -24,7 +25,7 @@ export default function GuideAfterScreen() {
       <ScreenHeader />
       <ScreenScroll>
         <PageTitle title={AFTER.heading} />
-        <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
+        <FadeInView style={{ paddingHorizontal: space.lg, gap: space.lg }}>
           {AFTER.body ? <Text variant="body">{AFTER.body}</Text> : null}
           {AFTER.points?.map((point: Pair) => (
             <View key={point[0]} style={{ gap: space.xs }}>
@@ -32,7 +33,7 @@ export default function GuideAfterScreen() {
               <Text variant="body" tone="muted">{point[1]}</Text>
             </View>
           ))}
-        </View>
+        </FadeInView>
       </ScreenScroll>
     </Screen>
   );

@@ -19,6 +19,7 @@ import { Stack } from 'expo-router';
 import { Screen, ScreenScroll } from '../../src/components/Screen';
 import { ScreenHeader, PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
+import { FadeInView } from '../../src/components/Motion';
 import { SCHOOLS_NOTE, SCOPE_NOTE } from '../../src/shared/guide';
 import { space } from '../../src/theme';
 
@@ -29,14 +30,14 @@ export default function GuideSourcesScreen() {
       <ScreenHeader />
       <ScreenScroll>
         <PageTitle title="Sources and the schools of law" />
-        <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
+        <FadeInView style={{ paddingHorizontal: space.lg, gap: space.lg }}>
           <Text variant="body">{SCHOOLS_NOTE}</Text>
           <Text variant="body">{SCOPE_NOTE}</Text>
           <Text variant="callout" tone="muted">
             Each recitation in the prayer carries its own source, shown with it
             when you open that takbir.
           </Text>
-        </View>
+        </FadeInView>
       </ScreenScroll>
     </Screen>
   );
