@@ -24,7 +24,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
-import { Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { Empty, ErrorState } from '../../src/components/States';
+import {
+  ConnectionBanner, SlowNotice, useSlowLoad,
+} from '../../src/components/Connection';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import { RowIn } from '../../src/components/Motion';
 import { SearchBar } from '../../src/features/notices/SearchBar';
@@ -34,6 +37,7 @@ import { useLocation } from '../../src/features/nearby/useLocation';
 import { useUpcomingNotices } from '../../src/lib/queries';
 import { annotate } from '../../src/lib/nearby';
 import { groupByDay } from '../../src/lib/grouping';
+import { connectionOf } from '../../src/lib/connectivity';
 import { search } from '../../src/lib/search';
 import type { Notice } from '../../src/lib/notice';
 import { space, useColors } from '../../src/theme';
@@ -59,6 +63,7 @@ export default function JanazahsScreen() {
     [data],
   );
   const stale = data?.pages.some((page) => page.stale) ?? false;
+  const slow = useSlowLoad(isPending);
 
   const results = useMemo(
     () => (query.trim() ? search(all, query) : all),
@@ -115,9 +120,14 @@ export default function JanazahsScreen() {
         />
       </View>
 
-      {stale ? <StaleBanner onRetry={refetch} /> : null}
+      <ConnectionBanner
+        connection={connectionOf({
+          isPending, isError, fromCache: stale, hasContent: all.length > 0,
+        })}
+        onRetry={refetch}
+      />
 
-      {isError ? (
+      {isError && all.length === 0 ? (
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg }}>
           <ErrorState
             message="Notices could not be loaded. You may be offline."
@@ -125,7 +135,10 @@ export default function JanazahsScreen() {
           />
         </View>
       ) : isPending ? (
-        <NoticeSkeletonList count={5} />
+        <>
+          <NoticeSkeletonList count={5} />
+          {slow ? <SlowNotice onRetry={refetch} /> : null}
+        </>
       ) : (
         <SectionList
           sections={sections}

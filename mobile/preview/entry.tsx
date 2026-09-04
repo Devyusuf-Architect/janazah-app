@@ -25,10 +25,13 @@ import { Button } from '../src/components/Button';
 import { Surface, Divider } from '../src/components/Surface';
 import { Badge, VerifiedBadge } from '../src/components/Badge';
 import { Row } from '../src/components/Row';
-import { Empty, ErrorState, StaleBanner, Loading } from '../src/components/States';
+import { Empty, ErrorState, Loading } from '../src/components/States';
+import { ConnectionBanner, SlowNotice } from '../src/components/Connection';
 import { Field } from '../src/components/Field';
 import { NoticeRow } from '../src/features/notices/NoticeRow';
 import { NoticeDetail } from '../src/features/notices/NoticeDetail';
+import { TimePanel } from '../src/features/notices/TimePanel';
+import { ScreenHeader } from '../src/components/ScreenHeader';
 import { LocationGate } from '../src/features/nearby/LocationGate';
 import { GuideBody } from '../src/features/guide/GuideBody';
 import { BrandGround } from '../src/features/launch/BrandGround';
@@ -305,6 +308,17 @@ function Gallery() {
         </View>
       </Section>
 
+      <Section title="Screen header">
+        <ScreenHeader title="Masjids" />
+      </Section>
+
+      <Section title="The time panel">
+        <View style={{ padding: space.lg, gap: space.lg }}>
+          <TimePanel notice={base} cancelled={false} />
+          <TimePanel notice={NOTICES[2]!.notice} cancelled />
+        </View>
+      </Section>
+
       <Section title="Notice detail">
         <View style={{ paddingVertical: space.lg }}>
           <NoticeDetail
@@ -400,7 +414,9 @@ function Gallery() {
 
       <Section title="States">
         <View style={{ gap: space.lg, paddingVertical: space.md }}>
-          <StaleBanner onRetry={() => {}} />
+          <ConnectionBanner connection="cached" onRetry={() => {}} />
+          <ConnectionBanner connection="unreachable" onRetry={() => {}} />
+          <SlowNotice onRetry={() => {}} />
           <View style={{ paddingHorizontal: space.lg }}>
             <Empty message="No Janazah notices have been published for the days ahead." />
             <ErrorState

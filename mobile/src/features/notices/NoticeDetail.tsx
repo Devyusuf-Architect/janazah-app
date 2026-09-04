@@ -12,12 +12,13 @@
 //   5. The burial, and how to get there.
 //   6. Parking and anything else the masjid said.
 //   7. The masjid, and what the verified mark actually means.
-//   8. Share, and saying something is wrong.
+//   8. A reminder, and saying something is wrong. Share is a header action.
 //
 // Nothing decorative goes above item 3.
 
 import React from 'react';
 import { Share, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { Text } from '../../components/Text';
 import { Button } from '../../components/Button';
@@ -25,6 +26,7 @@ import { Surface, Divider } from '../../components/Surface';
 import { VerifiedBadge } from '../../components/Badge';
 import { FollowButton } from '../following/FollowButton';
 import { ReminderButton } from '../alerts/ReminderButton';
+import { TimePanel } from './TimePanel';
 import { useColors, space, radius } from '../../theme';
 import { formatNoticeTime, timeSentence } from '../../lib/time';
 import {
@@ -33,6 +35,30 @@ import {
 } from '../../lib/notice';
 
 const SITE = 'https://taziyah.com';
+
+/**
+ * Shares a notice as plain text with the link last.
+ *
+ * Exported because the share action lives in the screen's header, where a
+ * one-tap action belongs, rather than in a row of buttons at the bottom. The
+ * shape of the message is the point: it has to be readable in a WhatsApp
+ * group, which is where most of this actually travels, and it must not lead
+ * with a link that some clients turn into a card and others do not.
+ */
+export function shareNotice(notice: Notice): void {
+  const time = formatNoticeTime(notice);
+  const name = displayName(notice);
+  const message = [
+    name ? `Janazah for ${name}` : 'Janazah',
+    isCancelled(notice) ? 'CANCELLED' : '',
+    timeSentence(time),
+    notice.prayerLocation?.name,
+    notice.prayerLocation?.address,
+    notice.orgName,
+    `${SITE}/n/${notice.id}`,
+  ].filter(Boolean).join('\n');
+  Share.share({ message }).catch(() => {});
+}
 
 export type NoticeDetailProps = {
   notice: Notice;
@@ -44,8 +70,6 @@ export type NoticeDetailProps = {
 export function NoticeDetail({
   notice, verified, onDirections, onReport,
 }: NoticeDetailProps) {
-  const colors = useColors();
-  const time = formatNoticeTime(notice);
   const name = displayName(notice);
   const cancelled = isCancelled(notice);
 
@@ -70,44 +94,17 @@ export function NoticeDetail({
       ) : null}
 
       {/* 2. The time. */}
-      <View accessible accessibilityLabel={`Janazah ${timeSentence(time)}`}>
-        <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase' }}>
-          Janazah prayer
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row', alignItems: 'baseline',
-            flexWrap: 'wrap', gap: space.sm, marginTop: space.xs,
-          }}
-        >
-          <Text
-            variant="display"
-            serif
-            style={cancelled ? { textDecorationLine: 'line-through' } : undefined}
-          >
-            {time.day}
-          </Text>
-          <Text
-            variant="display"
-            serif
-            tone={cancelled ? 'subtle' : 'default'}
-            style={cancelled ? { textDecorationLine: 'line-through' } : undefined}
-          >
-            {time.time}
-          </Text>
-          {time.zone ? <Text variant="callout" tone="muted">{time.zone}</Text> : null}
-        </View>
-        {time.label ? (
-          <Text variant="callout" tone="muted">{time.label}</Text>
-        ) : null}
-      </View>
+      <TimePanel notice={notice} cancelled={cancelled} />
 
-      {/* 3. Where to pray. */}
+      {/* 3. Where to pray. Directions is demoted on a cancelled notice: a
+          full-width green button under a cancellation invites somebody to
+          drive to a Janazah that is not happening. */}
       {notice.prayerLocation ? (
         <PlaceBlock
           heading="Prayer"
           place={notice.prayerLocation}
           onDirections={onDirections}
+          primary={!cancelled}
         />
       ) : null}
 
@@ -172,36 +169,18 @@ export function NoticeDetail({
           {/* Following from here, because this is where somebody decides a
               masjid matters to them: they came for one funeral and want to
               hear about the next. */}
-          <View style={{ flexDirection: 'row', paddingTop: space.xs }}>
-            <FollowButton orgId={notice.orgId} />
+          <View style={{ paddingTop: space.xs }}>
+            <FollowButton orgId={notice.orgId} size="regular" full />
           </View>
         </Surface>
       </View>
 
-      {/* 8. Share, and saying something is wrong. */}
+      {/* 8. A reminder, and saying something is wrong. Share is in the
+          header, where a one-tap action belongs. */}
       <Divider />
       <View style={{ flexDirection: 'row', gap: space.md, flexWrap: 'wrap' }}>
-        <Button
-          label="Share"
-          onPress={() => {
-            const line = [
-              name ? `Janazah for ${name}` : 'Janazah',
-              timeSentence(time),
-              notice.prayerLocation?.name,
-              notice.prayerLocation?.address,
-              notice.orgName,
-              `${SITE}/n/${notice.id}`,
-            ].filter(Boolean).join('\n');
-            // Shared as text with the link last, so it is readable in a
-            // WhatsApp group, which is where most of this actually travels.
-            Share.share({ message: line }).catch(() => {});
-          }}
-        />
         <ReminderButton notice={notice} />
-        <Button
-          label="Report a problem"
-          onPress={onReport}
-        />
+        <Button label="Report a problem" onPress={onReport} />
       </View>
 
       <Text variant="caption" tone="subtle">
@@ -212,28 +191,48 @@ export function NoticeDetail({
   );
 }
 
-function PlaceBlock({ heading, place, onDirections }: {
+function PlaceBlock({ heading, place, onDirections, primary = false }: {
   heading: string;
   place: Place;
   onDirections: (place: Place) => void;
+  /** The prayer location. Its Directions button is the one people press. */
+  primary?: boolean;
 }) {
+  const colors = useColors();
+
   return (
     <View>
       <Text variant="overline" tone="subtle" style={{ textTransform: 'uppercase' }}>
         {heading}
       </Text>
-      <View style={{ marginTop: space.xs, gap: space.sm }}>
+      <Surface level={primary ? 'raised' : 'flat'} padded style={{ marginTop: space.sm, gap: space.sm }}>
         {place.name ? <Text variant="bodyStrong">{place.name}</Text> : null}
         {place.address ? (
           <Text variant="body" tone="muted">{place.address}</Text>
         ) : null}
         <Button
           label="Directions"
-          kind="primary"
-          size="compact"
+          kind={primary ? 'primary' : 'secondary'}
+          size={primary ? 'regular' : 'compact'}
+          full={primary}
           onPress={() => onDirections(place)}
+          accessibilityHint="Opens your maps app"
+          icon={(
+            <Svg width={18} height={18} viewBox="0 0 24 24">
+              <Path
+                d="M12 21s6.5-5.6 6.5-10.2A6.5 6.5 0 0 0 5.5 10.8C5.5 15.4 12 21 12 21z"
+                stroke={primary ? colors.onAccent : colors.ink}
+                strokeWidth={1.7} strokeLinejoin="round" fill="none"
+              />
+              <Circle
+                cx="12" cy="10.6" r="2.3"
+                stroke={primary ? colors.onAccent : colors.ink}
+                strokeWidth={1.7} fill="none"
+              />
+            </Svg>
+          )}
         />
-      </View>
+      </Surface>
     </View>
   );
 }

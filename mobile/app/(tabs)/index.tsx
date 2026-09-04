@@ -18,7 +18,10 @@ import { router, useFocusEffect } from 'expo-router';
 import { Screen, ScreenScroll } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
-import { Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { Empty, ErrorState } from '../../src/components/States';
+import {
+  ConnectionBanner, SlowNotice, useSlowLoad,
+} from '../../src/components/Connection';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import { RowIn } from '../../src/components/Motion';
 import { HomeHeader } from '../../src/features/home/HomeHeader';
@@ -34,6 +37,7 @@ import { useLocation } from '../../src/features/nearby/useLocation';
 import { useFollows } from '../../src/features/following/useFollows';
 import { useUpcomingNotices, useNoticesFromOrgs } from '../../src/lib/queries';
 import { nearbyNotices, annotate } from '../../src/lib/nearby';
+import { connectionOf } from '../../src/lib/connectivity';
 import { isCancelled, isCorrected, type Notice } from '../../src/lib/notice';
 import type { MapDestination } from '../../src/shared/geo';
 import { space, useColors } from '../../src/theme';
@@ -59,6 +63,7 @@ export default function HomeScreen() {
     [data],
   );
   const stale = data?.pages.some((page) => page.stale) ?? false;
+  const slow = useSlowLoad(isPending);
 
   // Distances for every row, and the subset that is actually close. Both are
   // computed here, on the device, from a point that never leaves it.
@@ -114,11 +119,12 @@ export default function HomeScreen() {
 
         <SampleBanner />
 
-        {stale ? (
-          <View style={{ paddingTop: space.md }}>
-            <StaleBanner onRetry={refetch} />
-          </View>
-        ) : null}
+        <ConnectionBanner
+          connection={connectionOf({
+            isPending, isError, fromCache: stale, hasContent: notices.length > 0,
+          })}
+          onRetry={refetch}
+        />
 
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.lg }}>
           <CoordinatorCard />
@@ -144,7 +150,12 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        {isPending ? <NoticeSkeletonList count={4} /> : null}
+        {isPending ? (
+          <>
+            <NoticeSkeletonList count={4} />
+            {slow ? <SlowNotice onRetry={refetch} /> : null}
+          </>
+        ) : null}
 
         {updates.length ? (
           <>

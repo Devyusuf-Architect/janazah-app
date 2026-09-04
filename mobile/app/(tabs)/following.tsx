@@ -20,13 +20,18 @@ import { Text } from '../../src/components/Text';
 import { Button } from '../../src/components/Button';
 import { Surface, Divider } from '../../src/components/Surface';
 import { Row } from '../../src/components/Row';
-import { Loading, Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { Loading, Empty, ErrorState } from '../../src/components/States';
+import { NoticeSkeletonList } from '../../src/components/Skeleton';
+import {
+  ConnectionBanner, SlowNotice, useSlowLoad,
+} from '../../src/components/Connection';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { FollowButton } from '../../src/features/following/FollowButton';
 import { useFollows } from '../../src/features/following/useFollows';
 import { useLocation } from '../../src/features/nearby/useLocation';
 import { useNoticesFromOrgs, useVerifiedOrganizations } from '../../src/lib/queries';
 import { annotate } from '../../src/lib/nearby';
+import { connectionOf } from '../../src/lib/connectivity';
 import { useAuth } from '../../src/lib/auth';
 import type { Notice } from '../../src/lib/notice';
 import { space, useColors } from '../../src/theme';
@@ -58,6 +63,7 @@ export default function FollowingScreen() {
 
   const open = (notice: Notice) => router.push(`/n/${notice.id}`);
   const signedIn = !!user && !isAnonymous;
+  const slow = useSlowLoad(notices.isPending);
 
   return (
     <Screen>
@@ -147,11 +153,24 @@ export default function FollowingScreen() {
 
         {follows.ids.length ? (
           <>
-            {notices.data?.stale ? <StaleBanner onRetry={notices.refetch} /> : null}
+            <ConnectionBanner
+              connection={connectionOf({
+                isPending: notices.isPending,
+                isError: notices.isError,
+                fromCache: notices.data?.stale ?? false,
+                hasContent: (notices.data?.notices.length ?? 0) > 0,
+              })}
+              onRetry={notices.refetch}
+            />
 
-            {notices.isPending ? <Loading label="Loading notices" /> : null}
+            {notices.isPending ? (
+              <>
+                <NoticeSkeletonList count={3} />
+                {slow ? <SlowNotice onRetry={notices.refetch} /> : null}
+              </>
+            ) : null}
 
-            {notices.isError ? (
+            {notices.isError && !notices.data ? (
               <View style={{ paddingHorizontal: space.lg }}>
                 <ErrorState
                   message="These notices could not be loaded. You may be offline."

@@ -11,11 +11,12 @@
 // nothing in the shared modules changed for this.
 
 import React, { useEffect, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 
 import { connectEmulators } from '../src/lib/firebase';
 import { AuthProvider } from '../src/lib/auth';
@@ -30,6 +31,21 @@ import { useReduceMotion } from '../src/theme/motion';
 // Connected at module scope so it happens before the first query, and only
 // ever once. The function is itself idempotent for Fast Refresh.
 connectEmulators();
+
+// Coming back to the app is what stands in for "the connection returned".
+//
+// The app deliberately does not watch the network state: that would mean
+// ACCESS_NETWORK_STATE and a dependency for a question Firestore already
+// answers on every read (see src/lib/connectivity.ts). What it can watch for
+// free is the app itself becoming active, which is when somebody is looking,
+// and which covers the case the brief cared about: walking out of a basement
+// car park and reopening Ta'ziyah.
+//
+// TanStack Query has refetchOnWindowFocus on, and this is what gives it a
+// window to focus on a phone.
+AppState.addEventListener('change', (status: AppStateStatus) => {
+  focusManager.setFocused(status === 'active');
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {

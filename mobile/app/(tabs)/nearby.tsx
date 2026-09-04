@@ -18,7 +18,11 @@ import { Screen } from '../../src/components/Screen';
 import { Text } from '../../src/components/Text';
 import { Button } from '../../src/components/Button';
 import { Divider } from '../../src/components/Surface';
-import { Loading, Empty, ErrorState, StaleBanner } from '../../src/components/States';
+import { Loading, Empty, ErrorState } from '../../src/components/States';
+import { NoticeSkeletonList } from '../../src/components/Skeleton';
+import {
+  ConnectionBanner, SlowNotice, useSlowLoad,
+} from '../../src/components/Connection';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { LocationGate } from '../../src/features/nearby/LocationGate';
 import { RadiusSheet } from '../../src/features/nearby/RadiusSheet';
@@ -27,6 +31,7 @@ import { NearbyMap, mapAvailable } from '../../src/features/nearby/NearbyMap';
 import { useLocation } from '../../src/features/nearby/useLocation';
 import { useUpcomingNotices } from '../../src/lib/queries';
 import { nearbyNotices } from '../../src/lib/nearby';
+import { connectionOf } from '../../src/lib/connectivity';
 import { RADIUS_OPTIONS } from '../../src/lib/nearby';
 import type { Notice } from '../../src/lib/notice';
 import { space, useColors } from '../../src/theme';
@@ -48,6 +53,7 @@ export default function NearbyScreen() {
     [data],
   );
   const feedStale = data?.pages.some((page) => page.stale) ?? false;
+  const slow = useSlowLoad(isPending);
 
   const results = useMemo(
     () => nearbyNotices(notices, location.point, location.prefs.radiusKm),
@@ -151,11 +157,22 @@ export default function NearbyScreen() {
             </View>
           ) : null}
 
-          {feedStale ? <StaleBanner onRetry={refetch} /> : null}
+          <ConnectionBanner
+            connection={connectionOf({
+              isPending, isError, fromCache: feedStale,
+              hasContent: notices.length > 0,
+            })}
+            onRetry={refetch}
+          />
 
-          {isPending ? <Loading label="Loading notices" /> : null}
+          {isPending ? (
+            <>
+              <NoticeSkeletonList count={3} />
+              {slow ? <SlowNotice onRetry={refetch} /> : null}
+            </>
+          ) : null}
 
-          {isError ? (
+          {isError && notices.length === 0 ? (
             <View style={{ paddingHorizontal: space.lg }}>
               <ErrorState
                 message="Notices could not be loaded. You may be offline."
