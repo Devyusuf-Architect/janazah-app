@@ -57,6 +57,15 @@ export function renderAbout(mount) {
       '.',
     ]),
 
+    // The introduction shown once, automatically, on a first visit. Visiting
+    // it here on purpose does not reset that: it is a plain navigation, not
+    // a flag write, so a returning visitor who wants to see it again can,
+    // without it starting to interrupt them on future visits.
+    el('p', { class: 'muted' }, [
+      el('a', { class: 'link', href: '/welcome', text: 'How Ta’ziyah works' }),
+      ', from the start.',
+    ]),
+
     // Only appears once a platform administrator has set a support address
     // in Platform Settings; there is nothing useful to show before then.
     platformSettings().supportEmail

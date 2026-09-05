@@ -691,6 +691,10 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   background: var(--accent);
   color: var(--surface);
 }
+/* The brief window before auth state resolves: neither the signed-out icon
+   nor the signed-in initials are known yet, so neither is shown. See
+   renderBottomNav in nav.js. */
+.bottom-nav__avatar--placeholder { background: var(--bg-sunk); }
 
 /* Below the same breakpoint, the console's horizontal bar becomes an
    off-canvas drawer too, opened by #console-nav-toggle. Its own block, not
@@ -1389,6 +1393,30 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
     box-shadow: var(--shadow-sm);
   }
   .tabs.tabs--plain .slider { background: var(--surface); box-shadow: var(--shadow-sm); }
+
+  /* All four tabs do not fit a narrow phone even after .tabs--plain opts out
+     of the bottom-bar treatment above; the row scrolls within itself
+     (contained by .tabs's own overflow-x: auto, so the page itself never
+     gains horizontal scroll -- confirmed at 320/375/390/430px). What was
+     missing was a way to tell there is more to reach. This is the standard
+     CSS-only "scroll shadow": two solid gradients painted at the scrolling
+     content's own position (background-attachment: local) cover two fixed
+     shadow gradients (background-attachment: scroll) except right at each
+     edge, so a shadow only shows on the side that still has unseen content,
+     and both disappear on their own once scrolled all the way to that end.
+     No JavaScript, and nothing to keep in sync with scroll position. */
+  .tabs.tabs--plain {
+    background-image:
+      linear-gradient(to right, var(--bg-sunk) 50%, transparent),
+      linear-gradient(to left, var(--bg-sunk) 50%, transparent),
+      linear-gradient(to right, color-mix(in srgb, var(--ink) 16%, transparent), transparent),
+      linear-gradient(to left, color-mix(in srgb, var(--ink) 16%, transparent), transparent);
+    background-repeat: no-repeat;
+    background-color: var(--bg-sunk);
+    background-size: 1.4rem 100%, 1.4rem 100%, .8rem 100%, .8rem 100%;
+    background-position: left, right, left, right;
+    background-attachment: local, local, scroll, scroll;
+  }
 }
 
 /* ---------- the notice ---------- */
@@ -2577,8 +2605,13 @@ body.is-scrolled .masthead {
 /* The past half of an organization's own notice list, collapsed by default
    so a coordinator opening this page sees what is coming up, not a scroll
    of everything that already happened. */
-.past-notices { margin-top: 1.6rem; }
-.past-notices > summary {
+/* .disclosure is the same collapsed-by-default <details>/<summary> pattern
+   as .past-notices below (which predates it and keeps its own name so as
+   not to disturb anything keyed on it), generalized for reuse anywhere a
+   long explanation should stay out of the way of the useful content above
+   it until asked for -- e.g. "How location works" on Near Me. */
+.past-notices, .disclosure { margin-top: 1.6rem; }
+.past-notices > summary, .disclosure > summary {
   cursor: pointer;
   font-family: var(--serif);
   font-size: 1.02rem;
@@ -2587,9 +2620,11 @@ body.is-scrolled .masthead {
   color: var(--ink);
   list-style: none;
 }
-.past-notices > summary::-webkit-details-marker { display: none; }
-.past-notices > summary::before { content: '▸ '; color: var(--ink-3); }
-.past-notices[open] > summary::before { content: '▾ '; }
+.past-notices > summary::-webkit-details-marker,
+.disclosure > summary::-webkit-details-marker { display: none; }
+.past-notices > summary::before, .disclosure > summary::before { content: '▸ '; color: var(--ink-3); }
+.past-notices[open] > summary::before, .disclosure[open] > summary::before { content: '▾ '; }
+.disclosure > :not(summary) { margin-top: .9rem; }
 
 /* ---------- a Janazah, as a row ---------- */
 

@@ -298,7 +298,7 @@ export function renderNav(nav, { path, user, isAdmin = false, authReady = true }
   if (account) renderAccount(account, { user, path, authReady });
 
   const bottom = document.getElementById('bottom-nav');
-  if (bottom) renderBottomNav(bottom, { path, user });
+  if (bottom) renderBottomNav(bottom, { path, user, authReady });
 }
 
 /**
@@ -306,10 +306,16 @@ export function renderNav(nav, { path, user, isAdmin = false, authReady = true }
  * Everything else — Masjids, the guide, Settings, About — is a second tap
  * away, behind "Profile", rather than crammed in beside these.
  */
-function renderBottomNav(bar, { path, user }) {
+function renderBottomNav(bar, { path, user, authReady = true }) {
   bar.replaceChildren();
+  // Same reasoning as renderAccount's authReady check above: on first paint,
+  // signed-in-ness is not yet known. Deciding Home's destination and the
+  // Profile tab's identity as if the answer were "signed out" would flash the
+  // wrong thing at a returning signed-in visitor and swap it out a moment
+  // later. Until that resolves, both hold at a neutral placeholder instead.
+  const known = authReady ? user : undefined;
   bar.append(...BOTTOM_LINKS.map((link) => {
-    const href = link.href === '/' && user ? '/dashboard' : link.href;
+    const href = link.href === '/' && known ? '/dashboard' : link.href;
     return el('a', {
       class: `bottom-nav__item${isActive(href, path) ? ' bottom-nav__item--active' : ''}`,
       href,
@@ -323,9 +329,11 @@ function renderBottomNav(bar, { path, user }) {
     type: 'button',
     onclick: () => document.getElementById('nav-toggle')?.click(),
   }, [
-    user
-      ? el('span', { class: 'bottom-nav__avatar', text: initialsFor(user) })
-      : icon('users', { size: 20 }),
+    known === undefined
+      ? el('span', { class: 'bottom-nav__avatar bottom-nav__avatar--placeholder', 'aria-hidden': 'true' })
+      : known
+        ? el('span', { class: 'bottom-nav__avatar', text: initialsFor(user) })
+        : icon('users', { size: 20 }),
     el('span', { text: 'Profile' }),
   ]);
   bar.append(profile);

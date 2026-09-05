@@ -342,8 +342,47 @@ export async function myOrganizations(uid) {
   return snap.docs.map(withId);
 }
 
+// verifiedOrganizations() is a one-shot read (not a listener) called
+// independently from home.js, masjids.js, feed.js, dashboard.js and
+// following.js, each on its own mount. The list barely changes between
+// visits, so a short in-memory cache avoids re-fetching the whole
+// organization directory on every navigation between those pages. This is
+// intentionally a single global cache slot, not keyed by anything: there is
+// only one verified-organizations list. It expires on its own after
+// VERIFIED_ORGS_TTL_MS, and is invalidated immediately whenever this session
+// changes the verified set itself (an admin verifying/suspending/archiving/
+// restoring an organization), so an admin never sees their own action fail
+// to reflect. It never touches watchOrganizationsByStatus, watchAllOrganizations,
+// or any other onSnapshot listener -- those keep delivering live updates
+// exactly as before.
+const VERIFIED_ORGS_TTL_MS = 60_000;
+let verifiedOrgsCache = null; // { at: number, promise: Promise<object[]> }
+
 /** Verified organizations, for the public feed and the follow list. */
 export async function verifiedOrganizations() {
+  const now = Date.now();
+  if (verifiedOrgsCache && (now - verifiedOrgsCache.at) < VERIFIED_ORGS_TTL_MS) {
+    return verifiedOrgsCache.promise;
+  }
+  const promise = fetchVerifiedOrganizations();
+  verifiedOrgsCache = { at: now, promise };
+  // A failed read must not poison the cache for the TTL window; let the next
+  // call try again immediately.
+  promise.catch(() => {
+    if (verifiedOrgsCache && verifiedOrgsCache.promise === promise) verifiedOrgsCache = null;
+  });
+  return promise;
+}
+
+/**
+ * Drop the verifiedOrganizations() cache so the next call re-fetches. Called
+ * after any write that can change which organizations are verified.
+ */
+export function invalidateVerifiedOrganizations() {
+  verifiedOrgsCache = null;
+}
+
+async function fetchVerifiedOrganizations() {
   let live = [];
   try {
     const snap = await getDocs(query(
@@ -413,6 +452,7 @@ export async function setVerificationStatus(orgId, status, reason = '') {
     patch.verifiedBy = user.uid;
   }
   await updateDoc(doc(db, 'organizations', orgId), patch);
+  invalidateVerifiedOrganizations();
 }
 
 // ------------------------------------------------------------------ staff
@@ -896,6 +936,7 @@ export async function revokePlatformAdmin(uid, reason = '') {
 export async function archiveOrganization(orgId, reason = '') {
   const call = httpsCallable(functions, 'archiveOrganization');
   const { data } = await call({ orgId, reason });
+  invalidateVerifiedOrganizations();
   return data;
 }
 
@@ -909,6 +950,7 @@ export async function archiveOrganization(orgId, reason = '') {
 export async function restoreOrganization(orgId) {
   const call = httpsCallable(functions, 'restoreOrganization');
   const { data } = await call({ orgId });
+  invalidateVerifiedOrganizations();
   return data;
 }
 

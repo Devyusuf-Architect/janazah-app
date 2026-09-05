@@ -903,6 +903,15 @@ const run = async () => {
     await local.getByRole('button', { name: 'Near me' }).click();
     await local.getByRole('button', { name: 'Use my location' }).waitFor({ timeout: 10000 });
 
+    // The short promise is up front (mobile QA pass: progressive disclosure),
+    // and the full explanation of where location goes and how long it is
+    // kept sits collapsed behind "How location works" — innerText() only
+    // returns rendered text, so it must be opened first to see it, exactly
+    // as a person would have to.
+    const consentShort = await local.locator('.consent').innerText();
+    assert.match(consentShort, /never sent to Ta.ziyah or a masjid/i,
+      'the short consent line must state where location does not go');
+    await local.locator('.consent details.disclosure summary').click();
     const consent = await local.locator('.consent').innerText();
     assert.match(consent, /never sent to us/i, 'consent copy must state where location goes');
     assert.match(consent, /overwritten/i, 'consent copy must state that no history is kept');

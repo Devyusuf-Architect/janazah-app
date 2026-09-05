@@ -100,26 +100,38 @@ export function consentPanel(onChange) {
 
   return el('div', { class: 'card consent' }, [
     el('h2', { text: 'Find Janazahs near you' }),
-    el('p',
-      { text: 'With your permission, this page can check which Janazahs are ' +
-              'close to where you are right now, so you hear about one nearby ' +
-              'even if you do not follow that masjid.' }),
-
-    el('h3', { text: 'What happens to your location' }),
-    el('ul', { class: 'list list--plain consent__list' }, [
-      el('li', { text: 'It is used in your browser only, to measure distance to notices this page already shows.' }),
-      el('li', { text: 'It is never sent to us, to any masjid, or to anyone else.' }),
-      el('li', { text: 'Only your most recent position is kept, on this device, and it is overwritten each time. No history of where you have been is created.' }),
-      el('li', { text: 'Turning this off erases the stored position immediately.' }),
-      el('li', { text: 'Nobody can see which Janazahs you looked at or attended.' }),
-    ]),
-
-    el('p', { class: 'hint hint--boxed' },
-      'Your browser will ask for permission next. You can decline, and the ' +
-      'rest of this page keeps working.'),
+    // A one-line promise up front, with the full explanation this app treats
+    // as load-bearing (not decoration) still fully present, one tap away —
+    // same <details>/<summary> pattern as "Past notices" in notices.js,
+    // reused rather than a new disclosure widget invented for this page.
+    el('p', { class: 'consent__short' },
+      'Your location stays on this device and is never sent to Ta’ziyah or a masjid.'),
 
     error,
     el('div', { class: 'form-actions' }, [enable]),
+
+    el('details', { class: 'disclosure consent__details' }, [
+      el('summary', { text: 'How location works' }),
+      el('div', { class: 'consent__details-body' }, [
+        el('p',
+          { text: 'With your permission, this page can check which Janazahs are ' +
+                  'close to where you are right now, so you hear about one nearby ' +
+                  'even if you do not follow that masjid.' }),
+
+        el('h3', { text: 'What happens to your location' }),
+        el('ul', { class: 'list list--plain consent__list' }, [
+          el('li', { text: 'It is used in your browser only, to measure distance to notices this page already shows.' }),
+          el('li', { text: 'It is never sent to us, to any masjid, or to anyone else.' }),
+          el('li', { text: 'Only your most recent position is kept, on this device, and it is overwritten each time. No history of where you have been is created.' }),
+          el('li', { text: 'Turning this off erases the stored position immediately.' }),
+          el('li', { text: 'Nobody can see which Janazahs you looked at or attended.' }),
+        ]),
+
+        el('p', { class: 'hint hint--boxed' },
+          'Your browser will ask for permission next. You can decline, and the ' +
+          'rest of this page keeps working.'),
+      ]),
+    ]),
   ]);
 }
 
