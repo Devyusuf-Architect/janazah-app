@@ -1187,6 +1187,44 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   font-size: .88rem;
 }
 
+/* The next Janazah is the one thing on this page somebody actually came to
+   see, so it gets its own surface -- a shallow card, not a heavier shadow
+   than the rest of the app uses -- rather than sitting as one more plain
+   list among equals. */
+.dash-upcoming {
+  padding: 1.1rem 1.1rem 1.3rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.dash-upcoming .jlist { border-top: none; margin-top: .1rem; }
+.dash-upcoming .jrow:first-child { padding-top: .2rem; }
+.dash-upcoming .home-empty--compact { border-top: none; }
+
+/* Left: what is nearby and who you follow, in the order somebody actually
+   reads them. Right: how to act, then what changed. Both columns are one
+   above the other on a phone, in that same reading order, which is also
+   what keeps the mobile screen's first scroll useful rather than empty. */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 1.6rem;
+}
+.dash-col > .home-section:last-child { margin-bottom: 0; }
+@media (min-width: 780px) {
+  .dash-grid { grid-template-columns: 1.35fr 1fr; align-items: start; }
+}
+
+@media (max-width: 640px) {
+  /* Tighter rhythm so the greeting, the next Janazah, Near You and Masjids
+     You Follow all land within the first screen and a half of a phone,
+     instead of the desktop spacing pushing the third section out of reach. */
+  .dash-head { padding-bottom: .75rem; margin-bottom: 1rem; }
+  .dash-upcoming { padding: .85rem .85rem 1rem; }
+  .home-section { margin-bottom: 1.5rem; }
+}
+
 /* ---------- auth ---------- */
 
 .auth-divider {
@@ -2751,8 +2789,12 @@ body.is-scrolled .masthead {
   font-size: .82rem;
   color: var(--ink-3);
 }
-.mrow__next { margin: 0; font-size: .84rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.mrow__next {
+  display: flex; align-items: center; gap: .35rem;
+  margin: 0; font-size: .84rem; color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
 .mrow__next--none { color: var(--ink-3); }
+.mrow__count { font-variant-numeric: normal; }
 
 /* ---------- prompts and empties ---------- */
 /* A prompt asks for something (location, a follow). An empty reports a fact.
@@ -2784,16 +2826,34 @@ body.is-scrolled .masthead {
 .home-empty p:last-child { margin-bottom: 0; }
 .home-empty__actions {
   display: flex;
+  align-items: center;
   gap: .6rem;
   flex-wrap: wrap;
   margin-top: .7rem;
 }
+.home-empty__secondary { font-size: .84rem; }
+
+/* Upcoming Janazahs' own empty state: one short fact, one clear next step,
+   and a smaller second option -- never the two-paragraph, two-button version
+   this replaced, which read as an apology rather than as useful information. */
+.home-empty--compact { padding-top: .2rem; }
+.home-empty__title {
+  margin: 0 0 .3rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
 
 .home-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .3rem;
   margin: 0 0 .6rem;
   font-size: .82rem;
   color: var(--ink-3);
 }
+.home-note__update { padding: 0; font-size: .82rem; }
 
 .home-more {
   display: inline-block;
@@ -2840,6 +2900,29 @@ body.is-scrolled .masthead {
   cursor: pointer;
   text-align: left;
 }
+
+/* ---------- recent updates ---------- */
+
+.updates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.update-row { border-bottom: 1px solid var(--line); }
+.update-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .65rem .1rem;
+  color: var(--ink-2);
+  font-size: .86rem;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+.update-row__main .icon { flex: none; margin-top: .1rem; color: var(--ink-3); }
+.update-row__main:hover { color: var(--ink); }
+.update-row__main:hover .icon { color: var(--accent); }
 
 /* ---------- the growing note ---------- */
 /* Same calm, boxed treatment as .guide-strip, so an early-launch state and an

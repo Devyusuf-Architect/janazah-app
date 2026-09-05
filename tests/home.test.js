@@ -120,10 +120,12 @@ describe('location stays optional and stays on the device', () => {
     const enable = home.slice(home.indexOf('async function enableLocation'));
     assert.match(enable.slice(0, 600), /loc\.update\(\{ enabled: true \}\)/);
     // The only call sites are click handlers: the finder's "Use my
-    // location", the near-you prompt, and the zero-notices explore block's
-    // "Enable nearby alerts", plus the function's own definition.
+    // location", the near-you prompt, the near-you section's "Update
+    // location" (shown once the stored position goes stale), and the
+    // zero-notices explore block's "Enable nearby alerts", plus the
+    // function's own definition.
     const calls = home.match(/enableLocation\(/g) || [];
-    assert.equal(calls.length, 4, 'enableLocation should be defined once and called on click only');
+    assert.equal(calls.length, 5, 'enableLocation should be defined once and called on click only');
   });
 
   test('a refused permission turns the setting back off', () => {

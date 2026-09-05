@@ -246,6 +246,7 @@ export async function registerOrganization(form) {
   // application attached, which a reviewer sees plainly and can ask about.
   // That is a better failure than losing the registration entirely.
   if (form.applicantName) await saveApplication(ref.id, form);
+  invalidateMyOrganizations();
   return ref.id;
 }
 
@@ -333,8 +334,46 @@ export async function getOrganization(orgId) {
   return snap.exists() ? withId(snap) : null;
 }
 
+// myOrganizations() is now also read from the dashboard (to decide whether
+// to show the staff-only quick actions) in addition to its existing callers
+// (the console's own context load/refresh, and the account page's "your
+// masjids" list). Same short in-memory cache as verifiedOrganizations() just
+// below, for the same reason: it is one small query re-run on every
+// navigation for data that rarely changes within a session. Kept as a single
+// slot rather than a map, since there is only ever one signed-in uid in a tab
+// at a time; a uid mismatch (a different account signing in without a full
+// reload) is treated as a miss rather than served stale.
+//
+// Invalidated at every write that changes a staffUids array, so the console's
+// own ctx.refresh() -- called immediately after registering an organization
+// or resolving a staff request, precisely to show that change -- never shows
+// a stale membership list for the rest of the cache's TTL window.
+const MY_ORGS_TTL_MS = 60_000;
+let myOrgsCache = null; // { uid: string, at: number, promise: Promise<object[]> }
+
 /** Organizations the signed-in user is staff of. */
 export async function myOrganizations(uid) {
+  const now = Date.now();
+  if (myOrgsCache && myOrgsCache.uid === uid && (now - myOrgsCache.at) < MY_ORGS_TTL_MS) {
+    return myOrgsCache.promise;
+  }
+  const promise = fetchMyOrganizations(uid);
+  myOrgsCache = { uid, at: now, promise };
+  promise.catch(() => {
+    if (myOrgsCache && myOrgsCache.promise === promise) myOrgsCache = null;
+  });
+  return promise;
+}
+
+/**
+ * Drop the myOrganizations() cache so the next call re-fetches. Called after
+ * any write that can change which organizations a uid is staff of.
+ */
+export function invalidateMyOrganizations() {
+  myOrgsCache = null;
+}
+
+async function fetchMyOrganizations(uid) {
   const snap = await getDocs(query(
     collection(db, 'organizations'),
     where('staffUids', 'array-contains', uid),
@@ -494,6 +533,7 @@ export async function approveStaffRequest(orgId, requestUid, currentStaffUids) {
     decidedAt: serverTimestamp(),
     decidedBy: user.uid,
   });
+  invalidateMyOrganizations();
 }
 
 export async function rejectStaffRequest(orgId, requestUid) {
@@ -511,6 +551,7 @@ export async function removeStaff(orgId, staffUid, currentStaffUids) {
     updatedAt: serverTimestamp(),
     updatedBy: auth.currentUser.uid,
   });
+  invalidateMyOrganizations();
 }
 
 // ---------------------------------------------------------------- notices

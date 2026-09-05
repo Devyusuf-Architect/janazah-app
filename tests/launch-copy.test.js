@@ -29,13 +29,16 @@ describe('sample data defaults to off', () => {
 
 describe('the homepage when there are zero real notices', () => {
   test('the upcoming section explains the site is new, not broken', () => {
-    assert.match(home, /No Janazah notices have been published yet\./);
-    assert.match(home, /currently welcoming Masjids and funeral coordinators/);
+    // Replaced with a shorter empty state (the dashboard redesign): one line
+    // of fact, one line of what will change it, still true when the site is
+    // genuinely new rather than only implying it.
+    assert.match(home, /No upcoming Janazahs yet/);
+    assert.match(home, /Verified Masjids will appear here as they begin publishing\./);
   });
 
   test('it offers a way forward for both a visitor and a masjid', () => {
     assert.match(home, /'Find a Masjid'/);
-    assert.match(home, /'Register a Masjid'/);
+    assert.match(home, /text: 'Register a Masjid'/);
   });
 
   test('a search with no matches says so in the required wording', () => {

@@ -225,12 +225,19 @@ export function janazahRow(notice, distanceLabel = null) {
   ]);
 }
 
-function nextJanazahFor(orgId, notices) {
-  return notices.find((n) => n.orgId === orgId && n.status !== 'cancelled') || null;
+function upcomingNoticesFor(orgId, notices) {
+  return notices.filter((n) => n.orgId === orgId && n.status !== 'cancelled');
 }
 
+/**
+ * A masjid, as a scannable row. Shows the next Janazah it has coming up and,
+ * when there is more than one, how many are waiting behind it — a follower
+ * scanning a short list of masjids can tell which ones are actually active
+ * without opening each one.
+ */
 export function masjidRow(org, state) {
-  const next = nextJanazahFor(org.id, state.notices);
+  const upcoming = upcomingNoticesFor(org.id, state.notices);
+  const next = upcoming[0] || null;
   // The masjid's name gets its own line. Sitting the badge beside it means a
   // long name wraps and the badge lands underneath on some cards and not
   // others, which makes a grid of them look accidental.
@@ -242,9 +249,14 @@ export function masjidRow(org, state) {
           [icon('check', { size: 12 }), el('span', { text: 'Verified Masjid' })]),
         el('span', { text: [org.city, org.province].filter(Boolean).join(', ') }),
       ]),
-      el('p', { class: `mrow__next${next ? '' : ' mrow__next--none'}`, text: next
-        ? formatJanazahTime(next)
-        : 'No upcoming Janazah' }),
+      el('p', { class: `mrow__next${next ? '' : ' mrow__next--none'}` }, next
+        ? [
+          el('span', { text: formatJanazahTime(next) }),
+          upcoming.length > 1
+            ? el('span', { class: 'chip mrow__count', text: `+${upcoming.length - 1} more` })
+            : null,
+        ]
+        : 'No upcoming Janazah'),
     ]),
   ]);
 }
@@ -263,15 +275,14 @@ export function paintUpcoming(mount, state) {
   const visible = state.notices.slice(0, UPCOMING_LIMIT);
 
   if (!visible.length) {
-    mount.append(el('div', { class: 'home-empty' }, [
-      el('p', { text: 'No Janazah notices have been published yet.' }),
+    mount.append(el('div', { class: 'home-empty home-empty--compact' }, [
+      el('p', { class: 'home-empty__title', text: 'No upcoming Janazahs yet' }),
       el('p', { class: 'muted' },
-        'Ta’ziyah is currently welcoming Masjids and funeral coordinators to '
-        + 'join the platform.'),
+        'Verified Masjids will appear here as they begin publishing.'),
       el('div', { class: 'home-empty__actions' }, [
-        el('a', { class: 'btn btn--small', href: '/masjids' }, 'Find a Masjid'),
-        el('a', { class: 'btn btn--small btn--primary', href: '/register-masjid' },
-          'Register a Masjid'),
+        el('a', { class: 'btn btn--small btn--primary', href: '/masjids' }, 'Find a Masjid'),
+        el('a', { class: 'link home-empty__secondary', href: '/register-masjid',
+          text: 'Register a Masjid' }),
       ]),
     ]));
     return;
@@ -351,19 +362,23 @@ export function paintNear(mount, state, repaint) {
 
   const matches = loc.nearbyNotices(state.notices, settings.last, settings.radiusKm);
 
-  if (loc.isStale(settings.last)) {
-    mount.append(el('p', { class: 'home-note' },
-      'Based on where you were last, which was a while ago.'));
+  const stale = loc.isStale(settings.last);
+  const note = el('p', { class: 'home-note' }, [el('span', { text: 'Using your last known location.' })]);
+  if (stale) {
+    const update = el('button', { class: 'btn btn--link home-note__update', type: 'button' }, 'Update location');
+    update.addEventListener('click', () => enableLocation(update, repaint));
+    note.append(' ', update);
   }
+  mount.append(note);
 
   if (!matches.length) {
     mount.append(el('div', { class: 'home-empty' }, [
       el('p', {
         text: settings.radiusKm === 0
           ? 'No current or upcoming Janazahs anywhere.'
-          : `Nothing within ${settings.radiusKm} km of where you are.`,
+          : `No Janazahs within ${settings.radiusKm} km.`,
       }),
-      el('a', { class: 'link', href: '/near-me', text: 'Try a wider distance' }),
+      el('a', { class: 'link', href: '/near-me', text: 'Increase distance' }),
     ]));
     return;
   }
@@ -393,11 +408,10 @@ export function paintFollowed(mount, state, repaint) {
   if (!ids.length) {
     mount.append(el('div', { class: 'prompt' }, [
       el('div', { class: 'prompt__body' }, [
-        el('p', { class: 'prompt__lede', text: 'Follow masjids to see their Janazah notices here.' }),
-        el('p', { class: 'prompt__note' },
-          'Kept on this device only, so nobody can see whose notices you watch.'),
+        el('p', { class: 'prompt__lede', text: 'Follow Masjids to see their Janazah notices here.' }),
+        el('p', { class: 'prompt__note', text: 'Your follows remain private.' }),
       ]),
-      el('a', { class: 'btn btn--small', href: '/masjids' }, 'Find masjids'),
+      el('a', { class: 'btn btn--small', href: '/masjids' }, 'Find Masjids'),
     ]));
     return;
   }
@@ -487,17 +501,36 @@ function growingNote() {
 // ------------------------------------------------------------ the last bits
 
 const ACTIONS = [
-  { href: '/janazahs', icon: 'clock', label: 'All Janazahs' },
-  { href: '/masjids', icon: 'building', label: 'Find a masjid' },
-  { href: '/near-me', icon: 'pin', label: 'Near me' },
-  { href: '/janazah-guide', icon: 'shield', label: 'Janazah guide' },
-  { href: '/register-masjid', icon: 'users', label: 'Register a masjid' },
+  { href: '/janazahs', icon: 'clock', label: 'Find Janazahs' },
+  { href: '/near-me', icon: 'pin', label: 'Nearby' },
+  { href: '/masjids', icon: 'building', label: 'Find Masjids' },
+  { href: '/janazah-guide', icon: 'shield', label: 'Janazah Guide' },
+  { href: '/register-masjid', icon: 'users', label: 'Register a Masjid' },
 ];
 
-export function quickActions() {
+// Shown in place of "Register a Masjid" for a signed-in staff member of a
+// verified masjid: registration is already done, and the two things they
+// actually come back to do are publish and manage their own notices. Both
+// point at the console's Notices tab, which is the one real entry point for
+// composing (a button inside that tab opens the composer) and for managing
+// what is already published -- there is no separate composer route to link
+// to instead.
+const STAFF_ACTIONS = [
+  { href: '/console?tab=notices', icon: 'plus', label: 'Post Janazah' },
+  { href: '/console?tab=notices', icon: 'grid', label: 'Manage Janazahs' },
+];
+
+/**
+ * @param {{ canPublish: boolean } | null} staff Pass a staff context (from
+ *   the dashboard, which is the only caller that knows it) to add the two
+ *   staff-only actions for a verified masjid's own staff. Omitted on the
+ *   public feed, where nobody is signed in.
+ */
+export function quickActions(staff = null) {
+  const items = staff?.canPublish ? [...ACTIONS.slice(0, 4), ...STAFF_ACTIONS] : ACTIONS;
   return el('section', { class: 'home-section' }, [
     sectionHead('Quick actions'),
-    el('ul', { class: 'qa' }, ACTIONS.map((a) => el('li', {}, [
+    el('ul', { class: 'qa' }, items.map((a) => el('li', {}, [
       el('a', { class: 'qa__item', href: a.href }, [
         icon(a.icon, { size: 17 }),
         el('span', { text: a.label }),

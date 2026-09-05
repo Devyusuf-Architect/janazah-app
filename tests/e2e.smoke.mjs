@@ -1258,6 +1258,21 @@ const run = async () => {
         await memberSignIn(shotPage);
         await shotPage.locator('.jrow, .home-empty').first().waitFor({ timeout: 15000 });
         await shotPage.screenshot({ path: `${SHOT_DIR}/dashboard-${name}-location-off.png`, fullPage: true });
+        // Dark mode, at the two widths where the redesign's layout actually
+        // changes (single column vs. the two-column desktop grid), same
+        // pattern as the janazah-picker screenshots above.
+        if (name === 'mobile-375' || name === 'desktop-1280') {
+          await shotPage.emulateMedia({ colorScheme: 'dark' });
+          // .jrow (and friends) transition their background/box-shadow, so a
+          // screenshot taken the instant the scheme flips can catch that
+          // transition mid-flight -- worse, frozen at its very first frame,
+          // wherever the mouse was last left really was hovering a row (the
+          // sign-in button's own position, at this viewport). Move the mouse
+          // off content and let the short transition finish before capturing.
+          await shotPage.mouse.move(0, 0);
+          await shotPage.waitForTimeout(250);
+          await shotPage.screenshot({ path: `${SHOT_DIR}/dashboard-${name}-location-off-dark.png`, fullPage: true });
+        }
         await shotPage.close();
       }
 
@@ -1279,6 +1294,38 @@ const run = async () => {
       await geoPage.waitForTimeout(500);
       await geoPage.screenshot({ path: `${SHOT_DIR}/dashboard-mobile-390-location-on.png`, fullPage: true });
       await geoContext.close();
+
+      // Test Masjid (registered earlier by the coordinator flow) is verified,
+      // and COORD is its staff -- so their own dashboard should show the two
+      // staff-only Quick Actions (Post Janazah, Manage Janazahs) in addition
+      // to the base set.
+      const staffPage = await newPage({ viewport: { width: 1280, height: 900 } });
+      await staffPage.goto(`${BASE}/signin`);
+      await staffPage.locator('#email').fill(COORD.email);
+      await staffPage.locator('#password').fill(COORD.password);
+      await staffPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+      await staffPage.locator('.dash-head').waitFor({ timeout: 15000 });
+      await staffPage.getByRole('link', { name: 'Post Janazah' }).waitFor({ timeout: 15000 });
+      await staffPage.getByRole('link', { name: 'Manage Janazahs' }).waitFor({ timeout: 5000 });
+      // Recent Updates (staff-only content: this coordinator's own org was
+      // cancelled and re-published earlier in this run) arrives in a later
+      // repaint, once myOrganizations() resolves, and its rows use the same
+      // .reveal fade-in as every other row on this page. That row lands just
+      // past revealIn()'s own "already on screen" cutoff (90% of the
+      // viewport height) and inside motion.js's IntersectionObserver
+      // rootMargin (-8% off the bottom), so by that observer's own reckoning
+      // it is not yet intersecting -- scrollIntoViewIfNeeded() sees it as
+      // already "in view" by the plain viewport and does nothing. Scrolling
+      // it to the vertical centre clears both margins for certain, the same
+      // way a person scrolling down to it would, rather than a fixed
+      // timeout guessing at when the fade finishes.
+      const firstUpdateRow = staffPage.locator('.updates .update-row').first();
+      await firstUpdateRow.waitFor({ timeout: 15000 });
+      await firstUpdateRow.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+      await staffPage.locator('.updates .update-row.is-revealed').first().waitFor({ timeout: 5000 });
+      await staffPage.screenshot({ path: `${SHOT_DIR}/dashboard-desktop-1280-staff.png`, fullPage: true });
+      await staffPage.close();
+
       log(`dashboard screenshots written to ${SHOT_DIR}`);
 
       // The admin portal, at the three widths its layout actually changes
