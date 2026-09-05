@@ -105,7 +105,7 @@ export function NearbyMap({ from, results, radiusKm, onSelect }: {
             <Marker
               key={notice.id}
               coordinate={{ latitude: place.lat, longitude: place.lng }}
-              title={who ? `${who} — ${notice.orgName}` : notice.orgName}
+              title={who ? `${who}, ${notice.orgName}` : notice.orgName}
               description={
                 isCancelled(notice)
                   ? 'Cancelled'

@@ -125,13 +125,13 @@ export default function ProfileScreen() {
               subtitle={location.point
                 ? 'Distances are worked out on this phone'
                 : 'Location is off'}
-              onPress={() => router.push('/nearby')}
+              onPress={() => router.push('/(tabs)/nearby')}
             />
             <Divider inset={space.lg} />
             <Row
               title="Masjids you follow"
               note={follows.ids.length ? String(follows.ids.length) : 'None yet'}
-              onPress={() => router.push(follows.ids.length ? '/following' : '/masjids')}
+              onPress={() => router.push(follows.ids.length ? '/(tabs)/following' : '/masjids')}
             />
             <Divider inset={space.lg} />
             <Row
@@ -160,7 +160,7 @@ export default function ProfileScreen() {
             <Surface style={{ overflow: 'hidden' }}>
               <Row
                 title="Delete my account"
-                subtitle="Permanent. You can still read notices afterwards."
+                subtitle="Permanent. Ta’ziyah keeps nothing of yours afterwards."
                 onPress={() => router.push('/delete-account')}
               />
             </Surface>

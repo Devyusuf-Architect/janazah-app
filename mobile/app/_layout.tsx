@@ -33,6 +33,18 @@ import { motion, useReduceMotion } from '../src/theme/motion';
 // ever once. The function is itself idempotent for Fast Refresh.
 connectEmulators();
 
+/**
+ * The route the root stack opens on.
+ *
+ * Both app/(launch)/index.tsx and app/(tabs)/index.tsx resolve to "/", which
+ * expo-router permits as a shared route: "/(launch)" and "/(tabs)" pick
+ * between them. What it does not do is guarantee which one a cold start lands
+ * on, and getting that wrong means a signed-out person sees Home for a frame
+ * before the gate moves them. Pinning it here removes the ambiguity: the
+ * splash is always first, and it decides where to go from there.
+ */
+export const unstable_settings = { anchor: '(launch)' };
+
 // Coming back to the app is what stands in for "the connection returned".
 //
 // The app deliberately does not watch the network state: that would mean

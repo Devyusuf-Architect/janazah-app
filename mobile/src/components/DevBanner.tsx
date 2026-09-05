@@ -21,7 +21,7 @@
 // of it.
 
 import React, { useState } from 'react';
-import { Platform, Pressable, StatusBar as RNStatusBar, View } from 'react-native';
+import { Platform, Pressable, StatusBar as RNStatusBar } from 'react-native';
 
 import { Text } from './Text';
 import { usingEmulator, emulatorHost } from '../lib/firebase';

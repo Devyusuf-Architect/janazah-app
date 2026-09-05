@@ -85,28 +85,34 @@ export function NoticeRow({ notice, distanceKm, onPress, verified = true }: Prop
         style={{ gap: space.xs }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
-          <Text variant="bodyStrong" style={struck}>{time.day}</Text>
-          <Text
-            variant="bodyStrong"
-            tone={cancelled ? 'subtle' : 'default'}
-            style={struck}
+          {/* The time and its qualifiers wrap as a group. On a 320dp phone
+              "Today 1:30 p.m." and "after Dhuhr" do not fit on one line
+              beside a status, and clipping the masjid's own words for the
+              time is worse than letting them fall to a second line. */}
+          <View
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'baseline',
+              flexWrap: 'wrap',
+              gap: space.sm,
+            }}
           >
-            {time.time}
-          </Text>
-          {time.zone ? (
-            <Text variant="caption" tone="subtle">{time.zone}</Text>
-          ) : null}
-          {/* The masjid's own words for the time, beside the clock time
-              rather than on a line of their own. "after Dhuhr" is how the
-              announcement was made and is often what somebody was told on
-              the phone, so it belongs with the time it qualifies. */}
-          {time.label && !cancelled ? (
-            <Text variant="caption" tone="subtle" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {time.label}
+            <Text variant="bodyStrong" style={struck}>{time.day}</Text>
+            <Text
+              variant="bodyStrong"
+              tone={cancelled ? 'subtle' : 'default'}
+              style={struck}
+            >
+              {time.time}
             </Text>
-          ) : null}
-
-          <View style={{ flex: 1, minWidth: space.sm }} />
+            {time.zone ? (
+              <Text variant="caption" tone="subtle">{time.zone}</Text>
+            ) : null}
+            {time.label && !cancelled ? (
+              <Text variant="caption" tone="subtle">{time.label}</Text>
+            ) : null}
+          </View>
 
           {/* The state sits at the end of the time line rather than on a row
               of its own above it. It is still the first thing announced to a

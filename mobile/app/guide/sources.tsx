@@ -13,7 +13,6 @@
 // src/shared/guide.ts.
 
 import React from 'react';
-import { View } from 'react-native';
 import { Stack } from 'expo-router';
 
 import { Screen, ScreenScroll } from '../../src/components/Screen';

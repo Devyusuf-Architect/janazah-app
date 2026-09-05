@@ -135,6 +135,40 @@ test('the development banner cannot reach a release build', () => {
   assert.ok(layout.includes('<DevBanner />'), 'the banner is no longer mounted');
 });
 
+test('no component takes a prop it never uses', () => {
+  // This exists because of a real one. A refactor of the notice screen moved
+  // two blocks around and dropped the row carrying the reminder and "Report
+  // a problem"; the onReport prop was still declared, still typed and still
+  // passed in, and nothing failed, so the only route to reporting a
+  // fraudulent notice was quietly unreachable.
+  //
+  // Counting every mention of the name is not enough, which was the first
+  // version of this test and why it passed against the bug: the name also
+  // appears in the props type. So type positions are excluded, and what is
+  // left is uses.
+  const offenders: string[] = [];
+
+  for (const file of files) {
+    const source = code(file);
+    for (const match of source.matchAll(/function\s+\w+\s*\(\s*\{([^}]*)\}/g)) {
+      for (const raw of (match[1] ?? '').split(',')) {
+        // Skip defaults, renames and rest: those read differently.
+        const prop = raw.trim();
+        if (!prop || prop.includes('=') || prop.includes(':') || prop.startsWith('...')) continue;
+
+        // Every mention that is not "prop:" or "prop?:", which are the shapes
+        // a name takes in a type rather than in code, and not the
+        // destructuring itself.
+        const mentions = [...source.matchAll(new RegExp(`\\b${prop}\\b\\s*(\\??:)?`, 'g'))];
+        const uses = mentions.filter((m) => !m[1]).length;
+        if (uses <= 1) offenders.push(`${name(file)}: ${prop}`);
+      }
+    }
+  }
+
+  assert.deepEqual(offenders, []);
+});
+
 test('no screen builds its own bottom sheet', () => {
   // src/components/Sheet.tsx owns the scrim, the grabber and the
   // reduce-motion behaviour. Three screens had drifting copies of it once.

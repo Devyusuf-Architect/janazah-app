@@ -171,7 +171,7 @@ export function NoticeDetail({
                 most damaging thing this screen could do. */}
             <Text variant="callout" tone="muted">
               {verified
-                ? 'A Ta\u2019ziyah administrator confirmed this organization '
+                ? 'A Ta’ziyah administrator confirmed this organization '
                   + 'before it could publish anything. The mark is about the '
                   + 'masjid, not about this notice.'
                 : 'This organization is not currently shown as verified.'}
@@ -184,6 +184,12 @@ export function NoticeDetail({
         </Surface>
       </View>
 
+      {/* 8. A reminder, and saying something is wrong. Share is in the
+          header, where a one-tap action belongs. */}
+      <View style={{ flexDirection: 'row', gap: space.md, flexWrap: 'wrap' }}>
+        <ReminderButton notice={notice} />
+        <Button label="Report a problem" onPress={onReport} />
+      </View>
     </View>
   );
 }

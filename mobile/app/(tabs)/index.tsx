@@ -129,8 +129,6 @@ export default function HomeScreen() {
         />
 
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.lg }}>
-          <CoordinatorCard />
-
           {isPending ? null : next ? (
             <RowIn index={0}>
               <NextUp
@@ -143,6 +141,11 @@ export default function HomeScreen() {
           ) : !isError ? (
             <Empty message="Nothing is scheduled for the days ahead." />
           ) : null}
+
+          {/* Below the next Janazah, not above it. It arrives from its own
+              query a moment after the feed, and above the card it would push
+              the most important thing on the screen down as it loaded. */}
+          <CoordinatorCard />
         </View>
 
         {isPending ? (
