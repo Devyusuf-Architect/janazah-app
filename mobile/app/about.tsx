@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
@@ -154,6 +154,21 @@ export default function AboutScreen() {
               be checked, and it says plainly where the schools of law differ.
               Follow your local imam.
             </Text>
+          </Section>
+
+          <Section title="How Ta’ziyah works">
+            {/* The welcome panels are shown once, on a first launch, and
+                until now there was no way back to them. Somebody who skipped
+                past the location and alerts explanations on the day they
+                installed the app should be able to read them again without
+                reinstalling it. */}
+            <Surface style={{ overflow: 'hidden' }}>
+              <Row
+                title="See the introduction again"
+                subtitle="What Ta’ziyah is for, and what it does with your phone"
+                onPress={() => router.push('/(launch)/welcome')}
+              />
+            </Surface>
           </Section>
 
           {version ? (

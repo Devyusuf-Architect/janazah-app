@@ -27,7 +27,7 @@ import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
 import { Empty, ErrorState } from '../../src/components/States';
 import {
-  ConnectionBanner, SlowNotice, useSlowLoad,
+  ConnectionBanner, SlowNotice, useAutoRetry, useSlowLoad,
 } from '../../src/components/Connection';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import { RowIn } from '../../src/components/Motion';
@@ -65,6 +65,10 @@ export default function JanazahsScreen() {
   );
   const stale = data?.pages.some((page) => page.stale) ?? false;
   const slow = useSlowLoad(isPending);
+  const connection = connectionOf({
+    isPending, isError, fromCache: stale, hasContent: all.length > 0,
+  });
+  useAutoRetry(connection, refetch);
 
   const results = useMemo(
     () => (query.trim() ? search(all, query) : all),
@@ -115,12 +119,7 @@ export default function JanazahsScreen() {
         </View>
       </View>
 
-      <ConnectionBanner
-        connection={connectionOf({
-          isPending, isError, fromCache: stale, hasContent: all.length > 0,
-        })}
-        onRetry={refetch}
-      />
+      <ConnectionBanner connection={connection} onRetry={refetch} />
 
       {isError && all.length === 0 ? (
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg }}>
@@ -178,11 +177,20 @@ export default function JanazahsScreen() {
           ) : null}
           ListEmptyComponent={(
             <View style={{ paddingHorizontal: space.lg }}>
+              {/* Short, and it offers the next thing to do. An empty feed on
+                  a quiet week is the ordinary case, not a failure, and it
+                  should not read as one. */}
               <Empty
                 message={query.trim()
                   ? 'Nothing matched. Names are only searchable when the family '
                     + 'chose to make them public.'
-                  : 'No Janazah notices have been published for the days ahead.'}
+                  : 'Nothing has been published for the days ahead.'}
+                action={query.trim()
+                  ? { label: 'Clear search', onPress: () => setQuery('') }
+                  : {
+                    label: 'Follow a masjid',
+                    onPress: () => router.push('/masjids'),
+                  }}
               />
             </View>
           )}

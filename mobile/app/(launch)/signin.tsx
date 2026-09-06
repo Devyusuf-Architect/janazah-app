@@ -29,6 +29,7 @@ import {
   UNSUPPORTED_FACTOR_MESSAGE, type MfaChallenge,
 } from '../../src/lib/mfa';
 import { friendlyAuthError } from '../../src/lib/auth-errors';
+import { takePendingNotice } from '../../src/features/alerts/pending-notice';
 import { useColors, radius, space, elevation } from '../../src/theme';
 
 type Mode = 'signin' | 'signup';
@@ -57,7 +58,13 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const done = () => router.replace('/(tabs)');
+  const done = () => {
+    router.replace('/(tabs)');
+    // A notification tap that arrived with no session to restore. The splash
+    // left it for whoever got somebody through the door.
+    const pending = takePendingNotice();
+    if (pending) router.push(`/n/${pending}`);
+  };
 
   async function attempt(run: () => Promise<void>) {
     setBusy(true);

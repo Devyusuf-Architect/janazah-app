@@ -22,7 +22,7 @@ import { Divider } from '../../src/components/Surface';
 import { Loading, Empty, ErrorState } from '../../src/components/States';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import {
-  ConnectionBanner, SlowNotice, useSlowLoad,
+  ConnectionBanner, SlowNotice, useAutoRetry, useSlowLoad,
 } from '../../src/components/Connection';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { LocationGate } from '../../src/features/nearby/LocationGate';
@@ -55,6 +55,10 @@ export default function NearbyScreen() {
   );
   const feedStale = data?.pages.some((page) => page.stale) ?? false;
   const slow = useSlowLoad(isPending);
+  const connection = connectionOf({
+    isPending, isError, fromCache: feedStale, hasContent: notices.length > 0,
+  });
+  useAutoRetry(connection, refetch);
 
   const results = useMemo(
     () => nearbyNotices(notices, location.point, location.prefs.radiusKm),
@@ -153,13 +157,7 @@ export default function NearbyScreen() {
             </View>
           ) : null}
 
-          <ConnectionBanner
-            connection={connectionOf({
-              isPending, isError, fromCache: feedStale,
-              hasContent: notices.length > 0,
-            })}
-            onRetry={refetch}
-          />
+          <ConnectionBanner connection={connection} onRetry={refetch} />
 
           {isPending ? (
             <>

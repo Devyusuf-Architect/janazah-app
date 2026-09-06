@@ -29,6 +29,7 @@ import { BrandGround } from '../../src/features/launch/BrandGround';
 import { Text } from '../../src/components/Text';
 import { Button } from '../../src/components/Button';
 import { markOnboarded } from '../../src/features/launch/onboarding-state';
+import { useAuth } from '../../src/lib/auth';
 import { useColors, space } from '../../src/theme';
 import { motion, spring, timing, useReduceMotion } from '../../src/theme/motion';
 
@@ -74,21 +75,22 @@ export default function WelcomeScreen() {
   const reduce = useReduceMotion();
   const scroller = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
+  const { user, isAnonymous } = useAuth();
 
   const last = index === PANELS.length - 1;
+  const signedIn = !!user && !isAnonymous;
 
-  const advance = async () => {
-    if (last) {
-      await markOnboarded();
-      router.replace('/(launch)/signin');
-      return;
-    }
-    scroller.current?.scrollTo({ x: (index + 1) * width, animated: !reduce });
+  // Where "done" goes. Somebody signed in is here because they asked to see
+  // the introduction again from About, and sending them to a sign-in screen
+  // they are already past would be a dead end.
+  const done = async () => {
+    await markOnboarded();
+    router.replace(signedIn ? '/(tabs)' : '/(launch)/signin');
   };
 
-  const skip = async () => {
-    await markOnboarded();
-    router.replace('/(launch)/signin');
+  const advance = async () => {
+    if (last) { await done(); return; }
+    scroller.current?.scrollTo({ x: (index + 1) * width, animated: !reduce });
   };
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -110,7 +112,7 @@ export default function WelcomeScreen() {
           label="Skip"
           kind="plain"
           size="compact"
-          onPress={skip}
+          onPress={done}
           style={{ paddingHorizontal: space.sm }}
         />
       </View>

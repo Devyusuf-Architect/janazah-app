@@ -27,6 +27,9 @@ import { BrandGround } from '../../src/features/launch/BrandGround';
 import { Brandmark } from '../../src/features/launch/Brandmark';
 import { Text } from '../../src/components/Text';
 import { hasOnboarded } from '../../src/features/launch/onboarding-state';
+import {
+  markLaunchSettled, takePendingNotice,
+} from '../../src/features/alerts/pending-notice';
 import { useAuth } from '../../src/lib/auth';
 import { motion, timing, useReduceMotion } from '../../src/theme/motion';
 import { space, palettes } from '../../src/theme';
@@ -62,9 +65,18 @@ export default function SplashScreen() {
     // somebody past the door.
     const signedIn = !!user && !isAnonymous;
 
+    markLaunchSettled();
+
     if (!onboarded) router.replace('/(launch)/welcome');
     else if (!signedIn) router.replace('/(launch)/signin');
-    else router.replace('/(tabs)');
+    else {
+      router.replace('/(tabs)');
+      // Launched by a notification tap. The tabs go underneath so there is
+      // somewhere to go back to, then the notice on top. Sign-in does the
+      // same thing when there was no session to restore.
+      const pending = takePendingNotice();
+      if (pending) router.push(`/n/${pending}`);
+    }
   }, [ready, onboarded, floorPassed, user, isAnonymous]);
 
   const wordmarkStyle = useAnimatedStyle(() => ({ opacity: wordmark.value }));

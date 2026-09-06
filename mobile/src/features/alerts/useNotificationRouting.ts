@@ -29,6 +29,7 @@ import {
 import { app } from '../../lib/firebase';
 import { CHANNEL_ID } from '../../lib/notifications';
 import { remember } from './inbox';
+import { launchSettled, setPendingNotice } from './pending-notice';
 
 type Message = RemoteMessage;
 
@@ -82,23 +83,31 @@ export function useNotificationRouting(): void {
       if (id) openNotice(id);
     });
 
-    // Not running at all, started by the tap.
+    // Not running at all, started by the tap. This one does NOT navigate:
+    // it hands the id to the splash, which is still deciding where to send
+    // somebody and would replace anything pushed here. See
+    // src/features/alerts/pending-notice.ts.
     if (!handledColdStart.current) {
       handledColdStart.current = true;
       getInitialNotification(messaging).then((message) => {
         const id = noticeIdFrom(message);
-        if (id) openNotice(id);
+        if (id) setPendingNotice(id);
       }).catch(() => {});
     }
 
     // A tap on a notification this app raised itself, which is the
-    // foreground case above and the reminders.
+    // foreground case above and the reminders. This one fires on a cold
+    // start too, when a reminder is what launched the app, so it goes
+    // through the same slot until the splash has decided where to send
+    // somebody.
     const tapSubscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as
           Record<string, unknown> | undefined;
         const id = typeof data?.noticeId === 'string' ? data.noticeId : '';
-        if (id) openNotice(id);
+        if (!id) return;
+        if (launchSettled()) openNotice(id);
+        else setPendingNotice(id);
       },
     );
 

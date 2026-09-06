@@ -8,8 +8,9 @@
 // and an unannounced shift under somebody's thumb is how a reader taps the
 // wrong notice.
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import Animated from 'react-native-reanimated';
 
 import { Text } from './Text';
@@ -84,6 +85,44 @@ export function useSlowLoad(pending: boolean): boolean {
   }, [pending]);
 
   return slow;
+}
+
+/**
+ * Retries a failed or cached read on its own, so a connection that comes back
+ * is noticed without anybody tapping anything.
+ *
+ * The app does not watch the radio, and will not start: that means
+ * ACCESS_NETWORK_STATE and a dependency for a question Firestore answers on
+ * every read. What it can do is try again, on a backoff, while it knows it is
+ * not reaching the server. Backing off matters: a fixed interval on a phone
+ * left offline in a pocket is a retry loop with nothing at the end of it.
+ *
+ * Only while the screen is focused, and it stops the moment a read succeeds.
+ */
+export function useAutoRetry(
+  connection: Connection, refetch: () => void,
+): void {
+  // The count is state rather than a ref, and that is the whole mechanism: a
+  // retry that fails leaves the connection exactly as it was, so nothing else
+  // in the dependencies changes and the effect would never schedule a second
+  // attempt. Bumping this re-runs it with a longer delay.
+  const [attempt, setAttempt] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    if (connection === 'live' || connection === 'loading') {
+      if (attempt !== 0) setAttempt(0);
+      return undefined;
+    }
+
+    // 5s, 10s, 20s, 40s, then every minute.
+    const delay = Math.min(5_000 * 2 ** attempt, 60_000);
+    const timer = setTimeout(() => {
+      setAttempt((n) => n + 1);
+      refetch();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [connection, refetch, attempt]));
 }
 
 /** Shown under a skeleton that has been there too long. */

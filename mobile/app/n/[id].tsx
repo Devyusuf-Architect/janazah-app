@@ -20,7 +20,7 @@ import { ScreenHeader, HeaderAction } from '../../src/components/ScreenHeader';
 import { ErrorState } from '../../src/components/States';
 import { NoticeSkeleton } from '../../src/components/Skeleton';
 import {
-  ConnectionBanner, SlowNotice, useSlowLoad,
+  ConnectionBanner, SlowNotice, useAutoRetry, useSlowLoad,
 } from '../../src/components/Connection';
 import { FadeInView } from '../../src/components/Motion';
 import { NoticeDetail, shareNotice } from '../../src/features/notices/NoticeDetail';
@@ -44,6 +44,7 @@ export default function NoticeScreen() {
   const connection = connectionOf({
     isPending, isError, fromCache: data?.stale ?? false, hasContent: !!notice,
   });
+  useAutoRetry(connection, refetch);
 
   return (
     <Screen>

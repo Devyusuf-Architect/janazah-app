@@ -24,10 +24,11 @@ import { Row } from '../../src/components/Row';
 import { Loading, Empty, ErrorState } from '../../src/components/States';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import {
-  ConnectionBanner, SlowNotice, useSlowLoad,
+  ConnectionBanner, SlowNotice, useAutoRetry, useSlowLoad,
 } from '../../src/components/Connection';
 import { NoticeRow } from '../../src/features/notices/NoticeRow';
 import { FollowButton } from '../../src/features/following/FollowButton';
+import { AlertsPrompt } from '../../src/features/alerts/AlertsPrompt';
 import { useFollows } from '../../src/features/following/useFollows';
 import { useLocation } from '../../src/features/nearby/useLocation';
 import { useNoticesFromOrgs, useVerifiedOrganizations } from '../../src/lib/queries';
@@ -65,6 +66,13 @@ export default function FollowingScreen() {
   const open = (notice: Notice) => router.push(`/n/${notice.id}`);
   const signedIn = !!user && !isAnonymous;
   const slow = useSlowLoad(notices.isPending);
+  const connection = connectionOf({
+    isPending: notices.isPending,
+    isError: notices.isError,
+    fromCache: notices.data?.stale ?? false,
+    hasContent: (notices.data?.notices.length ?? 0) > 0,
+  });
+  useAutoRetry(connection, notices.refetch);
 
   return (
     <Screen>
@@ -106,6 +114,11 @@ export default function FollowingScreen() {
             </View>
           ) : null}
         </View>
+
+        {/* Only when at least one masjid is followed and alerts are off.
+            See src/features/alerts/AlertsPrompt.tsx for why this is the one
+            place the app raises notifications unprompted. */}
+        <AlertsPrompt following={follows.ids.length} />
 
         {!follows.ready ? <Loading label="Loading" /> : null}
 
@@ -154,15 +167,7 @@ export default function FollowingScreen() {
 
         {follows.ids.length ? (
           <>
-            <ConnectionBanner
-              connection={connectionOf({
-                isPending: notices.isPending,
-                isError: notices.isError,
-                fromCache: notices.data?.stale ?? false,
-                hasContent: (notices.data?.notices.length ?? 0) > 0,
-              })}
-              onRetry={notices.refetch}
-            />
+            <ConnectionBanner connection={connection} onRetry={notices.refetch} />
 
             {notices.isPending ? (
               <>

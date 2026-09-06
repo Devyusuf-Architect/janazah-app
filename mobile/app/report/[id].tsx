@@ -15,6 +15,7 @@ import { ScreenHeader, PageTitle } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { Field } from '../../src/components/Field';
 import { Button } from '../../src/components/Button';
+import { succeeded } from '../../src/lib/haptics';
 import { Surface, Divider } from '../../src/components/Surface';
 import { Row } from '../../src/components/Row';
 import {
@@ -118,6 +119,10 @@ export default function ReportScreen() {
               setError(null);
               try {
                 await submitReport(id, reason, detail);
+                // The one moment in the app worth confirming with the phone
+                // as well as the screen: somebody reporting a wrong time is
+                // usually anxious about it.
+                succeeded();
                 setSent(true);
               } catch {
                 setError(

@@ -26,7 +26,7 @@ import { Text } from '../../src/components/Text';
 import { Divider } from '../../src/components/Surface';
 import { Empty } from '../../src/components/States';
 import {
-  ConnectionBanner, SlowNotice, useSlowLoad,
+  ConnectionBanner, SlowNotice, useAutoRetry, useSlowLoad,
 } from '../../src/components/Connection';
 import { NoticeSkeletonList } from '../../src/components/Skeleton';
 import { RowIn } from '../../src/components/Motion';
@@ -69,6 +69,12 @@ export default function HomeScreen() {
   );
   const stale = data?.pages.some((page) => page.stale) ?? false;
   const slow = useSlowLoad(isPending);
+  const connection = connectionOf({
+    isPending, isError, fromCache: stale, hasContent: notices.length > 0,
+  });
+  // Tries again on its own while the server is out of reach, so a connection
+  // that comes back is noticed without anybody tapping Retry.
+  useAutoRetry(connection, refetch);
 
   // Distances for every row, and the subset that is actually close. Both are
   // computed here, on the device, from a point that never leaves it.
@@ -121,12 +127,7 @@ export default function HomeScreen() {
 
         <SampleBanner />
 
-        <ConnectionBanner
-          connection={connectionOf({
-            isPending, isError, fromCache: stale, hasContent: notices.length > 0,
-          })}
-          onRetry={refetch}
-        />
+        <ConnectionBanner connection={connection} onRetry={refetch} />
 
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.lg }}>
           {isPending ? null : next ? (
@@ -142,10 +143,6 @@ export default function HomeScreen() {
             <Empty message="Nothing is scheduled for the days ahead." />
           ) : null}
 
-          {/* Below the next Janazah, not above it. It arrives from its own
-              query a moment after the feed, and above the card it would push
-              the most important thing on the screen down as it loaded. */}
-          <CoordinatorCard />
         </View>
 
         {isPending ? (
@@ -163,6 +160,12 @@ export default function HomeScreen() {
             onOpen={open}
           />
         ) : null}
+
+        {/* Below the next Janazah and below anything cancelled, and above
+            the lists. It arrives from its own query a moment after the feed,
+            so higher up it would push the two most important things on the
+            screen down as it loaded. */}
+        <CoordinatorCard />
 
         {followedRows.length ? (
           <Section
