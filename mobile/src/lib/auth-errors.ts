@@ -55,6 +55,26 @@ export function friendlyAuthError(error: unknown): string {
       + 'EXPO_PUBLIC_USE_LIVE=1 to sign in against real accounts.';
   }
 
+  // auth/unknown is not a cause, it is react-native-firebase saying it could
+  // not map the Android exception. The cause is inside the message, in the
+  // brackets Firebase puts it in, and until this existed the screen showed
+  // "something went wrong" for every one of them alike.
+  if (__DEV__ && code === 'auth/unknown') {
+    const message = String((error as { message?: string })?.message ?? '').trim();
+    const reason = nativeReason(message);
+    const hint = reason ? UNKNOWN_HINTS[reason] : undefined;
+    return [
+      message || 'Firebase reported auth/unknown with no message.',
+      hint,
+      usingEmulator
+        ? `This build is pointed at the Firebase emulators at ${emulatorHost}. `
+          + 'The Auth emulator does not accept a real Google ID token, and it '
+          + 'has none of your live accounts. Rebuild with '
+          + 'EXPO_PUBLIC_USE_LIVE=1 to sign in against the real project.'
+        : undefined,
+    ].filter(Boolean).join('\n\n');
+  }
+
   if (AMBIGUOUS.has(code)) {
     return 'That email address and password did not match. Check both and try again.';
   }
@@ -66,3 +86,42 @@ export function friendlyAuthError(error: unknown): string {
   return MESSAGES[code]
     ?? 'Something went wrong signing in. Try again in a moment.';
 }
+
+/**
+ * The reason Firebase brackets at the end of an internal-error message.
+ *
+ * Android surfaces its backend failures as "An internal error has occurred.
+ * [ CONFIGURATION_NOT_FOUND ]" and react-native-firebase has no code for
+ * that, so it reports auth/unknown. The bracketed part is the actual answer.
+ */
+function nativeReason(message: string): string | undefined {
+  return message.match(/\[\s*([^\]]+?)\s*\]/)?.[1];
+}
+
+/**
+ * What the common ones mean, for a development build only.
+ *
+ * Every entry here is a statement about configuration, which is the only
+ * thing auth/unknown ever turns out to be: the app, the project and the
+ * OAuth client have to agree, and when they do not, Firebase says so in a
+ * word rather than a sentence.
+ */
+const UNKNOWN_HINTS: Record<string, string> = {
+  CONFIGURATION_NOT_FOUND:
+    'The project in google-services.json has no configuration for this '
+    + 'sign-in method. Check that the Android app is registered in this '
+    + 'Firebase project and that the provider is enabled under '
+    + 'Authentication > Sign-in method.',
+  OPERATION_NOT_ALLOWED:
+    'The provider is switched off in the Firebase console, under '
+    + 'Authentication > Sign-in method.',
+  INVALID_IDP_RESPONSE:
+    'Firebase rejected the Google ID token. The usual cause is that the token '
+    + 'was issued for an OAuth client belonging to a different project than '
+    + 'the one in google-services.json. Compare the audience and '
+    + 'configuredWebClientId lines logged by `google token`.',
+  AUDIENCE_MISMATCH:
+    'The Google ID token was issued for a different OAuth client than the one '
+    + 'this Firebase project expects. Compare the audience and '
+    + 'configuredWebClientId lines logged by `google token`.',
+};

@@ -179,3 +179,24 @@ test('no screen builds its own bottom sheet', () => {
 
   assert.deepEqual(offenders, []);
 });
+
+test('no expected auth failure raises the development LogBox', () => {
+  // console.error and console.warn both open LogBox, which throws a red
+  // full-screen overlay over the app. On a sign-in screen that is actively
+  // harmful: the failure is already on screen with a proper message, and the
+  // overlay hides the log line you opened the build to read. Everything
+  // diagnostic goes through src/lib/auth-log.ts, which uses console.log.
+  const offenders = files
+    .filter((file) => code(file).match(/console\.(error|warn)\s*\(/))
+    .map(name);
+  assert.deepEqual(offenders, []);
+});
+
+test('the auth log never truncates a message', () => {
+  // The first version of authError shortened any string over eighty
+  // characters to "<86 chars>", and the one string it did that to was the
+  // Firebase message naming the cause. Only credentials are redacted now.
+  const source = read(resolve(root, 'src/lib/auth-log.ts'));
+  assert.match(source, /token, \$\{value\.length\} chars/);
+  assert.equal(/\bvalue\.length > \d+\b/.test(code(resolve(root, 'src/lib/auth-log.ts'))), false);
+});

@@ -21,6 +21,8 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 
+import { authError, authLog } from './auth-log';
+
 /**
  * Public client identifier, not a secret.
  *
@@ -38,9 +40,23 @@ export const isGoogleConfigured = (): boolean => WEB_CLIENT_ID.length > 0;
 let configured = false;
 
 export function configureGoogle(): void {
-  if (configured || !isGoogleConfigured()) return;
+  if (configured) return;
+  if (!isGoogleConfigured()) {
+    authLog('google configure', {
+      webClientId: 'missing',
+      hint: 'google-services.json has no client_type 3 entry, so app.config.ts '
+        + 'had nothing to put in extra.googleWebClientId',
+    });
+    return;
+  }
   configured = true;
   GoogleSignin.configure({ webClientId: WEB_CLIENT_ID });
+  authLog('google configure', {
+    // The identifier itself, not a secret: it is compiled into every copy of
+    // the app and printed by any proxy. Which project it belongs to is
+    // exactly the thing worth checking when Firebase rejects the token.
+    webClientId: WEB_CLIENT_ID,
+  });
 }
 
 export class GoogleSignInError extends Error {
@@ -104,9 +120,28 @@ export async function getGoogleIdToken(): Promise<string | null> {
 
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    authLog('google play services ok');
+
     const result = await GoogleSignin.signIn();
+    authLog('google picker', { type: result.type });
     if (result.type === 'cancelled') return null;
+
     const idToken = result.data?.idToken;
+    // Length and issuer-audience are the two things worth knowing and the
+    // token itself is never printed: authError redacts anything JWT-shaped,
+    // and so does this. A token in a log is a credential in a log.
+    authLog('google token', {
+      idToken: idToken ? `present, ${idToken.length} chars` : 'MISSING',
+      audience: idToken ? audienceOf(idToken) : 'n/a',
+      configuredWebClientId: WEB_CLIENT_ID,
+      // If these two disagree, Firebase rejects the credential and reports
+      // auth/unknown rather than saying which client it expected.
+      audienceMatches: idToken
+        ? String(audienceOf(idToken) === WEB_CLIENT_ID)
+        : 'n/a',
+      serverAuthCode: result.data?.serverAuthCode ? 'present' : 'none',
+      email: result.data?.user?.email ? 'present' : 'none',
+    });
     if (!idToken) {
       throw new GoogleSignInError(
         'Google did not return a sign-in token. Try again.', 'no-token',
@@ -120,14 +155,12 @@ export async function getGoogleIdToken(): Promise<string | null> {
 
     if (code === statusCodes.SIGN_IN_CANCELLED) return null;
 
-    // Logged before anything is turned into a message for a person, and
-    // always, not only in development. Without this the only thing that ever
-    // reached anybody was the neutral sentence below, which names none of the
-    // four things that could be wrong. `adb logcat -s ReactNativeJS` shows it.
-    console.error(
-      `[Ta'ziyah] Google sign-in failed. code=${String(code ?? 'none')} `
-      + `message=${String(nativeMessage ?? 'none')}`,
-    );
+    // Logged before anything is turned into a message for a person. Through
+    // authError rather than console.error: console.error raises LogBox, and a
+    // full-screen red overlay on top of a sign-in failure the screen is
+    // already reporting hides the very thing you are trying to read.
+    // `adb logcat -s ReactNativeJS | grep taziyah-auth` shows it.
+    authError('google native', error);
 
     if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       throw new GoogleSignInError(
@@ -138,7 +171,7 @@ export async function getGoogleIdToken(): Promise<string | null> {
     }
 
     if (isDeveloperError(code, nativeMessage)) {
-      console.error(`[Ta'ziyah] ${DEVELOPER_ERROR_HINT}`);
+      authLog('google DEVELOPER_ERROR', { hint: DEVELOPER_ERROR_HINT });
       throw new GoogleSignInError(
         __DEV__
           ? DEVELOPER_ERROR_HINT
@@ -159,6 +192,52 @@ export async function getGoogleIdToken(): Promise<string | null> {
       String(code ?? 'unknown'),
     );
   }
+}
+
+/**
+ * The `aud` claim of an ID token, which is the OAuth client it was issued for.
+ *
+ * Firebase accepts a Google ID token only when its audience is a client of
+ * the same project, and rejects a good token from the wrong project with
+ * auth/unknown and an internal-error message that does not say so. Reading
+ * the claim is not verifying the token: nothing here trusts it, it is only
+ * printed next to the client id the app asked for so the two can be compared.
+ */
+function audienceOf(idToken: string): string {
+  try {
+    const payload = idToken.split('.')[1];
+    if (!payload) return 'unreadable';
+    const json = JSON.parse(decodeBase64Url(payload)) as { aud?: unknown };
+    return typeof json.aud === 'string' ? json.aud : 'unreadable';
+  } catch {
+    return 'unreadable';
+  }
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+/**
+ * base64url to text, written out rather than reached for.
+ *
+ * atob exists in the Hermes runtime but is not in the type surface this
+ * project compiles against, and a Buffer polyfill is a dependency for one
+ * claim of one token. Twelve lines is cheaper than either.
+ */
+function decodeBase64Url(input: string): string {
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const char of input) {
+    const index = B64.indexOf(char);
+    if (index < 0) continue;
+    value = (value << 6) | index;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out += String.fromCharCode((value >> bits) & 0xff);
+    }
+  }
+  return out;
 }
 
 /** Sign out of Google too, so the next sign-in offers the account chooser. */
