@@ -31,6 +31,7 @@ import {
   markLaunchSettled, takePendingNotice,
 } from '../../src/features/alerts/pending-notice';
 import { useAuth } from '../../src/lib/auth';
+import { authLog } from '../../src/lib/auth-log';
 import { motion, timing, useReduceMotion } from '../../src/theme/motion';
 import { space, palettes } from '../../src/theme';
 
@@ -66,6 +67,12 @@ export default function SplashScreen() {
     const signedIn = !!user && !isAnonymous;
 
     markLaunchSettled();
+    authLog('splash', {
+      onboarded,
+      signedIn,
+      uid: user?.uid ?? null,
+      goes: !onboarded ? 'welcome' : !signedIn ? 'signin' : 'tabs',
+    });
 
     if (!onboarded) router.replace('/(launch)/welcome');
     else if (!signedIn) router.replace('/(launch)/signin');

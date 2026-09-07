@@ -20,6 +20,7 @@ import {
 import { union, sanitisePrefs, MAX_FOLLOWS, type SyncedPrefs } from '../../lib/follow-merge';
 import { readPrefs, writePrefs } from '../../lib/location';
 import { useAuth } from '../../lib/auth';
+import { authError, authLog } from '../../lib/auth-log';
 
 type FollowsValue = {
   ready: boolean;
@@ -90,8 +91,15 @@ export function FollowsProvider({ children }: { children: React.ReactNode }) {
       const prefs = await writePrefsSnapshot();
       if (cancelled) return;
       await writeAccount(uid, merged, prefs);
+      authLog('profile synced', { uid, follows: merged.length });
       setSynced(true);
-    })();
+    })().catch((error) => {
+      // readAccount and writeAccount swallow their own failures, so reaching
+      // here means local storage failed rather than Firestore. It is not
+      // fatal and must not take the tree down with it, but an unhandled
+      // rejection is not a diagnosis either.
+      authError('profile sync', error);
+    });
 
     return () => { cancelled = true; };
   }, [authReady, ready, user]);

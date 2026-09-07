@@ -19,6 +19,10 @@ export const getMessaging = () => ({});
 export const getFunctions = () => ({});
 
 export const onAuthStateChanged = () => noop;
+// The app subscribes to this one rather than onAuthStateChanged: a link onto
+// an anonymous session does not change the uid, so only the id-token listener
+// fires. See src/lib/auth.tsx.
+export const onIdTokenChanged = () => noop;
 export const signInAnonymously = async () => ({ user: { uid: 'preview', isAnonymous: true } });
 export const signInWithEmailAndPassword = resolved;
 export const createUserWithEmailAndPassword = resolved;

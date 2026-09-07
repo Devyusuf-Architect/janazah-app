@@ -20,6 +20,7 @@ import { useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 
 import { useAuth } from '../../lib/auth';
+import { authLog } from '../../lib/auth-log';
 
 export function useAuthGate(): void {
   const { user, ready, isAnonymous } = useAuth();
@@ -35,6 +36,14 @@ export function useAuthGate(): void {
     // race that decision and skip onboarding.
     const inLaunch = group === '(launch)' || group === undefined;
     const signedIn = !!user && !isAnonymous;
+
+    authLog('gate', {
+      group: group ?? 'root',
+      signedIn,
+      anonymous: isAnonymous,
+      uid: user?.uid ?? null,
+      decision: !signedIn && !inLaunch ? 'bounce to signin' : 'stay',
+    });
 
     if (!signedIn && !inLaunch) {
       // Signed out from inside the app: a sign-out, or a token that expired

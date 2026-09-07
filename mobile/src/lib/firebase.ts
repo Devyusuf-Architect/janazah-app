@@ -13,23 +13,17 @@
 // connects to an emulator, whatever the environment says, because the check
 // below is on __DEV__ first.
 
-import { Platform } from 'react-native';
 import { getApp } from '@react-native-firebase/app';
 import { getAuth, connectAuthEmulator } from '@react-native-firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from '@react-native-firebase/firestore';
 
-/**
- * The host the emulators are reachable at from the device.
- *
- * 10.0.2.2 is the Android emulator's alias for the host machine's loopback.
- * A real device on the same network needs the machine's LAN address instead,
- * which is what EXPO_PUBLIC_EMULATOR_HOST is for.
- */
-export const emulatorHost = process.env.EXPO_PUBLIC_EMULATOR_HOST
-  ?? (Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1');
+import { authLog } from './auth-log';
+import { emulatorHost, usingEmulator } from './backend';
 
-export const usingEmulator =
-  __DEV__ && process.env.EXPO_PUBLIC_USE_LIVE !== '1';
+// The two flags live in src/lib/backend.ts, which imports nothing native, so
+// the error copy and the development banner can read them without pulling the
+// Firebase SDK in behind them.
+export { emulatorHost, usingEmulator } from './backend';
 
 export const app = getApp();
 export const auth = getAuth(app);
@@ -44,11 +38,20 @@ let connected = false;
  * emulator twice throws.
  */
 export function connectEmulators(): void {
+  // Said on every launch, whichever way it goes, because "which backend is
+  // this build talking to" is the first question any sign-in failure raises
+  // and the app used to answer it only by implication. A dead emulator and a
+  // wrong password produced the same message.
+  authLog('backend', {
+    project: app.options.projectId,
+    target: usingEmulator ? `emulator ${emulatorHost}` : 'live Firebase',
+    hint: usingEmulator
+      ? 'set EXPO_PUBLIC_USE_LIVE=1 and restart Metro with -c for live data'
+      : 'none',
+  });
+
   if (!usingEmulator || connected) return;
   connected = true;
   connectAuthEmulator(auth, `http://${emulatorHost}:9099`);
   connectFirestoreEmulator(db, emulatorHost, 8080);
-  // Deliberately not logged with the host in a release build; __DEV__ gates
-  // the whole function, so this only ever runs during development.
-  console.info(`Ta'ziyah is using the Firebase emulators at ${emulatorHost}.`);
 }

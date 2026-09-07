@@ -34,6 +34,7 @@ import { getDoc } from '@react-native-firebase/firestore';
 
 import { auth } from './firebase';
 import { adminRef } from './collections';
+import { authError, authLog } from './auth-log';
 
 export type Role = {
   isAdmin: boolean;
@@ -80,12 +81,7 @@ async function linkOrSignIn(
   if (current?.isAnonymous) {
     try {
       await linkWithCredential(current, credential);
-      if (__DEV__) {
-        console.log(
-          `[Ta'ziyah] auth: linked ${credential.providerId} onto the `
-          + `anonymous session ${current.uid}.`,
-        );
-      }
+      authLog('link ok', { provider: credential.providerId, uid: current.uid });
       return;
     } catch (error) {
       const code = (error as { code?: string }).code ?? '';
@@ -95,21 +91,17 @@ async function linkOrSignIn(
         || code === 'auth/email-already-in-use'
         || code === 'auth/account-exists-with-different-credential';
       if (!alreadyExists) throw error;
-      if (__DEV__) {
-        console.log(
-          `[Ta'ziyah] auth: ${code} on link, which is the ordinary case of an `
-          + 'account that already exists. Signing in to it instead.',
-        );
-      }
+      authLog('link declined', {
+        code,
+        next: 'signInWithCredential',
+      });
     }
   }
   await signInWithCredential(getAuth(), credential);
-  if (__DEV__) {
-    console.log(
-      `[Ta'ziyah] auth: signed in with ${credential.providerId} as `
-      + `${getAuth().currentUser?.uid ?? 'nobody'}.`,
-    );
-  }
+  authLog('credential ok', {
+    provider: credential.providerId,
+    uid: getAuth().currentUser?.uid ?? null,
+  });
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -141,6 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Linking mints a new ID token, so the id-token listener does fire, and it
   // is a superset: sign-in, sign-out, token refresh and link all reach it.
   useEffect(() => onIdTokenChanged(auth, (next) => {
+    authLog('listener', {
+      uid: next?.uid ?? null,
+      anonymous: next?.isAnonymous ?? null,
+      providers: next?.providerData?.map((p) => p.providerId) ?? [],
+      email: next?.email ? 'present' : 'none',
+    });
     setUser(next);
     setReady(true);
 
@@ -164,7 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * time (_setUser), so this is a real state change and not a no-op.
    */
   const syncUser = React.useCallback(() => {
-    setUser(getAuth().currentUser);
+    const current = getAuth().currentUser;
+    authLog('sync', {
+      currentUser: current ? current.uid : null,
+      anonymous: current?.isAnonymous ?? null,
+    });
+    setUser(current);
     setReady(true);
   }, []);
 
@@ -179,8 +182,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let isAdmin = false;
       try {
         isAdmin = (await getDoc(adminRef(user.uid))).exists();
-      } catch {
+        authLog('role', { uid: user.uid, admin: isAdmin });
+      } catch (error) {
         // The rules allow reading only your own admin row; a denial means no.
+        // Logged anyway: a denial and an unreachable backend look identical
+        // from here, and only one of them is expected.
+        authError('role', error);
         isAdmin = false;
       }
       if (!cancelled) setRole({ isAdmin });
@@ -196,7 +203,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role,
 
     signIn: async (email, password) => {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      authLog('signIn start', { provider: 'password' });
+      try {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      } catch (error) {
+        authError('signIn', error);
+        throw error;
+      }
+      authLog('signIn done', { currentUser: getAuth().currentUser?.uid ?? null });
       syncUser();
     },
 
@@ -213,7 +227,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
 
     signInWithGoogleCredential: async (idToken) => {
-      await linkOrSignIn(GoogleAuthProvider.credential(idToken));
+      authLog('signIn start', { provider: 'google.com' });
+      try {
+        await linkOrSignIn(GoogleAuthProvider.credential(idToken));
+      } catch (error) {
+        authError('signIn google.com', error);
+        throw error;
+      }
+      authLog('signIn done', { currentUser: getAuth().currentUser?.uid ?? null });
       // The one that was broken. See the note on onIdTokenChanged above.
       syncUser();
     },
@@ -227,7 +248,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (current) await sendEmailVerification(current);
     },
 
-    signOut: async () => { await fbSignOut(auth); syncUser(); },
+    signOut: async () => {
+      authLog('signOut');
+      await fbSignOut(auth);
+      syncUser();
+    },
   }), [user, ready, role, syncUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

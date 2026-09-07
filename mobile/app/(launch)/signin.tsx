@@ -29,6 +29,7 @@ import {
   UNSUPPORTED_FACTOR_MESSAGE, type MfaChallenge,
 } from '../../src/lib/mfa';
 import { friendlyAuthError } from '../../src/lib/auth-errors';
+import { authError, authLog } from '../../src/lib/auth-log';
 import { takePendingNotice } from '../../src/features/alerts/pending-notice';
 import { useColors, radius, space, elevation } from '../../src/theme';
 
@@ -59,6 +60,7 @@ export default function SignInScreen() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const done = () => {
+    authLog('signin screen', { goes: 'tabs' });
     router.replace('/(tabs)');
     // A notification tap that arrived with no session to restore. The splash
     // left it for whoever got somebody through the door.
@@ -78,11 +80,7 @@ export default function SignInScreen() {
       // Every failure is logged with its Firebase code before it becomes a
       // sentence. Without this the only trace of, say, an MFA challenge that
       // failed to parse was a generic message. `adb logcat -s ReactNativeJS`.
-      console.error(
-        `[Ta'ziyah] sign-in failed. code=`
-        + `${String((caught as { code?: string }).code ?? 'none')} `
-        + `message=${String((caught as { message?: string }).message ?? caught)}`,
-      );
+      authError('signin screen', caught);
       // A second factor is not a failure, it is the next step, so it is
       // handled before anything is reported as an error.
       const next = challengeFrom(caught);
@@ -245,12 +243,7 @@ export default function SignInScreen() {
                         // says so in a development build rather than looking
                         // like a tap that did nothing.
                         if (!idToken) {
-                          if (__DEV__) {
-                            console.log(
-                              `[Ta'ziyah] Google sign-in was cancelled before `
-                              + 'a token was issued.',
-                            );
-                          }
+                          authLog('google cancelled before a token');
                           throw new CancelledSignIn();
                         }
                         await signInWithGoogleCredential(idToken);

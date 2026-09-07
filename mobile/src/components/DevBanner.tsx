@@ -24,7 +24,7 @@ import React, { useState } from 'react';
 import { Platform, Pressable, StatusBar as RNStatusBar } from 'react-native';
 
 import { Text } from './Text';
-import { usingEmulator, emulatorHost } from '../lib/firebase';
+import { usingEmulator, emulatorHost } from '../lib/backend';
 import { useColors, space } from '../theme';
 
 export function DevBanner() {

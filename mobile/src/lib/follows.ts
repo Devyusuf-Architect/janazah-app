@@ -31,6 +31,7 @@ import {
 
 import { userRef } from './collections';
 import { auth } from './firebase';
+import { authError } from './auth-log';
 import {
   MAX_FOLLOWS, readRecord,
   type AccountRecord, type SyncedPrefs,
@@ -75,9 +76,12 @@ export async function readAccount(uid: string): Promise<AccountRecord | null> {
     const snapshot = await getDoc(userRef(uid));
     if (!snapshot.exists()) return null;
     return readRecord(snapshot.data());
-  } catch {
+  } catch (error) {
     // A denial or a network failure. The local list is still correct and is
-    // what every screen reads.
+    // what every screen reads, so this is not fatal, but it is logged: a
+    // silent swallow here is how a Firestore rules problem stayed invisible
+    // while looking like a sign-in that did not take.
+    authError('profile read', error);
     return null;
   }
 }
@@ -93,9 +97,10 @@ export async function writeAccount(
       ...(prefs ? { prefs } : {}),
       updatedAt: serverTimestamp(),
     });
-  } catch {
+  } catch (error) {
     // Fire and forget by design. A failed mirror is a sync that catches up
-    // later, not a lost follow.
+    // later, not a lost follow. Logged for the same reason as the read.
+    authError('profile write', error);
   }
 }
 

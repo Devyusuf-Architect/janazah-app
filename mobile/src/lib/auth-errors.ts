@@ -10,6 +10,8 @@
 //   Never print a raw Firebase code. "auth/invalid-credential" tells somebody
 //   standing outside a masjid nothing at all.
 
+import { emulatorHost, usingEmulator } from './backend';
+
 const MESSAGES: Record<string, string> = {
   'auth/invalid-email': 'That does not look like an email address.',
   'auth/missing-password': 'Enter your password.',
@@ -39,8 +41,27 @@ const AMBIGUOUS = new Set([
 
 export function friendlyAuthError(error: unknown): string {
   const code = (error as { code?: string })?.code ?? '';
+
+  // The one case where the honest message is about the build rather than the
+  // person. A development build points at the local Firebase emulators
+  // unless EXPO_PUBLIC_USE_LIVE=1, and with none running every sign-in fails
+  // with a network error, for every provider and every account, including one
+  // that works perfectly on the website. "Check your connection" sends
+  // somebody to look at their wifi, which is the wrong place entirely.
+  if (code === 'auth/network-request-failed' && __DEV__ && usingEmulator) {
+    return `This build is pointed at the Firebase emulators at ${emulatorHost}, `
+      + 'not at the live project, and nothing answered. Start them with '
+      + '`npm run demo` from the repository root, or rebuild with '
+      + 'EXPO_PUBLIC_USE_LIVE=1 to sign in against real accounts.';
+  }
+
   if (AMBIGUOUS.has(code)) {
     return 'That email address and password did not match. Check both and try again.';
+  }
+  if (__DEV__ && !MESSAGES[code] && !AMBIGUOUS.has(code)) {
+    // An unmapped code is worth naming to a developer rather than hiding
+    // behind "something went wrong".
+    return `Sign-in failed: ${code || 'no code'}. See the log for detail.`;
   }
   return MESSAGES[code]
     ?? 'Something went wrong signing in. Try again in a moment.';
