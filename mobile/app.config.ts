@@ -11,6 +11,9 @@ import type { ExpoConfig } from 'expo/config';
 
 const ANDROID_PACKAGE = 'com.taziyah.app';
 
+/** The EAS project, created by `eas init`. See extra.eas.projectId below. */
+const EAS_PROJECT_ID = '7b63ade2-7173-499c-9e50-a26c8de036e7';
+
 const GOOGLE_SERVICES = './google-services.json';
 
 /**
@@ -199,6 +202,11 @@ const config: ExpoConfig = {
     androidPackage: ANDROID_PACKAGE,
     googleWebClientId: googleWebClientId(),
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    // The EAS project this app builds under. `eas init` writes this itself
+    // for a static app.json and cannot for a dynamic config, so it is
+    // written here by hand. It identifies the project on Expo's servers and
+    // is not a secret: it appears in every build's manifest.
+    eas: { projectId: EAS_PROJECT_ID },
   },
 };
 
