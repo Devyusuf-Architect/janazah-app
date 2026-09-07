@@ -77,10 +77,9 @@ if (!existsSync(gsPath)) {
         + '  means none is registered against com.taziyah.app yet, or the file\n'
         + '  was downloaded before one was added.\n'
         + '  A build from `expo run:android` is signed with the DEBUG keystore,\n'
-        + '  not the EAS release one, so BOTH have to be registered:\n'
-        + '    debug   keytool -printcert -jarfile \\\n'
-        + '              android/app/build/outputs/apk/debug/app-debug.apk\n'
-        + '    release eas credentials\n'
+        + '  not the EAS release one, so BOTH have to be registered.\n'
+        + '    npm run signing     prints the debug fingerprints and compares\n'
+        + '    npx eas credentials prints the release ones\n'
         + '  Add each SHA-1 and SHA-256 in Firebase console > Project settings\n'
         + '  > Your apps > com.taziyah.app, then download the file again.',
       );
@@ -92,18 +91,35 @@ if (!existsSync(gsPath)) {
         `google-services.json carries ${hashes.length} registered signing\n`
         + '  certificate(s) for Continue with Google:\n'
         + hashes.map((h) => `    ${h}`).join('\n') + '\n'
-        + '  Sign-in works only for a build signed by one of these. Compare\n'
-        + '  against the build you are installing with:\n'
-        + '    keytool -printcert -jarfile \\\n'
-        + '      android/app/build/outputs/apk/debug/app-debug.apk\n'
-        + '  (the SHA-1 there, lowercased with the colons removed, is what\n'
-        + '  appears above).',
+        + '  Sign-in works only for a build signed by one of these.\n'
+        + '    npm run signing   compares them against what actually signs\n'
+        + '                      local builds, and against a built APK.',
       );
     }
 
   } catch {
     problems.push('google-services.json is not valid JSON.');
   }
+}
+
+// ---- the debug signing certificate ---------------------------------------
+// plugins/with-debug-keystore.js points the generated debug signingConfig at
+// this file. Without it the build falls back to the Expo template's own
+// keystore, whose certificate is not the one registered in Firebase, and
+// Google sign-in fails with DEVELOPER_ERROR for reasons nothing on screen
+// explains.
+if (!existsSync(resolve(root, 'credentials/debug.keystore'))) {
+  problems.push(
+    'credentials/debug.keystore is missing.\n'
+    + '  It is committed to the repository on purpose: it is what gives local\n'
+    + '  Android builds a signing certificate that survives\n'
+    + '  `expo prebuild --clean`, so one fingerprint stays registered in\n'
+    + '  Firebase instead of a new one every time the native project is\n'
+    + '  regenerated.\n'
+    + '  Restore it with `git checkout -- credentials/debug.keystore` rather\n'
+    + '  than generating a new one. A new keystore is a new certificate and a\n'
+    + '  new fingerprint for everybody to register.',
+  );
 }
 
 // ---- Google Maps ---------------------------------------------------------

@@ -85,6 +85,11 @@ change that:
 
 A release build never connects to an emulator regardless of either variable.
 
+Local builds are signed with `credentials/debug.keystore`, which is committed
+so that the debug certificate survives `expo prebuild --clean` and one
+fingerprint stays registered in Firebase. `npm run signing` prints it and
+checks it against `google-services.json`. See docs/eas.md.
+
 ## Layout
 
 ```

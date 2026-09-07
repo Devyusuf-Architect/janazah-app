@@ -150,6 +150,11 @@ const config: ExpoConfig = {
     // registered before it in order to run after it.
     // See plugins/with-notification-color-fix.js.
     './plugins/with-notification-color-fix',
+    // Points the generated debug signingConfig at credentials/debug.keystore
+    // instead of the one the Expo template ships, so the debug certificate is
+    // the project's own and survives `expo prebuild --clean`. One SHA-1 in
+    // Firebase, forever. See plugins/with-debug-keystore.js.
+    './plugins/with-debug-keystore',
     'expo-router',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
