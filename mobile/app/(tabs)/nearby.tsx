@@ -76,7 +76,7 @@ export default function NearbyScreen() {
   return (
     <Screen>
       <View style={{ paddingTop: insets.top + space.lg }}>
-        <PageTitle title="Nearby" />
+        <PageTitle title="Near Me" />
 
         <View style={{ paddingHorizontal: space.lg, paddingBottom: space.md }}>
           {location.point ? (

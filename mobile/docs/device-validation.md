@@ -309,7 +309,7 @@ never verify.
 
 ## 7. Google Maps API key — Google Cloud Console
 
-**Once. Optional: without it the map view is hidden and Nearby works as a
+**Once. Optional: without it the map view is hidden and Near Me works as a
 list.**
 
 1. Go to `console.cloud.google.com`, and select the project
@@ -451,7 +451,7 @@ Sign out, then **Continue with Google**.
   re-downloaded after registering it. Redo section 5.
 - Works → also confirm Profile shows the right account afterwards.
 
-### 10e. Location and Nearby
+### 10e. Location and Near Me
 
 Set a position the emulator will report:
 
@@ -460,7 +460,7 @@ Set a position the emulator will report:
    published notice. Toronto downtown is `43.6532`, `-79.3832`.
 3. **Set location**.
 
-In the app: **Nearby → Use my location**. Grant the permission when Android
+In the app: **Near Me → Use my location**. Grant the permission when Android
 asks.
 
 Confirm:
@@ -468,7 +468,7 @@ Confirm:
 - Distances appear on the rows, and they are plausible for the coordinates you
   set.
 - Changing the radius changes what is listed.
-- **Turn off location**, then reopen Nearby: it should be back to the
+- **Turn off location**, then reopen Near Me: it should be back to the
   explanation screen, not still showing distances.
 - Deny the permission twice (uninstall and reinstall to get the prompt back),
   and confirm you get the **Android Settings instructions** rather than a

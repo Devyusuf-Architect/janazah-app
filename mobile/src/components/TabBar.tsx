@@ -34,7 +34,7 @@ export const TAB_ICONS: Record<string, TabIconName> = {
   index: 'home',
   janazahs: 'notices',
   nearby: 'near',
-  following: 'follow',
+  following: 'masjid',
   profile: 'profile',
 };
 
@@ -125,6 +125,10 @@ function Tab({ icon, label, focused, onPress, onLongPress, badge }: {
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
+      // The visible word and the spoken one are the same string, so a label
+      // cannot drift from what is printed under the icon. The role already
+      // says "tab" and the state already says which one is selected, so
+      // repeating either here would only make TalkBack say it twice.
       accessibilityLabel={label}
       onPress={onPress}
       onLongPress={onLongPress}

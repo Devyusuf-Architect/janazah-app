@@ -28,10 +28,10 @@ Without them it fails with a developer error and nothing more useful.
 `eas credentials` prints the fingerprints.
 
 **`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`** is optional and enables the map view in
-Nearby. It is a separate key from anything in `google-services.json`, since the
+Near Me. It is a separate key from anything in `google-services.json`, since the
 Maps SDK for Android is billed and restricted independently of Firebase, and it
 should be restricted in Google Cloud to this package name and signing
-certificate. Without it the List/Map toggle is hidden and Nearby works as a
+certificate. Without it the List/Map toggle is hidden and Near Me works as a
 list, which is deliberate: an unkeyed map renders blank tiles and reads as a
 broken app rather than a missing key.
 
@@ -109,7 +109,7 @@ checks it against `google-services.json`. See docs/eas.md.
 
 ```
 app/                 expo-router routes; the file tree is the navigation
-  (tabs)/            Home, Nearby, Following, Alerts, Profile
+  (tabs)/            Home, Janazahs, Near Me, Masjids, Profile
   n/[id].tsx         a notice. The deep-link and notification target.
 src/
   theme/             the design system. Every colour and size lives here.
@@ -132,7 +132,7 @@ scripts/             preflight, and the Android images
 - **Never weaken `firestore.rules` for this app.** If a screen cannot read
   something, the screen is wrong. The rules are the security model for both
   clients and the mobile build is assumed to be readable by anyone.
-- **No user positions, ever.** Nearby matching happens in this process against
+- **No user positions, ever.** Near Me matching happens in this process against
   notices already fetched. Nothing about where anyone is may be written to
   Firestore, logged, or sent anywhere. If a change appears to need that, the
   design has drifted. `test/location.test.ts` enforces this structurally: no

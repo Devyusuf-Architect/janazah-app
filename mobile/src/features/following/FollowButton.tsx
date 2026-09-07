@@ -44,9 +44,11 @@ export function FollowButton({ orgId, size = 'compact', full = false }: {
       disabled={!ready || (atLimit && !following)}
       icon={following ? <Tick color={colors.accent} /> : null}
       accessibilityState={{ selected: following, disabled: !ready }}
+      // Names the tab these notices appear in, so the hint stays true to
+      // what is written at the bottom of the screen.
       accessibilityHint={following
-        ? 'Stops showing notices from this masjid in Following'
-        : 'Shows notices from this masjid in Following'}
+        ? 'Stops showing notices from this masjid in the Masjids tab'
+        : 'Shows notices from this masjid in the Masjids tab'}
       onPress={async () => {
         setBusy(true);
         try {

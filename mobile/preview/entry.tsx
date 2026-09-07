@@ -147,7 +147,7 @@ const NOTICES: { notice: Notice; distanceKm?: number }[] = [
  */
 function PreviewTabBar() {
   const routes = ['index', 'janazahs', 'nearby', 'following', 'profile'];
-  const titles = ['Home', 'Janazahs', 'Nearby', 'Following', 'Profile'];
+  const titles = ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Profile'];
   const props = {
     state: {
       index: 0,

@@ -120,7 +120,7 @@ export default function ProfileScreen() {
             />
             <Divider inset={space.lg} />
             <Row
-              title="Nearby"
+              title="Near Me"
               note={location.point ? radiusLabel : 'Off'}
               subtitle={location.point
                 ? 'Distances are worked out on this phone'

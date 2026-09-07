@@ -113,6 +113,45 @@ test('the tab bar and the tab routes agree', () => {
   }
 });
 
+test('a tab is called the same thing in the bar and on its own screen', () => {
+  // Two names for one section is how somebody ends up looking for a screen
+  // they have already found. Home is exempt: it has a branded header rather
+  // than a page title.
+  const layout = read(resolve(root, 'app/(tabs)/_layout.tsx'));
+  const titles = new Map<string, string>();
+  for (const match of layout.matchAll(/name: '(\w+)', title: '([^']+)'/g)) {
+    titles.set(String(match[1]), String(match[2]));
+  }
+  assert.equal(titles.size, 5, 'the tabs list did not parse');
+
+  for (const [route, title] of titles) {
+    const screen = read(resolve(root, `app/(tabs)/${route}.tsx`));
+    const page = screen.match(/<PageTitle title="([^"]+)"/)?.[1];
+    if (!page) continue;
+    assert.equal(
+      page, title,
+      `the ${route} tab is labelled "${title}" in the bar and "${page}" on the screen`,
+    );
+  }
+});
+
+test('every tab has a glyph of its own', () => {
+  // Two tabs sharing an icon is the same bug as two tabs sharing a word.
+  const bar = read(resolve(root, 'src/components/TabBar.tsx'));
+  const block = bar.match(/TAB_ICONS[^{]*\{([^}]*)\}/)?.[1] ?? '';
+  const icons = [...block.matchAll(/:\s*'(\w+)'/g)].map((m) => String(m[1]));
+  assert.equal(icons.length, 5, 'TAB_ICONS did not parse');
+  assert.equal(new Set(icons).size, icons.length, 'two tabs share an icon');
+
+  const glyphs = read(resolve(root, 'src/components/TabIcon.tsx'));
+  for (const icon of icons) {
+    assert.match(
+      glyphs, new RegExp(`name === '${icon}'`),
+      `TabIcon draws nothing for '${icon}', so that tab would show a blank box`,
+    );
+  }
+});
+
 test('no screen ships its own back button any more', () => {
   // ScreenHeader is the one back affordance. A Button labelled "Back" in the
   // content is what the app looked like before the redesign.

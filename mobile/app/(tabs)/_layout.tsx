@@ -1,8 +1,14 @@
 // Bottom navigation.
 //
-// Five tabs: Home, Janazahs, Nearby, Following, Profile. They are the five
+// Five tabs: Home, Janazahs, Near Me, Masjids, Profile. They are the five
 // things a community member does, and a sixth would start pushing labels into
 // ellipses at large font sizes.
+//
+// Two of those labels say what the section holds rather than what it does.
+// "Nearby" and "Following" are both states, and neither told somebody opening
+// the app for the first time what they would find. "Near Me" is janazahs
+// close to where the phone is; "Masjids" is the masjids this reader follows,
+// which is also what the row in Profile has always called them.
 //
 // Alerts used to be the fourth tab and is not any more. It is a settings
 // screen, opened perhaps twice in a year, and it was taking a fifth of the
@@ -24,8 +30,8 @@ import { motion, useReduceMotion } from '../../src/theme/motion';
 const TABS: { name: string; title: string }[] = [
   { name: 'index', title: 'Home' },
   { name: 'janazahs', title: 'Janazahs' },
-  { name: 'nearby', title: 'Nearby' },
-  { name: 'following', title: 'Following' },
+  { name: 'nearby', title: 'Near Me' },
+  { name: 'following', title: 'Masjids' },
   { name: 'profile', title: 'Profile' },
 ];
 

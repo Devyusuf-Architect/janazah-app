@@ -90,7 +90,7 @@ export default function FollowingScreen() {
           />
         )}
       >
-        <PageTitle title="Following" />
+        <PageTitle title="Masjids" />
         <View style={{ paddingHorizontal: space.lg, gap: space.md }}>
 
           {follows.ids.length ? (

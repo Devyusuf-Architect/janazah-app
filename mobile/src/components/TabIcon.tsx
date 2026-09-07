@@ -12,7 +12,7 @@ import React from 'react';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 export type TabIconName =
-  | 'home' | 'notices' | 'near' | 'follow' | 'alert' | 'profile';
+  | 'home' | 'notices' | 'near' | 'masjid' | 'alert' | 'profile';
 
 const SIZE = 24;
 
@@ -54,11 +54,19 @@ export function TabIcon({ name, color, focused }: {
         </>
       ) : null}
 
-      {name === 'follow' ? (
-        <Path
-          d="M12 20.2 5.2 13.6a4.3 4.3 0 0 1 6.1-6.1l.7.7.7-.7a4.3 4.3 0 0 1 6.1 6.1z"
-          {...common}
-        />
+      {/* A masjid, because the tab it belongs to is the list of masjids
+          somebody follows. It used to be a heart, which read as favourites
+          and said nothing about what the tab holds. Drawn plainly: a dome on
+          two walls, a minaret either side, a finial, a doorway. */}
+      {name === 'masjid' ? (
+        <>
+          <Path d="M6.4 20v-7.2a5.6 5.6 0 0 1 11.2 0V20" {...common} />
+          <Path d="M3.4 20h17.2" {...common} />
+          <Path d="M4.9 20V9.8M19.1 20V9.8" {...common} />
+          <Path d="M12 7.2V5.4" {...common} />
+          <Circle cx="12" cy="4.3" r="1" {...common} />
+          <Path d="M10.3 20v-3a1.7 1.7 0 0 1 3.4 0v3" {...common} />
+        </>
       ) : null}
 
       {name === 'alert' ? (
