@@ -75,6 +75,14 @@ export default function SignInScreen() {
       done();
     } catch (caught) {
       if (caught instanceof CancelledSignIn) return;
+      // Every failure is logged with its Firebase code before it becomes a
+      // sentence. Without this the only trace of, say, an MFA challenge that
+      // failed to parse was a generic message. `adb logcat -s ReactNativeJS`.
+      console.error(
+        `[Ta'ziyah] sign-in failed. code=`
+        + `${String((caught as { code?: string }).code ?? 'none')} `
+        + `message=${String((caught as { message?: string }).message ?? caught)}`,
+      );
       // A second factor is not a failure, it is the next step, so it is
       // handled before anything is reported as an error.
       const next = challengeFrom(caught);
@@ -232,7 +240,19 @@ export default function SignInScreen() {
                       busy={busy}
                       onPress={() => attempt(async () => {
                         const idToken = await getGoogleIdToken();
-                        if (!idToken) throw new CancelledSignIn();
+                        // Null means the person backed out of the account
+                        // sheet. It is the one silent path in the app, so it
+                        // says so in a development build rather than looking
+                        // like a tap that did nothing.
+                        if (!idToken) {
+                          if (__DEV__) {
+                            console.log(
+                              `[Ta'ziyah] Google sign-in was cancelled before `
+                              + 'a token was issued.',
+                            );
+                          }
+                          throw new CancelledSignIn();
+                        }
                         await signInWithGoogleCredential(idToken);
                       })}
                     />

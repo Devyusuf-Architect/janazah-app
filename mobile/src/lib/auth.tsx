@@ -16,7 +16,7 @@ import React, {
 } from 'react';
 import {
   getAuth,
-  onAuthStateChanged,
+  onIdTokenChanged,
   signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -80,6 +80,12 @@ async function linkOrSignIn(
   if (current?.isAnonymous) {
     try {
       await linkWithCredential(current, credential);
+      if (__DEV__) {
+        console.log(
+          `[Ta'ziyah] auth: linked ${credential.providerId} onto the `
+          + `anonymous session ${current.uid}.`,
+        );
+      }
       return;
     } catch (error) {
       const code = (error as { code?: string }).code ?? '';
@@ -89,9 +95,21 @@ async function linkOrSignIn(
         || code === 'auth/email-already-in-use'
         || code === 'auth/account-exists-with-different-credential';
       if (!alreadyExists) throw error;
+      if (__DEV__) {
+        console.log(
+          `[Ta'ziyah] auth: ${code} on link, which is the ordinary case of an `
+          + 'account that already exists. Signing in to it instead.',
+        );
+      }
     }
   }
   await signInWithCredential(getAuth(), credential);
+  if (__DEV__) {
+    console.log(
+      `[Ta'ziyah] auth: signed in with ${credential.providerId} as `
+      + `${getAuth().currentUser?.uid ?? 'nobody'}.`,
+    );
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -101,7 +119,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Guards against two anonymous sign-ins racing on a cold start.
   const bootstrapping = useRef(false);
 
-  useEffect(() => onAuthStateChanged(auth, (next) => {
+  // onIdTokenChanged, NOT onAuthStateChanged, and the difference is a bug
+  // this app actually had.
+  //
+  // Every launch signs in anonymously, so the current user when somebody taps
+  // Continue with Google is an anonymous one, and the first-time path links
+  // the Google credential onto it (see linkOrSignIn). Linking does not change
+  // the uid, so Android's FirebaseAuth.AuthStateListener does not fire, and
+  // react-native-firebase only emits onAuthStateChanged from that listener
+  // (its lib/index.ts: _handleAuthStateChanged is driven by the native
+  // auth_state_changed event, while the resolved credential goes through
+  // _setUserCredential, which emits onUserChanged and nothing else).
+  //
+  // The result was that React kept the stale anonymous user after a
+  // successful Google sign-in: isAnonymous stayed true, useAuthGate decided
+  // nobody was signed in, and the moment sign-in navigated to the tabs the
+  // gate replaced back to sign-in. The Google flow completed and the app came
+  // back with nobody signed in. Email and password were unaffected because
+  // they change the uid, which does fire the auth state listener.
+  //
+  // Linking mints a new ID token, so the id-token listener does fire, and it
+  // is a superset: sign-in, sign-out, token refresh and link all reach it.
+  useEffect(() => onIdTokenChanged(auth, (next) => {
     setUser(next);
     setReady(true);
 
@@ -115,6 +154,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .finally(() => { bootstrapping.current = false; });
     }
   }), []);
+
+  /**
+   * Push the SDK's current user into React, without waiting for an event.
+   *
+   * Belt and braces after the bug above: every auth action calls this when it
+   * resolves, so the app never depends on which listener a given provider
+   * happens to trigger. react-native-firebase builds a fresh User object each
+   * time (_setUser), so this is a real state change and not a no-op.
+   */
+  const syncUser = React.useCallback(() => {
+    setUser(getAuth().currentUser);
+    setReady(true);
+  }, []);
 
   // Roles are resolved after sign-in rather than assumed. Until this
   // resolves the app simply shows no coordinator affordances, which is the
@@ -145,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     signIn: async (email, password) => {
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      syncUser();
     },
 
     signUp: async (email, password, name) => {
@@ -156,10 +209,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // is, which is why organization verification is a separate process
       // entirely, handled by a human administrator on the web.
       await sendEmailVerification(created).catch(() => {});
+      syncUser();
     },
 
     signInWithGoogleCredential: async (idToken) => {
       await linkOrSignIn(GoogleAuthProvider.credential(idToken));
+      // The one that was broken. See the note on onIdTokenChanged above.
+      syncUser();
     },
 
     resetPassword: async (email) => {
@@ -171,8 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (current) await sendEmailVerification(current);
     },
 
-    signOut: async () => { await fbSignOut(auth); },
-  }), [user, ready, role]);
+    signOut: async () => { await fbSignOut(auth); syncUser(); },
+  }), [user, ready, role, syncUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
