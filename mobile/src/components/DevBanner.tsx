@@ -42,7 +42,7 @@ export function DevBanner() {
       accessibilityLabel={live
         ? 'Development build, connected to the live Firebase project. Tap to hide.'
         : `Development build, connected to the Firebase emulators at ${emulatorHost}, `
-          + 'not to the live project. Set EXPO_PUBLIC_USE_LIVE=1 for live data. Tap to hide.'}
+          + 'not to the live project. Run npm run android:live for live data. Tap to hide.'}
       onPress={() => setHidden(true)}
       style={{
         position: 'absolute',

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
+    "android:live": "EXPO_PUBLIC_USE_LIVE=1 expo run:android",
+    "start:live": "EXPO_PUBLIC_USE_LIVE=1 expo start --dev-client --clear",
     "prebuild": "node scripts/preflight.mjs && expo prebuild --platform android",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --import ./test/extensionless.mjs --test \"test/*.test.ts\"",

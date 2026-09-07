@@ -61,6 +61,7 @@ export const updateDoc = resolved;
 export const deleteDoc = resolved;
 export const connectAuthEmulator = noop;
 export const connectFirestoreEmulator = noop;
+export const connectFunctionsEmulator = noop;
 export const httpsCallable = () => resolved;
 export const getToken = resolved;
 export const deleteToken = resolved;

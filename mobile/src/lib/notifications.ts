@@ -32,10 +32,10 @@ import {
   getMessaging, getToken, deleteToken, requestPermission,
   hasPermission, AuthorizationStatus,
 } from '@react-native-firebase/messaging';
-import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
+import { httpsCallable } from '@react-native-firebase/functions';
 import { signInAnonymously } from '@react-native-firebase/auth';
 
-import { app, auth } from './firebase';
+import { app, auth, functions } from './firebase';
 import { desiredTopics, topicDelta } from './topics';
 import type { LocationPrefs, Point } from './nearby';
 
@@ -43,9 +43,6 @@ import type { LocationPrefs, Point } from './nearby';
 export const CHANNEL_ID = 'janazah';
 
 const STATE_KEY = 'taziyah.push';
-
-/** The region the functions are deployed to. Same as Firestore's. */
-const REGION = 'northamerica-northeast1';
 
 /** Topic changes a single device may request in one call. Matches the server. */
 const CHUNK = 50;
@@ -132,9 +129,7 @@ export const SETTINGS_HINT =
 
 const callSubscribe = (payload: {
   token: string; subscribe: string[]; unsubscribe: string[];
-}) => httpsCallable(
-  getFunctions(app, REGION), 'subscribeDevice',
-)(payload);
+}) => httpsCallable(functions, 'subscribeDevice')(payload);
 
 /**
  * Turn notifications on.

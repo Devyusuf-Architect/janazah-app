@@ -51,8 +51,8 @@ export function friendlyAuthError(error: unknown): string {
   if (code === 'auth/network-request-failed' && __DEV__ && usingEmulator) {
     return `This build is pointed at the Firebase emulators at ${emulatorHost}, `
       + 'not at the live project, and nothing answered. Start them with '
-      + '`npm run demo` from the repository root, or rebuild with '
-      + 'EXPO_PUBLIC_USE_LIVE=1 to sign in against real accounts.';
+      + '`npm run demo` from the repository root, or run `npm run '
+      + 'android:live` to sign in against real accounts.';
   }
 
   // auth/unknown is not a cause, it is react-native-firebase saying it could
@@ -69,8 +69,8 @@ export function friendlyAuthError(error: unknown): string {
       usingEmulator
         ? `This build is pointed at the Firebase emulators at ${emulatorHost}. `
           + 'The Auth emulator does not accept a real Google ID token, and it '
-          + 'has none of your live accounts. Rebuild with '
-          + 'EXPO_PUBLIC_USE_LIVE=1 to sign in against the real project.'
+          + 'has none of your live accounts. Run `npm run android:live` to '
+          + 'sign in against the real project.'
         : undefined,
     ].filter(Boolean).join('\n\n');
   }

@@ -207,6 +207,16 @@ const config: ExpoConfig = {
     androidPackage: ANDROID_PACKAGE,
     googleWebClientId: googleWebClientId(),
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    // Which Firebase backend a development build talks to. Read by
+    // src/lib/backend.ts, which explains why it is carried here as well as
+    // through process.env: this config is evaluated afresh every time Metro
+    // serves a manifest, while an inlined EXPO_PUBLIC_ value can survive in
+    // a cached bundle after the environment has changed. A release build
+    // ignores both and is always live.
+    backend: {
+      live: process.env.EXPO_PUBLIC_USE_LIVE === '1',
+      emulatorHost: process.env.EXPO_PUBLIC_EMULATOR_HOST ?? '',
+    },
     // The EAS project this app builds under. `eas init` writes this itself
     // for a static app.json and cannot for a dynamic config, so it is
     // written here by hand. It identifies the project on Expo's servers and

@@ -74,16 +74,31 @@ to be wrong here are the ones a type checker cannot see.
 
 The app talks to the **local Firebase emulators** in a development build,
 which is the native counterpart of the web app's behaviour on localhost. Start
-them from the repository root with `npm run demo`. Two environment variables
-change that:
+them from the repository root with `npm run demo`. To build and run against
+the real Firebase project instead:
 
-- `EXPO_PUBLIC_USE_LIVE=1` uses the real project instead, like the web app's
-  `?live=1`.
-- `EXPO_PUBLIC_EMULATOR_HOST` points at the machine running them. The default
-  is `10.0.2.2`, which is the Android emulator's alias for the host's
+```sh
+npm run android:live      # EXPO_PUBLIC_USE_LIVE=1 expo run:android
+npm run start:live        # the same, for a dev client that is already installed
+```
+
+Two environment variables decide it:
+
+- `EXPO_PUBLIC_USE_LIVE=1` uses the real project, like the web app's `?live=1`.
+- `EXPO_PUBLIC_EMULATOR_HOST` points at the machine running the emulators. The
+  default is `10.0.2.2`, which is the Android emulator's alias for the host's
   loopback; a physical device needs the machine's address on the network.
 
-A release build never connects to an emulator regardless of either variable.
+Auth, Firestore and Cloud Functions move together: either all three are local
+or all three are live, and the strip at the top of a development build says
+which, along with the first line of `adb logcat -s ReactNativeJS | grep
+taziyah-auth`. Cloud Messaging is the exception and cannot join them, because
+there is no FCM emulator.
+
+Because Expo inlines `EXPO_PUBLIC_` values when it bundles, and caches that
+work, the value has to be set for the process that starts Metro. The scripts
+above do that, and `start:live` clears the cache. A release build never
+connects to an emulator regardless of either variable.
 
 Local builds are signed with `credentials/debug.keystore`, which is committed
 so that the debug certificate survives `expo prebuild --clean` and one
