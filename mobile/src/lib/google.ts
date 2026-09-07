@@ -53,6 +53,42 @@ export class GoogleSignInError extends Error {
 }
 
 /**
+ * Google Play services' DEVELOPER_ERROR, which is CommonStatusCodes.10.
+ *
+ * The library rejects with the string "10" and a message beginning
+ * DEVELOPER_ERROR (see its RNGoogleSigninModule.handleSignInTaskResult), and
+ * it means one thing on Android: the certificate that signed this build, with
+ * this package name, does not match any Android OAuth client in the Firebase
+ * project. It is never a network problem, never the user's account, and never
+ * fixed by retrying.
+ *
+ * It is worth naming because the generic message below sends somebody looking
+ * in exactly the wrong places.
+ */
+const DEVELOPER_ERROR = '10';
+
+function isDeveloperError(code: unknown, message: unknown): boolean {
+  return code === DEVELOPER_ERROR
+    || String(message ?? '').includes('DEVELOPER_ERROR');
+}
+
+/**
+ * What a developer needs, in a build where a developer is looking.
+ *
+ * Never shown to somebody who downloaded the app: a release build gets the
+ * neutral message and the detail goes to the log instead.
+ */
+const DEVELOPER_ERROR_HINT =
+  'DEVELOPER_ERROR (10). The signing certificate of this build is not '
+  + 'registered against com.taziyah.app in the Firebase console, so Google '
+  + 'has no Android OAuth client to match it to. A build from '
+  + '`expo run:android` is signed with the DEBUG keystore, not the EAS '
+  + 'release one, so its own SHA-1 has to be added as well. Print it with '
+  + '`keytool -printcert -jarfile '
+  + 'android/app/build/outputs/apk/debug/app-debug.apk`, add it in Firebase, '
+  + 'download google-services.json again and rebuild.';
+
+/**
  * Run the native flow and return the ID token for Firebase.
  *
  * Returns null when the person backed out, which is not an error and must not
@@ -80,7 +116,19 @@ export async function getGoogleIdToken(): Promise<string | null> {
   } catch (error) {
     if (error instanceof GoogleSignInError) throw error;
     const code = (error as { code?: string }).code;
+    const nativeMessage = (error as { message?: string }).message;
+
     if (code === statusCodes.SIGN_IN_CANCELLED) return null;
+
+    // Logged before anything is turned into a message for a person, and
+    // always, not only in development. Without this the only thing that ever
+    // reached anybody was the neutral sentence below, which names none of the
+    // four things that could be wrong. `adb logcat -s ReactNativeJS` shows it.
+    console.error(
+      `[Ta'ziyah] Google sign-in failed. code=${String(code ?? 'none')} `
+      + `message=${String(nativeMessage ?? 'none')}`,
+    );
+
     if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       throw new GoogleSignInError(
         'Google Play services are not available on this device. '
@@ -88,9 +136,26 @@ export async function getGoogleIdToken(): Promise<string | null> {
         'no-play-services',
       );
     }
+
+    if (isDeveloperError(code, nativeMessage)) {
+      console.error(`[Ta'ziyah] ${DEVELOPER_ERROR_HINT}`);
+      throw new GoogleSignInError(
+        __DEV__
+          ? DEVELOPER_ERROR_HINT
+          : 'Google sign-in could not be completed. '
+            + 'You can sign in with an email address and password instead.',
+        DEVELOPER_ERROR,
+      );
+    }
+
     throw new GoogleSignInError(
-      'Google sign-in could not be completed. '
-      + 'You can sign in with an email address and password instead.',
+      // The code is on screen in a development build so a device with no
+      // logcat attached still says something specific.
+      __DEV__
+        ? `Google sign-in failed (${String(code ?? 'unknown')}). `
+          + `${String(nativeMessage ?? '')}`.trim()
+        : 'Google sign-in could not be completed. '
+          + 'You can sign in with an email address and password instead.',
       String(code ?? 'unknown'),
     );
   }

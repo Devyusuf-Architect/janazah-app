@@ -49,8 +49,6 @@ if (!existsSync(gsPath)) {
         + `  It has: ${packages.join(', ') || '(none)'}.`,
       );
     }
-    // An OAuth client of type 3 is the web client Firebase Auth needs to
-    // accept a Google ID token, even on Android.
     // An OAuth client of type 3 is the web client Firebase Auth needs in
     // order to accept a Google ID token, even when the sign-in happened on
     // Android. app.config.ts reads it straight out of this file.
@@ -59,26 +57,50 @@ if (!existsSync(gsPath)) {
     if (!hasWebClient) {
       warnings.push(
         'No web OAuth client in google-services.json, so Continue with Google\n'
-        + '  is hidden in this build. Email and password sign-in is unaffected.\n'
-        + '  Add the SHA-1 and SHA-256 fingerprints of both the EAS debug and\n'
-        + '  release keystores to the Android app in the Firebase console, then\n'
-        + '  download the file again.',
+        + '  is hidden in this build. Email and password sign-in is unaffected.',
       );
     }
 
-    // Present in the file, but only actually usable once the signing
-    // certificate fingerprints are registered. Nothing in the file records
-    // whether they are, so this cannot be checked here and is called out
-    // instead: it is the single most common reason Continue with Google
-    // fails on Android with nothing but a developer error.
-    if (hasWebClient) {
+    // An OAuth client of type 1 is an ANDROID client, and Firebase adds one
+    // for each signing certificate fingerprint registered against the app.
+    // Their absence is the single most common reason Continue with Google
+    // fails on Android with DEVELOPER_ERROR and nothing more useful, and it
+    // is visible right here: no type 1 entry means no fingerprint is
+    // registered, or the file was downloaded before one was added.
+    const androidClients = (gs.client ?? []).flatMap((c) =>
+      (c.oauth_client ?? []).filter((o) => o.client_type === 1));
+    if (hasWebClient && androidClients.length === 0) {
+      problems.push(
+        'google-services.json has no Android OAuth client, so Continue with\n'
+        + '  Google will fail with DEVELOPER_ERROR (code 10) on every build.\n'
+        + '  Firebase adds one per signing certificate fingerprint, so this\n'
+        + '  means none is registered against com.taziyah.app yet, or the file\n'
+        + '  was downloaded before one was added.\n'
+        + '  A build from `expo run:android` is signed with the DEBUG keystore,\n'
+        + '  not the EAS release one, so BOTH have to be registered:\n'
+        + '    debug   keytool -printcert -jarfile \\\n'
+        + '              android/app/build/outputs/apk/debug/app-debug.apk\n'
+        + '    release eas credentials\n'
+        + '  Add each SHA-1 and SHA-256 in Firebase console > Project settings\n'
+        + '  > Your apps > com.taziyah.app, then download the file again.',
+      );
+    } else if (androidClients.length) {
+      const hashes = androidClients
+        .map((o) => o.android_info?.certificate_hash)
+        .filter(Boolean);
       warnings.push(
-        'Continue with Google is switched on in this build. It will still fail\n'
-        + '  until the SHA-1 and SHA-256 fingerprints of the EAS debug AND\n'
-        + '  release keystores are registered against com.taziyah.app in the\n'
-        + '  Firebase console. `eas credentials` prints them.',
+        `google-services.json carries ${hashes.length} registered signing\n`
+        + '  certificate(s) for Continue with Google:\n'
+        + hashes.map((h) => `    ${h}`).join('\n') + '\n'
+        + '  Sign-in works only for a build signed by one of these. Compare\n'
+        + '  against the build you are installing with:\n'
+        + '    keytool -printcert -jarfile \\\n'
+        + '      android/app/build/outputs/apk/debug/app-debug.apk\n'
+        + '  (the SHA-1 there, lowercased with the colons removed, is what\n'
+        + '  appears above).',
       );
     }
+
   } catch {
     problems.push('google-services.json is not valid JSON.');
   }
