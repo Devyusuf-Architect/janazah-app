@@ -55,9 +55,8 @@ export const APP = {
   defaultTimeZone: 'America/Toronto',
   // How long after the prayer a notice stays in the "current" feed.
   currentWindowHours: 6,
-  // Continue with Google is off while the custom domain's OAuth redirect URI
-  // isn't registered yet in Google Cloud Console (taziyah.com switched from
-  // the *.firebaseapp.com authDomain). Email/password sign-in is unaffected.
-  // Flip back to true once that's added there.
-  googleSignIn: false,
+  // Continue with Google. taziyah.com's OAuth redirect URI is registered in
+  // Google Cloud Console, so the button is back on. Email/password sign-in
+  // is unaffected either way.
+  googleSignIn: true,
 };
