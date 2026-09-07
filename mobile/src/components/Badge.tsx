@@ -60,3 +60,31 @@ export function VerifiedBadge() {
     </View>
   );
 }
+
+/**
+ * Where a registration stands, for the people who registered it.
+ *
+ * Only the verified state is shown to the community, through VerifiedBadge
+ * above. The rest of the lifecycle is the organization's own business and
+ * appears on its page only for its owner and staff, which is also the only
+ * case where a document in any of these states can be read at all: the rules
+ * make an unverified organization visible to its own people and to platform
+ * administrators, and to nobody else.
+ *
+ * The wording matches public/js/model.js so a coordinator reading the same
+ * status in a browser and on a phone reads the same word.
+ */
+const ORG_STATUS: Record<string, { tone: Tone; label: string }> = {
+  verified: { tone: 'verified', label: 'Verified' },
+  pending: { tone: 'neutral', label: 'Pending review' },
+  needs_information: { tone: 'corrected', label: 'More information needed' },
+  rejected: { tone: 'cancelled', label: 'Not approved' },
+  suspended: { tone: 'cancelled', label: 'Suspended' },
+  withdrawn: { tone: 'neutral', label: 'Withdrawn' },
+};
+
+export function OrgStatusBadge({ status }: { status: string }) {
+  const shown = ORG_STATUS[status];
+  if (!shown) return null;
+  return <Badge tone={shown.tone} label={shown.label} />;
+}

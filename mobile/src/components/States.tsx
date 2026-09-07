@@ -79,6 +79,42 @@ export function Empty({ message, action }: {
 }
 
 /**
+ * The compact form: a heading, a line, and at most one action.
+ *
+ * For an empty section inside a screen that has other content, where the
+ * disc and the vertical air of Empty would claim more of the page than the
+ * absence deserves. A masjid with no upcoming janazah is the ordinary case
+ * for most masjids on most days, not an event.
+ */
+export function EmptyNote({ title, message, action }: {
+  title: string;
+  message: string;
+  action?: { label: string; onPress: () => void };
+}) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        gap: space.xs,
+        padding: space.md,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.surfaceAlt,
+      }}
+    >
+      <Text variant="label" style={{ fontWeight: '700' }}>{title}</Text>
+      <Text variant="callout" tone="muted">{message}</Text>
+      {action ? (
+        <View style={{ alignSelf: 'flex-start', paddingTop: space.xs }}>
+          <Button label={action.label} onPress={action.onPress} size="compact" />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * Something went wrong, said in the same shape as Empty.
  *
  * Centred so the two read as siblings: a reader who sees one on Monday and

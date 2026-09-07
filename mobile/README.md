@@ -111,6 +111,8 @@ checks it against `google-services.json`. See docs/eas.md.
 app/                 expo-router routes; the file tree is the navigation
   (tabs)/            Home, Janazahs, Near Me, Masjids, Profile
   n/[id].tsx         a notice. The deep-link and notification target.
+  o/[id]/            a masjid: its page, and its own people's edit and
+                     settings screens. See "Organization management" below.
 src/
   theme/             the design system. Every colour and size lives here.
   lib/               Firebase, auth, MFA, Google sign-in, queries, types
@@ -129,6 +131,22 @@ scripts/             preflight, and the Android images
   would drift, and drift in `geo.js` means this app's idea of what is near you
   stops matching the backend's idea of which notification topic a notice went
   to.
+- **Organization management is presentation, never permission.**
+  `src/lib/org-role.ts` decides which management controls appear, and it is a
+  mirror of clauses in `firestore.rules`, not a substitute for them: a build
+  with those functions replaced by `() => true` would still have every write
+  refused by Firestore. `test/org-role.test.ts` reads the rules file and fails
+  if the two drift. Writes to an organization document live in
+  `src/lib/org.ts` and nowhere else, so what the app can send is one file
+  long: profile fields, and the withdrawal below. Verification status,
+  ownership, the staff list and the created and verified stamps have no code
+  path at all.
+- **A registration is withdrawn, never deleted.** `allow delete: if false` has
+  guarded organizations since the beginning, because the audit trail has to
+  keep pointing at something. An owner may set `verificationStatus` to
+  `withdrawn`, and only from `pending`, `needs_information` or `rejected`. A
+  verified masjid is closed by the platform, so that notices it published and
+  the record of who published them stay intact.
 - **Never weaken `firestore.rules` for this app.** If a screen cannot read
   something, the screen is wrong. The rules are the security model for both
   clients and the mobile build is assumed to be readable by anyone.

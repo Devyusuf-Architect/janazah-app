@@ -152,6 +152,68 @@ test('every tab has a glyph of its own', () => {
   }
 });
 
+test('nothing offers an organization action without checking the role', () => {
+  // Presentation, not enforcement: firestore.rules checks ownerUid and
+  // staffUids against request.auth on every write, so a card shown to the
+  // wrong person would still save nothing. What this pins is that the app
+  // does not put management controls in front of a family looking up a
+  // janazah time, and does not offer a button whose write is going to be
+  // refused.
+  const gated = [
+    'src/features/org/ManageCard.tsx',
+    'app/o/[id]/edit.tsx',
+    'app/o/[id]/settings.tsx',
+  ];
+  for (const file of gated) {
+    const source = code(resolve(root, file));
+    assert.match(
+      source, /canEditOrg\(/,
+      `${file} shows organization management without asking who is looking`,
+    );
+  }
+});
+
+test('the app never writes an organization field the rules reserve', () => {
+  // src/lib/org.ts is the only module that writes an organization document.
+  // Verification status is the one exception, and only as the withdrawal the
+  // rules permit an owner to make.
+  const source = code(resolve(root, 'src/lib/org.ts'));
+  for (const reserved of [
+    'ownerUid', 'staffUids', 'verifiedBy', 'verifiedAt', 'statusReason',
+    'createdBy', 'createdAt',
+  ]) {
+    assert.equal(
+      source.includes(reserved), false,
+      `src/lib/org.ts writes ${reserved}, which belongs to the rules`,
+    );
+  }
+  assert.match(source, /verificationStatus: 'withdrawn'/);
+});
+
+test('no organization document is written outside src/lib/org.ts', () => {
+  // Reading one happens in several places and is fine. Writing one is the
+  // whole surface the rules guard, so it lives in a single module where the
+  // test above can check what it sends.
+  const offenders = files
+    .filter((file) => name(file) !== 'src/lib/org.ts')
+    .filter((file) => {
+      const source = code(file);
+      return source.includes("'organizations'")
+        && /\b(updateDoc|setDoc|deleteDoc|addDoc)\s*\(/.test(source);
+    })
+    .map(name);
+  assert.deepEqual(offenders, []);
+});
+
+test('a destructive organization action is confirmed before it runs', () => {
+  // A second tap is a reflex. Withdrawing a registration is the one action
+  // in the app that a platform administrator has to undo.
+  const settings = code(resolve(root, 'app/o/[id]/settings.tsx'));
+  assert.match(settings, /<Sheet/, 'withdrawal is not behind a confirmation sheet');
+  assert.match(settings, /CONFIRM_WORD/, 'withdrawal takes no typed confirmation');
+  assert.match(settings, /disabled=\{typed/, 'the confirm button is not gated on the typed word');
+});
+
 test('no screen ships its own back button any more', () => {
   // ScreenHeader is the one back affordance. A Button labelled "Back" in the
   // content is what the app looked like before the redesign.

@@ -125,6 +125,37 @@ describe('classifyOrgChange', () => {
     }
   });
 
+  test('a withdrawal is the applicant\u2019s own action, and says so', () => {
+    // Every other status change is an administrator's and verifiedBy names
+    // them. This one is the owner's, and withdrawnBy names them instead.
+    const entries = classifyOrgChange(
+      { verificationStatus: 'pending', staffUids: ['u1'] },
+      { verificationStatus: 'withdrawn', staffUids: ['u1'], withdrawnBy: 'u1' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, ACTIONS.ORG_WITHDRAWN);
+    assert.equal(entries[0].actorUid, 'u1');
+  });
+
+  test('a profile edit names the editor when the client sent one', () => {
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['u1'], phone: '' },
+      { verificationStatus: 'verified', staffUids: ['u1'], phone: '555', updatedBy: 'u2' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, ACTIONS.ORG_UPDATED);
+    assert.equal(entries[0].actorUid, 'u2');
+  });
+
+  test('a profile edit with no editor named is still recorded', () => {
+    // The web console has never written updatedBy. Losing the entry would be
+    // worse than losing the attribution.
+    const entries = classifyOrgChange(
+      { verificationStatus: 'verified', staffUids: ['u1'], phone: '' },
+      { verificationStatus: 'verified', staffUids: ['u1'], phone: '555' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].action, ACTIONS.ORG_UPDATED);
+    assert.equal(entries[0].actorUid, null);
+  });
+
   test('a staff member removed is its own entry', () => {
     const entries = classifyOrgChange(
       { verificationStatus: 'verified', staffUids: ['owner', 'staff1'] },

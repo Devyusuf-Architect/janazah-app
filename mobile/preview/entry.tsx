@@ -48,7 +48,10 @@ import { SearchBar } from '../src/features/notices/SearchBar';
 import { TabBar } from '../src/components/TabBar';
 import { Field as PreviewField } from '../src/components/Field';
 import { ViewToggle } from '../src/features/nearby/ViewToggle';
-import type { Notice } from '../src/lib/notice';
+import type { Notice, Organization } from '../src/lib/notice';
+import { ManageCard } from '../src/features/org/ManageCard';
+import { EmptyNote } from '../src/components/States';
+import { OrgStatusBadge } from '../src/components/Badge';
 
 const hours = (n: number) => new Date(Date.now() + n * 3600_000);
 
@@ -139,6 +142,23 @@ const NOTICES: { notice: Notice; distanceKm?: number }[] = [
     },
   },
 ];
+
+/** A masjid document, for the management card. Never a real one. */
+function previewOrg(status: string): Organization {
+  return {
+    id: 'preview-org',
+    name: 'Preview Masjid',
+    type: 'masjid',
+    address: '1 Example Street',
+    city: 'Toronto',
+    province: 'ON',
+    lat: 43.65,
+    lng: -79.38,
+    verificationStatus: status,
+    ownerUid: 'preview-owner',
+    staffUids: ['preview-owner', 'preview-staff'],
+  };
+}
 
 /**
  * The bar without a navigator behind it. Everything it needs is a routes
@@ -309,6 +329,33 @@ function Gallery() {
         </View>
         <View style={{ height: 44, justifyContent: 'center' }}>
           <DevStrip live />
+        </View>
+      </Section>
+
+      <Section title="A masjid, seen by the people who run it">
+        <View style={{ gap: 16 }}>
+          <ManageCard org={previewOrg('verified')} role="owner" />
+          <ManageCard org={previewOrg('pending')} role="staff" />
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <OrgStatusBadge status="pending" />
+            <OrgStatusBadge status="needs_information" />
+            <OrgStatusBadge status="withdrawn" />
+            <OrgStatusBadge status="suspended" />
+          </View>
+        </View>
+      </Section>
+
+      <Section title="Upcoming, with nothing upcoming">
+        <View style={{ gap: 16 }}>
+          <EmptyNote
+            title="No upcoming Janazahs"
+            message="This Masjid has not published any upcoming Janazah notices."
+          />
+          <EmptyNote
+            title="No upcoming Janazahs"
+            message="This Masjid has not published any upcoming Janazah notices."
+            action={{ label: 'Post a Janazah', onPress: () => {} }}
+          />
         </View>
       </Section>
 

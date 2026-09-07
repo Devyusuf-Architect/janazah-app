@@ -75,7 +75,9 @@ service cloud.firestore {
               'country',
               'lat', 'lng', 'cell', 'contactEmail', 'phone', 'website',
               'verificationStatus', 'statusReason', 'verifiedAt', 'verifiedBy',
-              'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt'];
+              'withdrawnAt', 'withdrawnBy',
+              'ownerUid', 'staffUids', 'createdAt', 'createdBy', 'updatedAt',
+              'updatedBy'];
     }
 
     function orgRequiredKeys() {
@@ -95,9 +97,16 @@ service cloud.firestore {
         // unable to publish, but distinguishable so an applicant is told
         // there is something for them to do rather than being left to
         // assume nobody has looked.
+        // withdrawn is the applicant's own end of the same lifecycle: a
+        // registration taken back by the person who submitted it, before
+        // anybody verified it. It behaves exactly like the other unverified
+        // states everywhere it matters, because it is one. isOrgVerified()
+        // is false, so nothing can be published; the public `get` clause
+        // requires 'verified', so the record leaves the directory. Nothing
+        // is deleted, so the audit trail still points at something.
         && request.resource.data.verificationStatus
              in ['pending', 'needs_information', 'verified', 'rejected',
-                 'suspended']
+                 'suspended', 'withdrawn']
         && request.resource.data.lat is number
         && request.resource.data.lng is number
         && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
@@ -144,18 +153,74 @@ service cloud.firestore {
         && (request.resource.data.get('verifiedBy', null) == resource.data.get('verifiedBy', null)
             || request.resource.data.verifiedBy == uid());
 
+      // updatedBy names whoever made a profile edit, and is pinned to the
+      // caller for the same reason verifiedBy and decidedBy are: the audit
+      // trail attributes the change to the account in the document, so a
+      // client must not be able to write somebody else's name there. It is
+      // optional rather than required, because the web console has always
+      // written this document without it and a client that omits it is
+      // recorded as it always was, with no actor, rather than rejected.
+      function honestEditor() {
+        return !('updatedBy' in request.resource.data)
+          || request.resource.data.updatedBy == uid();
+      }
+
       // Owner: may edit the profile and manage staff, never the status.
       allow update: if isOrgOwner(orgId)
         && validOrgShape()
+        && honestEditor()
         && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
-                     'statusReason', 'ownerUid', 'createdAt', 'createdBy']);
+                     'statusReason', 'withdrawnAt', 'withdrawnBy',
+                     'ownerUid', 'createdAt', 'createdBy']);
 
       // Non-owner staff: profile edits only, no staff list changes.
       allow update: if isOrgStaff(orgId)
         && validOrgShape()
+        && honestEditor()
         && !changed(['verificationStatus', 'verifiedAt', 'verifiedBy',
-                     'statusReason', 'ownerUid', 'staffUids', 'createdAt',
-                     'createdBy']);
+                     'statusReason', 'withdrawnAt', 'withdrawnBy',
+                     'ownerUid', 'staffUids', 'createdAt', 'createdBy']);
+
+      // Owner: may withdraw a registration nobody has approved yet.
+      //
+      // The one status transition a client may make, and it is deliberately
+      // the narrowest useful one. Somebody who registered a masjid by
+      // mistake, or twice, or has decided not to go ahead, currently has no
+      // way to take it back: organizations are never deleted, and every
+      // other status belongs to a platform administrator. Leaving them to
+      // email somebody is how duplicate registrations sit in the review
+      // queue forever.
+      //
+      // What keeps it safe:
+      //
+      //   Only from a state nobody has approved. pending, needs_information
+      //   and rejected. Never from verified, so an organization cannot leave
+      //   with its published notices behind it, and never from suspended, so
+      //   withdrawing cannot be used to escape a platform decision. Both of
+      //   those remain an administrator's to make.
+      //
+      //   Only the owner, never other staff.
+      //
+      //   Only these five keys move. Not the name, not the address, not the
+      //   staff list, not statusReason, which is the administrator's side of
+      //   the conversation. A withdrawal is a withdrawal and cannot be
+      //   smuggled in alongside an edit.
+      //
+      //   withdrawnBy is pinned to the caller, so the audit entry the
+      //   Firestore trigger writes names a real account.
+      //
+      // It is not a delete. The document stays, its history stays, and an
+      // administrator can put it back to pending if it was a mistake.
+      allow update: if isOrgOwner(orgId)
+        && validOrgShape()
+        && resource.data.verificationStatus
+             in ['pending', 'needs_information', 'rejected']
+        && request.resource.data.verificationStatus == 'withdrawn'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['verificationStatus', 'withdrawnAt', 'withdrawnBy',
+                       'updatedAt', 'updatedBy'])
+        && request.resource.data.withdrawnBy == uid()
+        && honestEditor();
 
       // Organizations are suspended, never deleted: the audit trail must keep
       // pointing at something. The one exception is sample data, which a

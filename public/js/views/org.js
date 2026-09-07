@@ -33,6 +33,11 @@ const STATUS_COPY = {
     tone: 'error',
     text: 'Suspended. Publishing is disabled while this is under review.',
   },
+  withdrawn: {
+    tone: 'muted',
+    text: 'Withdrawn by its owner before verification. It is not listed and '
+        + 'cannot publish. An administrator can reopen it for review.',
+  },
 };
 
 export function statusBadge(status) {
@@ -94,6 +99,18 @@ function verificationStateScreen(org, ctx, mount) {
       next: [
         'If the reason above is something you can correct, update the organization’s details and contact the administrators to ask for another review.',
         'If you believe this was a mistake, reply to the address you registered with.',
+      ],
+      nextHeading: 'What you can do',
+    },
+    withdrawn: {
+      tone: 'muted',
+      heading: 'Registration withdrawn',
+      lede: 'This registration was withdrawn before it was verified. It is '
+          + 'not listed anywhere and it cannot publish Janazah notices. '
+          + 'Nothing has been deleted.',
+      next: [
+        'If this was a mistake, contact the platform administrators and ask for it to be reopened for review.',
+        'If you meant to register a different organization, start a new registration instead.',
       ],
       nextHeading: 'What you can do',
     },

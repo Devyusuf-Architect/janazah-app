@@ -580,6 +580,188 @@ describe('verification cannot be self-granted', () => {
   });
 });
 
+describe('an owner can withdraw a registration nobody has approved', () => {
+  // Organizations are never deleted, and until now every status belonged to a
+  // platform administrator, so somebody who registered a masjid by mistake
+  // had no way to take it back. Withdrawal is the one status transition a
+  // client may make, and these pin how narrow it is.
+
+  test('the owner may withdraw a pending registration', async () => {
+    await assertSucceeds(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      verificationStatus: 'withdrawn',
+      withdrawnBy: OUTSIDER,
+      withdrawnAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      updatedBy: OUTSIDER,
+    }));
+  });
+
+  test('a withdrawn organization leaves the public directory', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG), {
+        verificationStatus: 'withdrawn', withdrawnBy: OWNER, withdrawnAt: Timestamp.now(),
+      });
+    });
+    await assertFails(getDoc(doc(anon(), 'organizations', VERIFIED_ORG)));
+    // Its own staff keep their view of it, which is what the app needs to
+    // tell the owner what happened.
+    await assertSucceeds(getDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG)));
+  });
+
+  test('a withdrawn organization cannot publish', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', VERIFIED_ORG), {
+        verificationStatus: 'withdrawn', withdrawnBy: OWNER, withdrawnAt: Timestamp.now(),
+      });
+    });
+    await assertFails(addDoc(collection(as(STAFF), 'notices'), noticeDoc({ createdBy: STAFF })));
+  });
+
+  test('a verified organization cannot be withdrawn by its owner', async () => {
+    // Leaving with published notices behind it is a platform decision, not
+    // an applicant's. Suspension and removal stay with an administrator.
+    await assertFails(updateDoc(doc(as(OWNER), 'organizations', VERIFIED_ORG), {
+      verificationStatus: 'withdrawn', withdrawnBy: OWNER, withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('a suspended organization cannot withdraw its way out', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        verificationStatus: 'suspended',
+      });
+    });
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      verificationStatus: 'withdrawn', withdrawnBy: OUTSIDER, withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('a non-owner staff member cannot withdraw', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        staffUids: [OUTSIDER, STAFF],
+      });
+    });
+    await assertFails(updateDoc(doc(as(STAFF), 'organizations', PENDING_ORG), {
+      verificationStatus: 'withdrawn', withdrawnBy: STAFF, withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('a community member cannot withdraw somebody else’s organization', async () => {
+    await assertFails(updateDoc(doc(as(STAFF), 'organizations', PENDING_ORG), {
+      verificationStatus: 'withdrawn', withdrawnBy: STAFF, withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('withdrawal cannot be attributed to another account', async () => {
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      verificationStatus: 'withdrawn', withdrawnBy: ADMIN, withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('withdrawal cannot carry an edit along with it', async () => {
+    // A withdrawal is a withdrawal. Renaming the organization, moving it or
+    // rewriting the administrator's statusReason in the same write are all
+    // refused, so the document an administrator looks at afterwards is the
+    // one they were reviewing.
+    for (const smuggled of [
+      { name: 'Something Else' },
+      { address: '999 Elsewhere Ave' },
+      { statusReason: 'Approved, actually.' },
+      { staffUids: [OUTSIDER, STAFF] },
+      { ownerUid: STAFF },
+    ]) {
+      await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+        verificationStatus: 'withdrawn',
+        withdrawnBy: OUTSIDER,
+        withdrawnAt: serverTimestamp(),
+        ...smuggled,
+      }));
+    }
+  });
+
+  test('an owner still cannot reach any other status', async () => {
+    for (const status of ['verified', 'needs_information', 'suspended', 'rejected']) {
+      await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+        verificationStatus: status,
+      }));
+    }
+  });
+
+  test('a withdrawn registration cannot be reopened by its owner', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        verificationStatus: 'withdrawn', withdrawnBy: OUTSIDER, withdrawnAt: Timestamp.now(),
+      });
+    });
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      verificationStatus: 'pending',
+    }));
+    // An administrator can, which is what makes this recoverable rather than
+    // a one-way door.
+    await assertSucceeds(updateDoc(doc(as(ADMIN), 'organizations', PENDING_ORG), {
+      verificationStatus: 'pending',
+    }));
+  });
+
+  test('organizations are still never deletable, withdrawn or not', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'organizations', PENDING_ORG), {
+        verificationStatus: 'withdrawn', withdrawnBy: OUTSIDER, withdrawnAt: Timestamp.now(),
+      });
+    });
+    await assertFails(deleteDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG)));
+    await assertFails(deleteDoc(doc(as(ADMIN), 'organizations', PENDING_ORG)));
+  });
+});
+
+describe('a profile edit says who made it', () => {
+  test('an owner may name themselves as the editor', async () => {
+    await assertSucceeds(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      phone: '+1 613 555 0100', updatedAt: serverTimestamp(), updatedBy: OUTSIDER,
+    }));
+  });
+
+  test('a staff member may edit the profile and is named for it', async () => {
+    await assertSucceeds(updateDoc(doc(as(STAFF), 'organizations', VERIFIED_ORG), {
+      website: 'https://example.org', updatedAt: serverTimestamp(), updatedBy: STAFF,
+    }));
+  });
+
+  test('an edit cannot be attributed to somebody else', async () => {
+    // Same reason verifiedBy and decidedBy are pinned: the audit entry names
+    // the account in the document, so the document must not be able to lie.
+    await assertFails(updateDoc(doc(as(STAFF), 'organizations', VERIFIED_ORG), {
+      website: 'https://example.org', updatedBy: OWNER,
+    }));
+  });
+
+  test('an edit with no editor named is still accepted', async () => {
+    // The web console has always written this document without updatedBy.
+    // Requiring it would break every edit made from a browser.
+    await assertSucceeds(updateDoc(doc(as(OUTSIDER), 'organizations', PENDING_ORG), {
+      phone: '+1 613 555 0101', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test('a staff member cannot smuggle a withdrawal into a profile edit', async () => {
+    await assertFails(updateDoc(doc(as(STAFF), 'organizations', VERIFIED_ORG), {
+      website: 'https://example.org',
+      withdrawnBy: STAFF,
+      withdrawnAt: serverTimestamp(),
+    }));
+  });
+
+  test('a community member still cannot edit an organization', async () => {
+    await assertFails(updateDoc(doc(as(OUTSIDER), 'organizations', VERIFIED_ORG), {
+      name: 'Not Your Masjid', updatedBy: OUTSIDER,
+    }));
+    await assertFails(updateDoc(doc(anon(), 'organizations', VERIFIED_ORG), {
+      name: 'Not Your Masjid',
+    }));
+  });
+});
+
 describe('staff join requests', () => {
   const requestDoc = (uid, overrides = {}) => ({
     uid, email: 'someone@example.com', displayName: 'Someone',

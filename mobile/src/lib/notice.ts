@@ -118,13 +118,32 @@ export type Organization = {
   address: string;
   city: string;
   province: string;
+  postalCode?: string;
   country?: string;
   lat: number;
   lng: number;
   cell?: string;
   website?: string;
   phone?: string;
+  contactEmail?: string;
   verificationStatus: string;
+  /**
+   * Who registered this organization, and who may act for it.
+   *
+   * Both are already on the organization document and already readable by
+   * anyone who can read the document at all: firestore.rules makes a
+   * verified organization world-readable in full. Carrying them here
+   * exposes nothing new, and it is what lets the app show an owner their
+   * own management actions and show nobody else anything.
+   *
+   * Reading them grants nothing. Every edit, every withdrawal and every
+   * publish is decided by the rules against request.auth, not by what this
+   * client believes about a document it fetched.
+   */
+  ownerUid?: string;
+  staffUids: string[];
+  /** An administrator's note on the current status, where they left one. */
+  statusReason?: string;
 };
 
 export function toOrganization(
@@ -139,13 +158,18 @@ export function toOrganization(
     address: String(data.address ?? ''),
     city: String(data.city ?? ''),
     province: String(data.province ?? ''),
+    postalCode: data.postalCode ? String(data.postalCode) : undefined,
     country: data.country ? String(data.country) : undefined,
     lat: Number(data.lat),
     lng: Number(data.lng),
     cell: data.cell ? String(data.cell) : undefined,
     website: data.website ? String(data.website) : undefined,
     phone: data.phone ? String(data.phone) : undefined,
+    contactEmail: data.contactEmail ? String(data.contactEmail) : undefined,
     verificationStatus: String(data.verificationStatus ?? 'pending'),
+    ownerUid: data.ownerUid ? String(data.ownerUid) : undefined,
+    staffUids: Array.isArray(data.staffUids) ? data.staffUids.map(String) : [],
+    statusReason: data.statusReason ? String(data.statusReason) : undefined,
   };
 }
 

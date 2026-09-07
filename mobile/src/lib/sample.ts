@@ -99,6 +99,10 @@ export function sampleOrganizations(): Organization[] {
     // site: seedSampleData creates them pending and then verifies them, the
     // same two writes a real registration goes through.
     verificationStatus: 'verified',
+    // Nobody owns a sample. An empty staff list is what makes every
+    // ownership check in src/lib/org-role.ts answer "no" for sample data,
+    // so no management action can appear on a record that is not real.
+    staffUids: [],
   } satisfies Organization));
 }
 

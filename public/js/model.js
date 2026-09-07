@@ -16,6 +16,10 @@ export const ORG_TYPES = [
 // Mirror of the enum in validOrgShape() in firestore.rules.
 export const VERIFICATION_STATUSES = [
   'pending', 'needs_information', 'verified', 'rejected', 'suspended',
+  // Taken back by the applicant before anyone approved it. The only status
+  // a client may set, and only its owner, only from an unapproved state.
+  // See the withdrawal rule in firestore.rules.
+  'withdrawn',
 ];
 
 /** Human wording for a status, used wherever one is shown to a person. */
@@ -25,6 +29,7 @@ export const VERIFICATION_STATUS_LABEL = {
   verified: 'Verified',
   rejected: 'Declined',
   suspended: 'Suspended',
+  withdrawn: 'Withdrawn',
 };
 
 // Mirror of noticePublicKeys() in firestore.rules.

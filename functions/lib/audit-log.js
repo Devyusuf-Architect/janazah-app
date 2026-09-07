@@ -23,6 +23,7 @@ export const ACTIONS = {
   ORG_REJECTED: 'org.rejected',
   ORG_INFO_REQUESTED: 'org.info_requested',
   ORG_SUSPENDED: 'org.suspended',
+  ORG_WITHDRAWN: 'org.withdrawn',
   ORG_REINSTATED: 'org.reinstated',
   ORG_DELETED: 'org.deleted',
   STAFF_REQUESTED: 'staff.requested',
@@ -45,6 +46,7 @@ const ORG_STATUS_ACTION = {
   suspended: ACTIONS.ORG_SUSPENDED,
   needs_information: ACTIONS.ORG_INFO_REQUESTED,
   pending: ACTIONS.ORG_REINSTATED,
+  withdrawn: ACTIONS.ORG_WITHDRAWN,
 };
 
 /**
@@ -123,9 +125,16 @@ export function classifyOrgChange(before, after) {
   const entries = [];
 
   if (before.verificationStatus !== after.verificationStatus) {
+    const action = ORG_STATUS_ACTION[after.verificationStatus] || ACTIONS.ORG_UPDATED;
+    // Every other status change is an administrator's, and verifiedBy names
+    // them. A withdrawal is the applicant's own, and withdrawnBy names them.
+    // Both fields are pinned to the caller by firestore.rules, so neither
+    // can be attributed to an account that did not make the change.
     entries.push({
-      action: ORG_STATUS_ACTION[after.verificationStatus] || ACTIONS.ORG_UPDATED,
-      actorUid: after.verifiedBy ?? null,
+      action,
+      actorUid: action === ACTIONS.ORG_WITHDRAWN
+        ? after.withdrawnBy ?? null
+        : after.verifiedBy ?? null,
     });
   }
 
@@ -143,7 +152,11 @@ export function classifyOrgChange(before, after) {
     // profile field (name, address, contact email, and so on). A document
     // that genuinely did not change at all, timestamps included, gets no
     // entry rather than a spurious org.updated.
-    entries.push({ action: ACTIONS.ORG_UPDATED, actorUid: null });
+    //
+    // updatedBy names the editor where the client wrote one, which the
+    // mobile app does on every profile edit. The web console has never sent
+    // it, so an edit made there is recorded with no actor, exactly as before.
+    entries.push({ action: ACTIONS.ORG_UPDATED, actorUid: after.updatedBy ?? null });
   }
 
   return entries;
