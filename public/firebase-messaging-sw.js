@@ -10,8 +10,10 @@
  * being duplicated here, so there is one place the project is configured.
  */
 
-importScripts('https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging-compat.js');
+// Kept in step with the version pinned in index.html/console.html's
+// importmap (see the comment there for why it's held at 12.16.0).
+importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging-compat.js');
 
 const params = new URL(self.location).searchParams;
 

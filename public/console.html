@@ -17,16 +17,24 @@
 
   <!-- Single place the Firebase SDK version is pinned. Bump all three
        together. The end-to-end test swaps this map for a locally bundled
-       copy so it can run without reaching the CDN. -->
+       copy so it can run without reaching the CDN.
+
+       Held at 12.16.0 (@firebase/auth 1.13.3): 12.17.0 shipped a
+       visibilitychange listener in the IndexedDB auth-persistence layer that
+       closes the database when a sign-in popup takes focus, throwing
+       "Database is closing/hidden" and dropping the credential instead of
+       completing sign-in (firebase/firebase-js-sdk#10264, still present as
+       of @firebase/auth 1.13.5). Bump past 12.16.0 only once that's fixed
+       upstream. -->
   <script type="importmap">
   {
     "imports": {
-      "firebase/app": "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js",
-      "firebase/auth": "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js",
-      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js",
-      "firebase/messaging": "https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging.js",
-      "firebase/functions": "https://www.gstatic.com/firebasejs/12.17.1/firebase-functions.js",
-      "firebase/storage": "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js"
+      "firebase/app": "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js",
+      "firebase/firestore": "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js",
+      "firebase/messaging": "https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging.js",
+      "firebase/functions": "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js",
+      "firebase/storage": "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js"
     }
   }
   </script>

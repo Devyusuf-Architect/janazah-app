@@ -15,6 +15,17 @@ import { APP } from '../config.js';
 import { el, toast, friendlyError } from '../ui.js';
 
 /**
+ * Logs a Firebase/Auth error with its exact error code front and center, so
+ * a report of "Google sign-in is broken" turns into an `auth/...` code to
+ * look up rather than a guessing game. `console.error(err)` alone is not
+ * enough: some browser consoles collapse the error object and hide `.code`
+ * behind a click, which is exactly the detail that matters here.
+ */
+function logAuthError(stage, err) {
+  console.error(`[auth] ${stage}:`, err?.code || '(no code)', err?.message || err);
+}
+
+/**
  * Sign in with Google, falling back from a popup to a full-page redirect.
  *
  * A popup is the better experience when it works, but browsers block popups
@@ -40,6 +51,7 @@ export async function signInWithGoogle() {
   } catch (err) {
     const code = err?.code || '';
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      logAuthError('signInWithPopup cancelled by the person, not a failure', err);
       return;
     }
     // Three different reasons the popup mechanism itself cannot work, not
@@ -56,11 +68,13 @@ export async function signInWithGoogle() {
     if (code === 'auth/popup-blocked'
         || code === 'auth/operation-not-supported-in-this-environment'
         || code === 'auth/web-storage-unsupported') {
+      logAuthError('signInWithPopup could not work here, falling back to redirect', err);
       // Leaves the page entirely; completeRedirectSignIn() picks it up when
       // the browser comes back.
       await signInWithRedirect(auth, provider);
       return;
     }
+    logAuthError('signInWithPopup', err);
     throw err;
   }
 }
@@ -77,9 +91,15 @@ export async function signInWithGoogle() {
  */
 export async function completeRedirectSignIn(onError) {
   try {
-    await getRedirectResult(auth);
+    const result = await getRedirectResult(auth);
+    // Logged even on success: a silent `null` here (this load was not the
+    // return leg of a redirect, or the pending credential was lost before it
+    // got this far) is indistinguishable from "nothing to do" without this,
+    // which is exactly the failure mode a lost/expired redirect state
+    // produces -- no error thrown, no user signed in.
+    console.info('[auth] getRedirectResult:', result ? `signed in as ${result.user.uid}` : 'no pending redirect');
   } catch (err) {
-    console.error('getRedirectResult', err);
+    logAuthError('getRedirectResult', err);
     if (onError) onError(friendlyError(err));
   }
 }
@@ -186,7 +206,7 @@ export function renderAuth(mount, { variant = 'coordinator', initialMode = 'sign
     } catch (err) {
       // Never fail silently here: a button that appears to do nothing is the
       // single most common way a working sign-in reads as broken.
-      console.error('signInWithGoogle', err);
+      logAuthError('Continue with Google button', err);
       error.hidden = false;
       error.textContent = friendlyError(err);
     } finally {
