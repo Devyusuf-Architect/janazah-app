@@ -189,6 +189,39 @@ describe('navigation', () => {
   });
 });
 
+describe('the page fits the screen it is read on', () => {
+  test('one column by default; the second is opted into at a width', () => {
+    // Written this way round on purpose. A grid that starts at two columns
+    // and is undone for phones is one forgotten override away from a
+    // squeezed home page on the device most of this site is read on.
+    const grid = css.slice(css.indexOf('.home-grid {'));
+    assert.match(grid.slice(0, 120), /grid-template-columns: 1fr/);
+    const wide = css.slice(css.indexOf('@media (min-width: 1180px)'));
+    assert.match(wide.slice(0, 400), /\.home-grid \{ grid-template-columns: [\d.]+fr [\d.]+fr/);
+  });
+
+  test('the wide treatment belongs to the home route and leaves with it', () => {
+    // The class lives on the shared #view element, so a page that added it
+    // and did not take it away would widen whatever was rendered next.
+    assert.match(home, /mount\.classList\.add\('view--home'\)/);
+    const teardown = home.slice(home.indexOf('export function teardownHome'));
+    assert.match(teardown.slice(0, 400), /classList\.remove\('view--home'\)/);
+  });
+
+  test('the phone keeps the reading order it had', () => {
+    // The columns are wrappers, not a reordering: at one column the sections
+    // still come out in the order somebody scrolls them.
+    const render = home.slice(home.indexOf('mount.replaceChildren('), home.indexOf('repaint();'));
+    const order = ['upcoming', 'near', 'explore', 'followed', 'quickActions'];
+    let at = -1;
+    for (const section of order) {
+      const next = render.indexOf(section);
+      assert.ok(next > at, `${section} is out of reading order in the mobile column`);
+      at = next;
+    }
+  });
+});
+
 describe('responsive behaviour', () => {
   test('the sidebar becomes a drawer rather than a squeezed sidebar', () => {
     const mobile = css.slice(css.indexOf('@media (max-width: 900px)'));

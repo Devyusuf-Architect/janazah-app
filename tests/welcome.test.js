@@ -108,6 +108,80 @@ describe('what it says', () => {
   });
 });
 
+describe('the six things a newcomer needs told', () => {
+  // The introduction exists to answer "what is this and can I trust it"
+  // before somebody has to decide whether to act on a funeral notice. Each
+  // of these is one of those answers, and losing one quietly is exactly the
+  // kind of regression a page of prose hides well.
+  test('who publishes, following, nearby, and notifications each get a point', () => {
+    for (const [what, claim] of [
+      ['who publishes', /Verified masjids publish it/],
+      ['following masjids', /Follow the masjids you pray at/],
+      ['finding one nearby', /Find a Janazah near you/],
+      ['being told about changes', /Hear when something changes/],
+    ]) {
+      assert.match(welcome, claim, `the introduction no longer explains ${what}`);
+    }
+  });
+
+  test('the notifications point covers an update, not only a new notice', () => {
+    // Being told a Janazah is at four and never told it moved to two is
+    // worse than not being told at all.
+    const point = welcome.slice(welcome.indexOf('Hear when something changes'));
+    assert.match(point.slice(0, 400), /corrected or the Janazah is cancelled/);
+  });
+
+  test('the location promise names the part that needs a server', () => {
+    // push.js is explicit that a coarse area leaves the device so a locked
+    // phone can be reached at all, and calls that a compromise worth naming.
+    // A privacy claim with a quiet exception behind it is worth less than an
+    // honest one, so the introduction says it where the promise is made.
+    const privacy = welcome.slice(welcome.indexOf("class: 'wel-privacy reveal'"));
+    assert.match(privacy.slice(0, 1400), /subscribes itself to a general area/);
+    assert.match(privacy.slice(0, 1400), /acted on and discarded/);
+  });
+
+  test('it stays an introduction rather than growing into a landing page', () => {
+    // The opening is allowed to be the largest thing in the app and no
+    // larger: at 78vh the whole first screen of a laptop was one sentence
+    // and two buttons, with what the service does below the fold.
+    const rule = welcomeCss.slice(welcomeCss.indexOf('.wel-hero {'));
+    const height = rule.slice(0, rule.indexOf('}')).match(/min-height: min\((\d+)vh/);
+    assert.ok(height && Number(height[1]) <= 60,
+      `the opening takes ${height?.[1]}vh, which is a hero rather than an introduction`);
+  });
+});
+
+describe('a returning visitor can always get back to it', () => {
+  const nav = readFileSync('public/js/nav.js', 'utf8');
+  const home = readFileSync('public/js/views/home.js', 'utf8');
+
+  test('it is a named item in the sidebar, which is also the phone drawer', () => {
+    // The mobile "Profile" tab opens this very drawer (renderBottomNav), so
+    // one item covers both, rather than a second menu built for the phone.
+    const utility = nav.slice(nav.indexOf('const UTILITY_LINKS'), nav.indexOf('// Deeper pages'));
+    assert.match(utility, /href: '\/welcome'/);
+    assert.match(utility, /How Ta.ziyah Works/);
+  });
+
+  test('the home page offers it too, for somebody who arrived on a link', () => {
+    const actions = home.slice(home.indexOf('const ACTIONS'), home.indexOf('const STAFF_ACTIONS'));
+    assert.match(actions, /href: '\/welcome'/);
+  });
+
+  test('reopening it changes nothing: no flag, no sign-out, no reset', () => {
+    // A plain link, so the route simply renders. Anything that wrote to
+    // visited.js or touched auth from here would make revisiting the
+    // introduction an action with consequences.
+    for (const [name, source] of [['nav.js', nav], ['home.js', home]]) {
+      const near = source.slice(Math.max(0, source.indexOf("'/welcome'") - 300),
+        source.indexOf("'/welcome'") + 300);
+      assert.ok(!/markVisited|isFirstVisit|signOut|onclick/.test(near),
+        `${name} does something besides linking to the introduction`);
+    }
+  });
+});
+
 describe('its motion', () => {
   test('the scroll effects need no scroll listener', () => {
     // Nothing running on the main thread while a long page moves.

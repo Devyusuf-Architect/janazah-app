@@ -39,11 +39,17 @@ const BOTTOM_LINKS = [
   { href: '/following', label: 'Following', icon: 'bookmark' },
 ];
 
-// The sidebar's own footer, always last regardless of collapse state: the two
+// The sidebar's own footer, always last regardless of collapse state: the
 // things somebody wants when they are done browsing sections, not while they
 // are in the middle of one.
+//
+// "How Ta'ziyah Works" is the introduction a first-time visitor is shown, at
+// its own address so it stays reachable afterwards. It is a plain link: it
+// opens the page and changes nothing, so returning to it does not reset the
+// first-visit flag, sign anybody out, or restart anything.
 const UTILITY_LINKS = [
   { href: '/account', label: 'Settings', icon: 'eye' },
+  { href: '/welcome', label: "How Ta'ziyah Works", icon: 'info' },
   { href: '/about', label: 'Help & About', icon: 'flag' },
 ];
 

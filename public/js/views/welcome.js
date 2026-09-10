@@ -27,25 +27,36 @@ export function teardownWelcome() {
   unwatch = null;
 }
 
-const STEPS = [
+// Four points, not a feature list. Each one is a thing somebody can do or
+// rely on, in the order the questions get asked: who is telling me this, how
+// do I hear about the masjids I pray at, how do I hear about the ones I do
+// not, and what happens when a time changes. Short enough that the whole of
+// it fits on one screen of a phone below the opening.
+const POINTS = [
   {
-    title: 'A masjid publishes',
+    icon: 'check',
+    title: 'Verified masjids publish it',
     body: 'A masjid or funeral coordinator is checked by a platform '
         + 'administrator before it can publish anything. Nothing here is '
-        + 'user-submitted, and every notice traces back to an organization '
-        + 'somebody verified.',
+        + 'user-submitted.',
   },
   {
-    title: 'You find out in time',
-    body: 'Follow the masjids you pray at, or let the page tell you when a '
-        + 'Janazah is close to where you are. Both are optional, and both '
-        + 'work without an account.',
+    icon: 'bookmark',
+    title: 'Follow the masjids you pray at',
+    body: 'Their Janazah notices are waiting for you when you open the page. '
+        + 'Who you follow stays on your device.',
   },
   {
-    title: 'You know where to go',
-    body: 'Every notice carries the prayer time, the address and directions '
-        + 'that open in your own maps app, along with the burial when it has '
-        + 'been arranged.',
+    icon: 'pin',
+    title: 'Find a Janazah near you',
+    body: 'See which Janazahs are close enough to reach, at whatever distance '
+        + 'you choose, even from masjids you do not follow.',
+  },
+  {
+    icon: 'bell',
+    title: 'Hear when something changes',
+    body: 'Notifications can tell you about a new Janazah, and tell you again '
+        + 'if the time is corrected or the Janazah is cancelled.',
   },
 ];
 
@@ -89,13 +100,13 @@ export function renderWelcome(mount) {
 
       el('section', { class: 'wel-how', id: 'how' }, [
         el('h2', { class: 'wel-section__title reveal', text: 'How it works' }),
-        el('ol', { class: 'wel-steps' }, STEPS.map((step, i) => el('li', {
-          class: 'wel-step reveal',
+        el('ul', { class: 'wel-points' }, POINTS.map((point) => el('li', {
+          class: 'wel-point reveal',
         }, [
-          el('span', { class: 'wel-step__num', 'aria-hidden': 'true', text: String(i + 1) }),
-          el('div', {}, [
-            el('h3', { class: 'wel-step__title', text: step.title }),
-            el('p', { class: 'wel-step__body', text: step.body }),
+          el('span', { class: 'wel-point__mark' }, [icon(point.icon, { size: 17 })]),
+          el('div', { class: 'wel-point__text' }, [
+            el('h3', { class: 'wel-point__title', text: point.title }),
+            el('p', { class: 'wel-point__body', text: point.body }),
           ]),
         ]))),
       ]),
@@ -110,6 +121,16 @@ export function renderWelcome(mount) {
           + 'us, never sent to a masjid, and no history of where you have been '
           + 'is kept: only your latest position, on your device, overwritten '
           + 'each time.'),
+        // Named rather than glossed over. Reaching a phone that is locked and
+        // not on this page means something has to leave it, and a privacy
+        // claim with a quiet exception behind it is worth less than an
+        // honest one. The full account is on /privacy, linked below.
+        el('p', { class: 'wel-privacy__body' },
+          'Notifications are the one part that needs a server. Your browser '
+          + 'subscribes itself to a general area, usually several kilometres '
+          + 'across, and notices are sent to everyone subscribed to that '
+          + 'area. It is acted on and discarded, so there is still no way to '
+          + 'ask where you are.'),
         el('ul', { class: 'wel-facts' }, [
           ['No account needed', 'Read every notice, follow masjids, use nearby alerts.'],
           ['Nothing about you is stored', 'Follows and settings live on your device, not in a profile.'],

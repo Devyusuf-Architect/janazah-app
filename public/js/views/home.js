@@ -28,6 +28,9 @@ let unwatch = null;
 export function teardownHome() {
   if (unwatch) unwatch();
   unwatch = null;
+  // The wide two-column treatment belongs to this route only; every other
+  // page keeps the reading column it was designed around.
+  document.getElementById('view')?.classList.remove('view--home');
 }
 
 export function renderHome(mount) {
@@ -49,16 +52,28 @@ export function renderHome(mount) {
     paintExplore(explore, state);
   };
 
+  // Two columns on a large monitor, one everywhere else. The wrappers are
+  // always present and the grid is a single column until 1180px, so on a
+  // phone, a tablet and a laptop this is exactly the page it was: the same
+  // sections in the same reading order. Above that width the page was a
+  // narrow ribbon down the middle of the screen with the lower half of it
+  // below the fold for no reason.
+  //
+  // What goes where follows the dashboard's split: the left column is what is
+  // happening, the right column is what to do about it.
+  mount.classList.add('view--home');
   mount.replaceChildren(
     finder(state, repaint),
     results,
-    upcoming,
-    near,
-    followed,
-    explore,
-    quickActions(),
-    growingNote(),
-    guideStrip(),
+    el('div', { class: 'home-grid' }, [
+      el('div', { class: 'home-col' }, [upcoming, near, explore]),
+      el('div', { class: 'home-col' }, [
+        followed,
+        quickActions(),
+        growingNote(),
+        guideStrip(),
+      ]),
+    ]),
   );
 
   repaint();
@@ -506,6 +521,10 @@ const ACTIONS = [
   { href: '/masjids', icon: 'building', label: 'Find Masjids' },
   { href: '/janazah-guide', icon: 'shield', label: 'Janazah Guide' },
   { href: '/register-masjid', icon: 'users', label: 'Register a Masjid' },
+  // The introduction, at its own address. Somebody who arrived on a link to
+  // one notice has never seen it, and this is where they would look for it
+  // rather than in the sidebar's footer.
+  { href: '/welcome', icon: 'info', label: "How Ta'ziyah works" },
 ];
 
 // Shown in place of "Register a Masjid" for a signed-in staff member of a
