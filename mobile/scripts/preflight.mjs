@@ -80,6 +80,11 @@ if (!existsSync(gsPath)) {
         + '  not the EAS release one, so BOTH have to be registered.\n'
         + '    npm run signing     prints the debug fingerprints and compares\n'
         + '    npx eas credentials prints the release ones\n'
+        + '  With Play App Signing there is a THIRD certificate: Google\n'
+        + '  re-signs the bundle with its own key, shown in Play Console\n'
+        + '  under Setup > App signing. Registering only the upload key is\n'
+        + '  why Google sign-in works in an internal test and then fails\n'
+        + '  for everyone who installs from the store.\n'
         + '  Add each SHA-1 and SHA-256 in Firebase console > Project settings\n'
         + '  > Your apps > com.taziyah.app, then download the file again.',
       );

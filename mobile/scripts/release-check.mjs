@@ -13,7 +13,7 @@
 // person has to confirm, usually because it cannot be read from the
 // repository at all.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +23,25 @@ const repoRoot = resolve(root, '..');
 
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
 const readRepo = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
+
+/**
+ * Every TypeScript source that actually ships, as paths relative to mobile/.
+ *
+ * test/ and preview/ are excluded because neither is bundled: the design
+ * harness stubs the native modules and the tests name these functions in
+ * order to check that the app calls them.
+ */
+function sources(dir = '.') {
+  const out = [];
+  for (const entry of readdirSync(resolve(root, dir))) {
+    if (['node_modules', 'android', 'ios', 'preview', 'test', 'scripts',
+         '.expo', 'dist'].includes(entry)) continue;
+    const rel = dir === '.' ? entry : `${dir}/${entry}`;
+    if (statSync(resolve(root, rel)).isDirectory()) { out.push(...sources(rel)); continue; }
+    if (/\.tsx?$/.test(entry)) out.push(rel);
+  }
+  return out;
+}
 
 const blocking = [];
 const check = [];
@@ -77,12 +96,39 @@ check.push(
 
 // ---- the emulator cannot reach a release build ---------------------------
 
-const firebase = read('src/lib/firebase.ts');
-if (!/__DEV__ &&/.test(firebase)) {
+// The decision moved to src/lib/backend.ts, which is where the __DEV__ test
+// now lives; firebase.ts only acts on it. This check follows it there rather
+// than looking for __DEV__ in the file that no longer makes the decision. It
+// went stale exactly once, and a release check that has quietly stopped
+// checking is worse than not having one.
+
+const backend = read('src/lib/backend.ts');
+if (!/usingEmulator\s*=\s*__DEV__ &&/.test(backend)) {
   blocking.push(
-    'src/lib/firebase.ts no longer gates the emulator connection on __DEV__.\n'
+    'src/lib/backend.ts no longer gates usingEmulator on __DEV__ first.\n'
     + '  A released app silently talking to nothing is worse than one that\n'
     + '  fails to build.',
+  );
+}
+
+const firebase = read('src/lib/firebase.ts');
+if (!/if \(!usingEmulator \|\| connected\) return;/.test(firebase)) {
+  blocking.push(
+    'src/lib/firebase.ts no longer returns early when usingEmulator is false.\n'
+    + '  Every connect*Emulator call has to sit behind that one guard.',
+  );
+}
+
+// Every emulator connection in the whole app, wherever it is written, has to
+// be in the one function that guard protects. A second one somewhere else
+// would be a release pointed half at a laptop.
+const strayEmulator = [...sources()]
+  .filter((file) => file !== 'src/lib/firebase.ts')
+  .filter((file) => /connect(Auth|Firestore|Functions|Storage|Database)Emulator\s*\(/
+    .test(read(file)));
+if (strayEmulator.length) {
+  blocking.push(
+    `An emulator is connected outside src/lib/firebase.ts: ${strayEmulator.join(', ')}.`,
   );
 }
 
@@ -166,6 +212,43 @@ check.push(
 
 // ---- store requirements a repository cannot verify -----------------------
 
+// ---- Play App Signing changes the certificate ----------------------------
+//
+// The one that breaks a release that tested perfectly.
+
+check.push(
+  'Google sign-in and the Play App Signing certificate. With Play App Signing\n'
+  + '  on, Google re-signs the bundle with ITS OWN key, which is not the EAS\n'
+  + '  upload key. Google matches a sign-in on the package name plus the\n'
+  + '  signing certificate, so unless that certificate is also registered\n'
+  + '  against com.taziyah.app in Firebase, Continue with Google fails with\n'
+  + '  DEVELOPER_ERROR for every person who installs from Play, while working\n'
+  + '  perfectly on the internal build you tested.\n'
+  + '    Play Console > Setup > App signing > App signing key certificate\n'
+  + '    Copy its SHA-1 AND SHA-256 into Firebase console > Project settings\n'
+  + '    > Your apps > com.taziyah.app > Add fingerprint\n'
+  + '    Then download google-services.json again and rebuild.\n'
+  + '  The same certificate also belongs in assetlinks.json, above.',
+);
+
+// ---- 16 KB memory pages --------------------------------------------------
+//
+// Every app targeting API 35 or higher must support 16 KB pages on 64-bit
+// devices, and from 1 February 2027 an update that does not cannot be
+// released. This app ships native libraries through React Native, so it
+// cannot be answered by reading the source.
+
+check.push(
+  '16 KB memory page support, required for apps targeting API 35 and higher\n'
+  + '  on 64-bit devices, and enforced on updates from 1 February 2027. React\n'
+  + '  Native and Expo ship the native libraries here, and recent versions of\n'
+  + '  both align them, so this is very likely already true. Confirm it on the\n'
+  + '  real bundle rather than assuming:\n'
+  + '    Play Console > pre-launch report, after the first upload, or\n'
+  + '    unzip the AAB and check each .so with\n'
+  + '      llvm-objdump -p lib.so | grep LOAD   (align must be 2**14 or more)',
+);
+
 check.push(
   'Data Safety form: drafted in docs/play-store.md against what the code\n'
   + '  actually does. Read it rather than filling the form from memory.',
@@ -202,7 +285,12 @@ const say = (label, list) => {
 say('BLOCKING', blocking);
 say('CHECK BY HAND', check);
 
+console.log(
+  '\nThe Play Console steps, in the order Play asks for them, are in\n'
+  + 'docs/play-store.md section 6.\n',
+);
+
 if (!blocking.length) {
-  console.log(`\nNothing blocking. ${check.length} things need a person.\n`);
+  console.log(`Nothing blocking. ${check.length} things need a person.\n`);
 }
 process.exit(blocking.length ? 1 : 0);

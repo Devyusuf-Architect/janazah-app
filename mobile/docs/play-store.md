@@ -223,5 +223,77 @@ release rather than an internal test.
 3. **Data Safety needs the judgement in section 1b confirmed** by whoever is
    accountable for the policy.
 4. The keystore decision, and Play App Signing, before the first production
-   build.
+   build. **Play App Signing has a consequence that is easy to miss:** Google
+   re-signs the bundle with its own key, which is not the EAS upload key, and
+   Google matches a sign-in on the package name plus the signing certificate.
+   That certificate's SHA-1 and SHA-256 have to be added in Firebase against
+   `com.taziyah.app`, and `google-services.json` downloaded again, or Continue
+   with Google fails with DEVELOPER_ERROR for everyone who installs from the
+   store while working perfectly on the internal build that was tested. The
+   same SHA-256 belongs in `assetlinks.json`, or App Links break the same way.
 5. Nobody outside the author has tried to break any of this.
+
+---
+
+## 6. The Play Console checklist
+
+Everything below has to be done by a person, outside this repository. The
+order is the order Play asks for it.
+
+**Before the first upload**
+
+- [ ] Create the app in Play Console. Name `Ta'ziyah`, package
+      `com.taziyah.app`, category Lifestyle, free.
+- [ ] Turn on Play App Signing, then copy the **app signing key** SHA-1 and
+      SHA-256 from Setup > App signing.
+- [ ] Add both to Firebase console > Project settings > Your apps >
+      `com.taziyah.app` > Add fingerprint. Download `google-services.json`
+      again into `mobile/`. Without this Google sign-in fails from the store.
+- [ ] Rebuild `assetlinks.json` with every SHA-256 that will sign a release,
+      the upload key and Google's own, and deploy it:
+      `node mobile/scripts/build-assetlinks.mjs <SHA-256> <SHA-256>`
+      then confirm `curl https://taziyah.com/.well-known/assetlinks.json`.
+- [ ] Confirm Firebase is on the Blaze plan. Cloud Functions do not run
+      otherwise and no notification is ever sent.
+- [ ] Deploy the backend: `npm run deploy:rules` and
+      `npm run deploy:functions` from the repository root.
+- [ ] Confirm `platformSettings/sampleData` is false or absent in the live
+      project, so no fictional notice can appear.
+
+**Store listing**
+
+- [ ] Copy the name, short description and full description from section 2.
+- [ ] Upload the icon and the feature graphic.
+- [ ] Replace `mobile/store/screenshot-*.png` with captures from a real
+      device. The ones in the repository are browser renders with no status
+      bar and no tab bar, which Play will accept and which look wrong.
+- [ ] Privacy policy URL: `https://taziyah.com/privacy`. It must be reachable
+      and must describe the Android app, not only the website, and it still
+      needs the named accountable person and contact address in item 2 above.
+- [ ] Account deletion URL. Play requires a page somebody can reach without
+      installing the app, saying how to have an account and its data deleted.
+      The in-app path exists (`app/delete-account.tsx`) and the web console
+      has one for a signed-in user; confirm a public page documents the
+      process for somebody who cannot sign in.
+- [ ] Support contact: a real email address and a postal address. The same
+      gap as the privacy policy applies.
+
+**Forms**
+
+- [ ] Data Safety, from section 1. Read it rather than answering from memory,
+      particularly 1b on location and the FCM token.
+- [ ] Content rating questionnaire, from section 2.
+- [ ] Target audience, ads declaration (there are none), and the news and
+      government app declarations (neither applies).
+
+**Testing, before production**
+
+- [ ] Internal testing track first, with the production profile, so the build
+      is signed exactly the way the public one will be.
+- [ ] Push delivery end to end on that build: publish a notice, then cancel
+      it, with the phone locked. Section 4.
+- [ ] Google sign-in on that build, which is what proves the Play App Signing
+      fingerprint was registered.
+- [ ] A notification tap and a `https://taziyah.com/n/{id}` link, which is
+      what proves App Links verified.
+- [ ] Read the pre-launch report, including the 16 KB page size finding.
