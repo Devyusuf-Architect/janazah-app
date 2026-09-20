@@ -249,6 +249,34 @@ check.push(
   + '      llvm-objdump -p lib.so | grep LOAD   (align must be 2**14 or more)',
 );
 
+// ---- the legal pages have to name a real person -------------------------
+
+const contact = readRepo('public/js/contact.js');
+const filled = [...contact.matchAll(/^\s*(accountable|privacyEmail|supportEmail|postalAddress):\s*'([^']*)'/gm)]
+  .filter(([, , value]) => value.trim().length > 0);
+if (filled.length < 4) {
+  blocking.push(
+    'public/js/contact.js still has blanks. PIPEDA requires a named\n'
+    + '  individual accountable for privacy, and Play requires a support\n'
+    + '  contact, so the privacy page, the terms page and the public deletion\n'
+    + '  page all currently say no contact address has been published yet.\n'
+    + '  That is honest, and it is not releasable. Fill in all four.',
+  );
+}
+
+if (!existsSync(resolve(repoRoot, 'public/js/views/delete-account.js'))) {
+  blocking.push(
+    'The public account deletion page is gone. Play requires a URL where\n'
+    + '  deletion can be requested without installing the app.',
+  );
+}
+check.push(
+  'Account deletion URL for the Play listing:\n'
+  + '    https://taziyah.com/delete-account\n'
+  + '  Confirm it is reachable after deploying, and paste it into Play\n'
+  + '  Console > App content > Data deletion.',
+);
+
 check.push(
   'Data Safety form: drafted in docs/play-store.md against what the code\n'
   + '  actually does. Read it rather than filling the form from memory.',

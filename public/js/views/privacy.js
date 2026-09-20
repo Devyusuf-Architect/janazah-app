@@ -8,8 +8,9 @@
 import { el } from '../ui.js';
 import { RETENTION_DAYS } from '../retention-policy.js';
 import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
+import { CONTACT, CONTACT_PENDING, isContactComplete } from '../contact.js';
 
-const LAST_UPDATED = '25 August 2026';
+const LAST_UPDATED = '20 September 2026';
 
 export function renderPrivacy(mount) {
   mount.replaceChildren();
@@ -34,12 +35,15 @@ export function renderPrivacy(mount) {
               'possible, because it handles funeral information and, if you ' +
               'choose, your location.' }),
 
-    section('Reading notices', [
+    section('Reading notices on this website', [
       el('p', { text: 'You do not need an account to read notices, follow a ' +
-                      'masjid, or open directions. No sign-up, no email, no name.' }),
+                      'masjid, or open directions on this website. No sign-up, ' +
+                      'no email, no name.' }),
       el('p', { text: 'The masjids you follow are stored in your own browser ' +
                       'on this device. They are never sent to us or to the ' +
                       'masjids, so nobody can see whose notices you watch.' }),
+      el('p', { class: 'muted', text: 'The Android app works differently in ' +
+                      'both of those respects. See “The Android app” below.' }),
     ]),
 
     section('Your location', [
@@ -65,11 +69,62 @@ export function renderPrivacy(mount) {
                       'not stored and not written to our logs.' }),
     ]),
 
+    section('The Android app', [
+      el('p', { text: 'Ta’ziyah is also an Android app, and it handles two ' +
+                      'things differently from this website. Everything else ' +
+                      'on this page applies to both.' }),
+      el('h3', { text: 'The app requires an account' }),
+      el('p', { text: 'Reading notices in the app needs an email address and ' +
+                      'a password, or a Google account. That is a difference ' +
+                      'from this website, where reading needs no account at ' +
+                      'all. If you would rather not have an account, the ' +
+                      'website shows the same notices.' }),
+      el('p', { text: 'Signing in with Google tells us the email address and ' +
+                      'the name on that Google account, and nothing else. It ' +
+                      'does not give us access to your Google account.' }),
+      el('h3', { text: 'Your choices are stored on your account' }),
+      el('p', { text: 'Because the app has an account, the masjids you follow ' +
+                      'and your alert settings are stored against it rather ' +
+                      'than only on the device, so they reach your other ' +
+                      'devices and this website. That record holds the list of ' +
+                      'masjids, your alert distance and your alert choices. It ' +
+                      'holds no position, no history of what you opened, and ' +
+                      'nothing about where you have been.' }),
+      el('h3', { text: 'Notifications' }),
+      el('p', { text: 'Turning alerts on in the app registers a notification ' +
+                      'token for that device with Google’s messaging service, ' +
+                      'and subscribes the device to general areas, usually ' +
+                      'several kilometres across, and to the masjids you ' +
+                      'follow. The token identifies a device, not a person, ' +
+                      'and is used only to deliver these notices. Your ' +
+                      'position is still never sent. Turning alerts off ' +
+                      'removes the token and the subscriptions.' }),
+      el('h3', { text: 'Location in the app' }),
+      el('p', { text: 'The app asks for location permission only when you ask ' +
+                      'for distances, and explains why before the Android ' +
+                      'prompt appears. It asks for approximate and precise ' +
+                      'location while the app is in use, never in the ' +
+                      'background. The position is kept on the phone in ' +
+                      'encrypted storage, each reading replaces the last, and ' +
+                      'turning location off erases it. It is never sent to us.' }),
+      el('h3', { text: 'Deleting your account' }),
+      el('p', {}, [
+        el('span', { text: 'The app deletes accounts from inside it: Profile, ' +
+                           'then Delete my account. You can also ' }),
+        el('a', { class: 'link', href: '/delete-account' }, 'request deletion here'),
+        el('span', { text: ', without installing anything.' }),
+      ]),
+    ]),
+
     section('What we do hold', [
       list([
         'Notices published by verified masjids, which are public by design.',
-        'Accounts for masjid staff and administrators: an email address and, ' +
-          'if they add one, a name.',
+        'Accounts: an email address and, if there is one, a name. For masjid ' +
+          'staff and administrators on either the website or the app, and for ' +
+          'everyone using the Android app, which requires an account.',
+        'For an app account, the masjids it follows and its alert settings.',
+        'For a device with alerts on, a notification token and the areas and ' +
+          'masjids it is subscribed to.',
         'A record of who created, changed or cancelled each notice, and when.',
         'Reports of incorrect notices, tied to an anonymous session rather ' +
           'than to a person.',
@@ -121,6 +176,17 @@ section('Asking for a notice to come down', [
                       'same as reporting an incorrect notice.' }),
     ]),
 
+    section('Email', [
+      el('p', { text: 'Ta’ziyah sends no marketing email, no newsletter and ' +
+                      'no promotional messages, and there is nothing to ' +
+                      'unsubscribe from. The only email it sends is about ' +
+                      'your own account: confirming an address and resetting ' +
+                      'a password. Your address is not sold, rented or shared ' +
+                      'with anyone for their own purposes.' }),
+      el('p', { text: 'Notices themselves are never emailed. They reach you ' +
+                      'as a notification, only if you turn alerts on.' }),
+    ]),
+
     section('Your choices', [
       list([
         'Turn location and alerts off at any time from the “Near me” tab.',
@@ -137,10 +203,29 @@ section('Asking for a notice to come down', [
                       'or to ask for a notice to be corrected or removed, use ' +
                       'the “Report a problem” link on the notice, or contact the ' +
                       'masjid that published it.' }),
-      el('p', { class: 'hint hint--boxed' },
-        'Before launch, replace this section with a real contact address and a ' +
-        'named person responsible for privacy. PIPEDA requires an accountable ' +
-        'individual, and a policy without one is incomplete.'),
+      ...(isContactComplete()
+        ? [
+          el('p', { text: 'You can also write to us directly. Ta’ziyah has a ' +
+                          'named individual accountable for privacy, and ' +
+                          'requests about your own information, corrections ' +
+                          'and deletion all reach them.' }),
+          el('dl', { class: 'policy__contact' }, [
+            el('dt', { text: 'Accountable for privacy' }),
+            el('dd', { text: CONTACT.accountable }),
+            el('dt', { text: 'Privacy requests' }),
+            el('dd', {}, [el('a', { class: 'link', href: `mailto:${CONTACT.privacyEmail}` }, CONTACT.privacyEmail)]),
+            el('dt', { text: 'Support' }),
+            el('dd', {}, [el('a', { class: 'link', href: `mailto:${CONTACT.supportEmail}` }, CONTACT.supportEmail)]),
+            el('dt', { text: 'Post' }),
+            el('dd', { text: CONTACT.postalAddress }),
+          ]),
+          el('p', { text: 'You may ask what information is held about you or ' +
+                          'your family, ask for it to be corrected, or ask for ' +
+                          'it to be deleted. If you are not satisfied with the ' +
+                          'answer, you can complain to the Office of the ' +
+                          'Privacy Commissioner of Canada.' }),
+        ]
+        : [el('p', { class: 'hint hint--boxed' }, CONTACT_PENDING)]),
     ]),
   ]));
 }

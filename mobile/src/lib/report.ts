@@ -18,22 +18,44 @@ import { reportsRef } from './collections';
 import { auth } from './firebase';
 import { signInAnonymously } from '@react-native-firebase/auth';
 
+/**
+ * The reasons somebody can give, and they are not this app's to choose.
+ *
+ * Reports from the app and from the website land in one queue, and
+ * public/js/views/admin.js turns the stored value into a label for the
+ * administrator reading it. A value that is not in that map arrives as a
+ * report nobody can categorise, which is how a fraud report gets triaged as
+ * though it were a typo. These are the web's values, in the web's order, with
+ * wording short enough for a phone. test/report-reasons.test.ts reads the
+ * admin console and fails if the two ever drift apart again.
+ *
+ * family_takedown is first because it is the most time-sensitive thing on the
+ * list and a distressed person should not have to scroll for it.
+ */
 export const REPORT_REASONS = [
+  {
+    value: 'family_takedown',
+    label: 'I am family and want this taken down',
+  },
   {
     value: 'incorrect_details',
     label: 'The time or place is wrong',
+  },
+  {
+    value: 'already_cancelled',
+    label: 'This Janazah was cancelled',
   },
   {
     value: 'duplicate',
     label: 'This is already announced elsewhere',
   },
   {
-    value: 'not_genuine',
-    label: 'This does not look genuine',
+    value: 'privacy',
+    label: 'It shares something the family did not approve',
   },
   {
-    value: 'family_takedown',
-    label: 'I am family and want this taken down',
+    value: 'fraudulent',
+    label: 'I believe this notice is fake',
   },
   {
     value: 'other',

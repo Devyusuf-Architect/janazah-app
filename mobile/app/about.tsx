@@ -116,10 +116,12 @@ export default function AboutScreen() {
               />
               <Divider inset={space.lg} />
               <Fact
-                title="Reading needs no account"
+                title="This app needs an account"
                 body={
-                  'Notices, following a masjid and alerts all work without one. '
-                  + 'An account only carries your choices between devices.'
+                  'Signing in is what lets the masjids you follow and your '
+                  + 'alert settings reach your other devices. If you would '
+                  + 'rather not have an account, taziyah.com shows the same '
+                  + 'notices and needs none.'
                 }
               />
             </Surface>
@@ -143,6 +145,12 @@ export default function AboutScreen() {
                 title="Asking for a notice to be taken down"
                 subtitle="If you are family and want one removed sooner"
                 onPress={() => open('/privacy')}
+              />
+              <Divider inset={space.lg} />
+              <Row
+                title="Deleting your account"
+                subtitle="How to do it here, and how to ask if you cannot"
+                onPress={() => open('/delete-account')}
               />
             </Surface>
           </Section>

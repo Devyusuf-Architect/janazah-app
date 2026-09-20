@@ -1,7 +1,7 @@
 // Reporting a notice.
 //
 // Reachable from the notice itself, because that is where somebody notices
-// that a time is wrong. Deliberately short: five reasons, an optional note,
+// that a time is wrong. Deliberately short: a list of reasons, an optional note,
 // and a send button. A long form between somebody and telling us a funeral
 // notice is wrong is a form that does not get filled in.
 

@@ -7,8 +7,9 @@
 // wrong, and what this platform is not.
 
 import { el } from '../ui.js';
+import { CONTACT, CONTACT_PENDING, isContactComplete } from '../contact.js';
 
-const LAST_UPDATED = '25 August 2026';
+const LAST_UPDATED = '20 September 2026';
 
 export function renderTerms(mount) {
   mount.replaceChildren();
@@ -86,8 +87,10 @@ export function renderTerms(mount) {
 
     section('Community members', [
       list([
-        'Reading notices, following an organization, and opting into nearby ' +
-          'alerts need no account.',
+        'On this website, reading notices, following an organization and ' +
+          'opting into nearby alerts need no account. The Android app ' +
+          'requires one; the website shows the same notices for anyone who ' +
+          'would rather not have an account.',
         'Location, where you choose to share it, is used on your device and ' +
           'is never sent to this platform or to any organization. See the ' +
           'privacy page for exactly how.',
@@ -104,10 +107,17 @@ export function renderTerms(mount) {
       }),
     ]),
 
-    el('p', { class: 'hint hint--boxed' },
-      'Questions about these terms, or about a specific notice, go through ' +
-      '“Report a problem” on the notice, or the takedown request ' +
-      'described on the privacy page. A direct contact address will be added ' +
-      'here once one is confirmed.'),
+    section('Getting in touch', [
+      el('p', { text: 'Questions about a specific notice are fastest through ' +
+                      '“Report a problem” on the notice itself, which reaches ' +
+                      'a platform administrator and needs no account.' }),
+      ...(isContactComplete()
+        ? [el('p', {}, [
+          el('span', { text: 'Questions about these terms: ' }),
+          el('a', { class: 'link', href: `mailto:${CONTACT.supportEmail}` }, CONTACT.supportEmail),
+          el('span', { text: '.' }),
+        ])]
+        : [el('p', { class: 'hint hint--boxed' }, CONTACT_PENDING)]),
+    ]),
   ]));
 }

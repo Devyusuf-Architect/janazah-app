@@ -23,6 +23,9 @@ part is genuinely arguable.
 | App activity: other | Yes | No | Which masjids somebody follows, in `/users/{uid}`, only while signed in. `src/lib/follows.ts`. |
 | Device or other IDs | Yes | No | The FCM messaging token. See section 1b. |
 | Location | **See section 1b** | No | Never transmitted. `src/lib/location.ts`. |
+| App activity: app interactions | No | No | Nothing records which notices somebody opened. |
+| User-generated content | Yes, from coordinators only | Yes, published publicly | A Janazah notice, written by verified organization staff. Public by design: that is the product. A reader generates none. `firestore.rules`, `noticePublicKeys()`. |
+| Personal info: other (reported content) | Yes | No | The free-text note on a report, capped at 1000 characters, tied to an anonymous session rather than to a person. `src/lib/report.ts`. |
 | Photos, files, contacts, calendar, health, financial, messages | No | No | The app has no permission for any of them. |
 | Crash logs, diagnostics, analytics | No | No | No Crashlytics, no Analytics, no third-party SDK of any kind. Check `package.json` before answering otherwise. |
 
@@ -31,13 +34,29 @@ For everything marked collected:
 - **Purpose:** App functionality, and account management for the email and
   name. Nothing is used for advertising, personalisation or analytics, because
   none of those exist here.
-- **Is it required?** No. Reading notices, following a masjid and receiving
-  alerts all work with no account at all. That is worth stating in the form's
-  optional explanation, because it is unusual and it is true.
+- **Is it required?** For the email address, **yes**. The Android app requires
+  an account: `src/features/launch/AuthGate.tsx` bounces anything outside the
+  launch group to sign-in, and an anonymous session deliberately does not
+  count. Answering "optional" here would be wrong, and it is the kind of wrong
+  that gets an app pulled. Everything else is optional: the display name,
+  following a masjid, alerts and location are each a choice, and the app works
+  without any of them.
+
+  This differs from taziyah.com, which needs no account. The form is about the
+  app, so answer for the app.
 - **Encrypted in transit?** Yes, everything is HTTPS through the Firebase SDKs.
-- **Can users request deletion?** Yes. In the app at Profile > Delete my
-  account (`app/delete-account.tsx`), and Play also requires a web URL for
-  requesting it without installing the app.
+- **Can users request deletion?** Yes, and both routes exist. In the app at
+  Profile > Delete my account (`app/delete-account.tsx`), which deletes
+  immediately, and at `https://taziyah.com/delete-account`
+  (`public/js/views/delete-account.js`), which is the public URL Play requires
+  for requesting deletion without installing the app. Answer "Yes" to both the
+  deletion question and the "provide a way to request deletion" question.
+- **What deletion does not remove, and why the form still says yes:** notices
+  published by an organization, and the record of who published or changed
+  one. Neither is reader data. A notice is a masjid's public announcement of a
+  funeral, and the change record is what makes a fraudulent notice traceable;
+  it refers to notices by id and holds no name. Both age out on their own
+  schedule (`functions/lib/retention.js`). The public page says this plainly.
 
 ### 1b. Location, and the FCM token: the arguable part
 
@@ -81,6 +100,30 @@ Google's definition rather than a fact about the code.
 
 The same reasoning applies to the FCM token under "Device or other IDs", where
 the answer is more clearly yes: it is transferred, and FCM retains it.
+
+---
+
+## 1c. Third-party services, from the dependency list
+
+Read off `mobile/package.json` and `functions/package.json`, not from memory.
+The short version: there is no analytics, no crash reporting, no advertising
+SDK and no email provider anywhere in this app.
+
+| Service | Used for | Data it sees | Declared where |
+| --- | --- | --- | --- |
+| Firebase Authentication | Accounts, email and password, Google, TOTP second factor | Email address, display name, password hash, sign-in metadata | Data Safety: email, name |
+| Cloud Firestore | Notices, organizations, `/users/{uid}`, reports | Everything the app stores, under `firestore.rules` | Data Safety: app activity |
+| Cloud Functions | Sending notifications, retention deletion, audit entries | Notice ids, topics, counts | No user data beyond the above |
+| Firebase Cloud Messaging | Delivering notices | A per-device token, and the topics that device subscribed to | Data Safety: device IDs |
+| Google Sign-In (`@react-native-google-signin`) | The Continue with Google button | The email address and name on the Google account, nothing else | Data Safety: email, name |
+| Google Maps SDK for Android | The optional map in Near Me | Map tile requests from the device | Only if a Maps key is set. Without one the map is hidden and Near Me is a list. |
+| Expo and EAS | Build tooling | Nothing at runtime. No Expo Updates, no expo-analytics. | Not a data recipient |
+| Analytics, crash reporting, advertising | **None** | Nothing | Answer "no" to all of these |
+| Email provider | **None** | Nothing | Firebase Auth sends verification and password-reset mail. There is no marketing email and nothing to unsubscribe from. |
+
+Data is encrypted in transit everywhere: every one of these is reached over
+HTTPS by the Firebase and Google SDKs, and the app sets no cleartext exception
+in a release build.
 
 ---
 
@@ -132,7 +175,12 @@ partner names.
 > law differ. Ta'ziyah is a notification service, not a religious authority.
 > Follow your local imam.
 >
-> Reading notices needs no account.
+> Reading notices in the app needs an account, so that the masjids you follow
+> and your alert settings reach your other devices. taziyah.com shows the same
+> notices and needs no account at all.
+>
+> Ta'ziyah does not cover every masjid or every Janazah. It covers the
+> organizations that have registered and been verified.
 
 **Category:** Lifestyle. (Books & Reference is the alternative; Lifestyle fits
 better, since the app's job is finding an event rather than reading.)

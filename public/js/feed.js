@@ -28,6 +28,7 @@ import { renderAbout } from './views/about.js';
 import { renderRegisterMasjid } from './views/register-masjid.js';
 import { renderPrivacy } from './views/privacy.js';
 import { renderTerms } from './views/terms.js';
+import { renderDeleteAccount } from './views/delete-account.js';
 import { renderAuth, completeRedirectSignIn } from './views/auth.js';
 import { renderDashboard, teardownDashboard } from './views/dashboard.js';
 import { startAccountSync } from './account-sync.js';
@@ -141,6 +142,11 @@ function renderRoute() {
   if (/^\/privacy\/?$/.test(path)) {
     document.title = "Privacy — Ta'ziyah";
     renderPrivacy(mount());
+    return;
+  }
+  if (/^\/delete-account\/?$/.test(path)) {
+    document.title = "Deleting your account — Ta'ziyah";
+    renderDeleteAccount(mount());
     return;
   }
   if (/^\/terms\/?$/.test(path)) {
