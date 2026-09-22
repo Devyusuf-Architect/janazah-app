@@ -110,39 +110,107 @@ export function autoReveal(container) {
 // -------------------------------------------------------- scroll position
 //
 // Somebody scrolls a long feed, opens a notice, and presses back. Returning
-// them to the top of the list means finding their place again — and on this
+// them to the top of the list means finding their place again, and on this
 // site "their place" is often a specific funeral they were reading about.
 //
-// Kept in memory rather than in history.state: the position is only useful
-// within a session, and writing it into history entries means every scroll
-// event competing to replaceState.
+// The offset lives in history.state, not in a Map in this module. A Map only
+// answers for the entry you came from, in the tab you are still in: pressing
+// Forward returned to the top, and so did reloading and then pressing Back,
+// because nothing outside memory knew where the page had been. history.state
+// is attached to the entry itself and the browser keeps it across both.
+//
+// The cost is a replaceState while scrolling, which is why it is throttled
+// hard: Safari rate-limits history writes, and a scroll handler that writes
+// on every frame will hit that ceiling and start throwing.
 
-const positions = new Map();
+const SAVE_EVERY_MS = 600;
+const MOVED_ENOUGH = 24;
+
+let lastSaved = 0;
+let lastOffset = 0;
 
 /** Take the browser out of the loop; the router decides where the page sits. */
 export function ownScrollRestoration() {
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 }
 
-/** Remember where `key` was scrolled to. Call before leaving a page. */
-export function rememberScroll(key) {
-  positions.set(key, window.scrollY);
+/** Write the current offset onto the current history entry. */
+export function rememberScroll() {
+  try {
+    const scrollY = Math.round(window.scrollY);
+    history.replaceState({ ...history.state, scrollY }, '');
+    lastSaved = Date.now();
+    lastOffset = scrollY;
+  } catch { /* a browser rate-limiting history writes; the page still works */ }
+}
+
+/**
+ * Keep the current entry's offset roughly current while somebody scrolls.
+ *
+ * Throttled by both time and distance, because the only thing this has to be
+ * is close enough that returning to the page looks like returning to it.
+ */
+export function watchScrollPosition() {
+  const save = () => {
+    const now = Date.now();
+    if (now - lastSaved < SAVE_EVERY_MS) return;
+    if (Math.abs(window.scrollY - lastOffset) < MOVED_ENOUGH) return;
+    rememberScroll();
+  };
+  window.addEventListener('scroll', save, { passive: true });
+  // A page being left for any reason at all: a reload, a real navigation, or
+  // the tab being hidden on a phone, which is where it is most often killed.
+  window.addEventListener('pagehide', rememberScroll);
+  return () => window.removeEventListener('scroll', save);
 }
 
 /**
  * Put the page where it should be for this navigation.
  *
- * Going back to somewhere already visited returns to the remembered offset;
- * anything else starts at the top, because arriving halfway down a page you
- * have not seen is disorienting rather than helpful.
+ * Going back or forward returns to the offset that entry recorded; anything
+ * else starts at the top, because arriving halfway down a page you have not
+ * seen is disorienting rather than helpful.
  *
- * Instant, not smooth: a restored position should already be there when the
- * page appears. Animating to it means watching the page scroll itself, which
- * reads as the site doing something rather than as returning.
+ * The retry is the part that matters. Views here paint twice: once
+ * synchronously, and again when a live Firestore snapshot arrives with the
+ * actual notices. Scrolling to 1200px against the first paint does nothing,
+ * because the document is still one screen tall and the browser clamps it, so
+ * the old single attempt landed somewhere near the top and looked like the
+ * position had been lost. This keeps asking across a few frames until the
+ * page is tall enough to honour it, and stops the moment it lands, gives up,
+ * or the reader takes over by scrolling themselves.
  */
-export function restoreScroll(key, { remembered = false } = {}) {
-  const to = remembered ? positions.get(key) ?? 0 : 0;
-  window.scrollTo({ top: to, behavior: 'instant' in window ? 'instant' : 'auto' });
+export function restoreScroll({ remembered = false } = {}) {
+  const target = remembered ? Number(history.state?.scrollY) || 0 : 0;
+  lastOffset = target;
+  lastSaved = Date.now();
+
+  const jump = (top) => window.scrollTo({ top, behavior: 'auto' });
+  if (!target) { jump(0); return; }
+
+  let frames = 0;
+  let cancelled = false;
+  const stop = () => { cancelled = true; };
+  // Their scroll wins over ours, immediately and for good.
+  for (const event of ['wheel', 'touchstart', 'keydown']) {
+    window.addEventListener(event, stop, { once: true, passive: true });
+  }
+
+  const settle = () => {
+    if (cancelled) return;
+    jump(target);
+    // Landed, or the page is never going to be tall enough. 40 frames is
+    // about two thirds of a second, which is longer than a snapshot takes
+    // and short enough that nothing is still moving when a reader arrives.
+    if (Math.abs(window.scrollY - target) <= 2 || frames++ > 40) {
+      for (const event of ['wheel', 'touchstart', 'keydown']) {
+        window.removeEventListener(event, stop);
+      }
+      return;
+    }
+    requestAnimationFrame(settle);
+  };
+  settle();
 }
 
 // ------------------------------------------------------------ scroll state

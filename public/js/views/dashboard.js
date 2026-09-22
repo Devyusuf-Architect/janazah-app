@@ -57,14 +57,18 @@ export function renderDashboard(mount, ctx) {
   const near = el('section', { class: 'home-section' });
   const followed = el('section', { class: 'home-section' });
   const updates = el('section', { class: 'home-section', hidden: true });
-  let qa = quickActions();
+  // Null unless this account can publish for a verified masjid. A comment
+  // node holds the place so the column keeps its order when the staff
+  // context resolves a moment later and the section appears.
+  let qa = quickActions() || document.createComment('quick-actions');
 
   const repaint = () => {
     paintUpcoming(upcoming, state);
     paintNear(near, state, repaint);
     paintFollowed(followed, state, repaint);
     paintRecentUpdates(updates, state);
-    const freshQa = quickActions(staffContext(state));
+    const freshQa = quickActions(staffContext(state))
+      || document.createComment('quick-actions');
     qa.replaceWith(freshQa);
     qa = freshQa;
   };

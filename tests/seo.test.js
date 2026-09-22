@@ -281,7 +281,6 @@ describe('the pages connect to each other', () => {
     // Home to how it works to the notices, and the masjid route from the
     // page that explains it to the form that starts it.
     const journeys = [
-      ['views/home.js', '/how-it-works'],
       ['views/how-it-works.js', '/janazahs'],
       ['views/how-it-works.js', '/masjids'],
       ['views/how-it-works.js', '/for-masjids'],
@@ -289,7 +288,7 @@ describe('the pages connect to each other', () => {
       ['views/for-masjids.js', '/register-masjid'],
       ['views/for-masjids.js', '/faq'],
       ['views/faq.js', '/for-masjids'],
-      ['nav.js', '/how-it-works'],
+      ['footer.js', '/how-it-works'],
     ];
     for (const [file, target] of journeys) {
       assert.ok(sources[file].includes(`'${target}'`),

@@ -40,9 +40,11 @@ describe('the first screen is content, not a pitch', () => {
   });
 
   test('every section a person came for is present', () => {
+    // The four a reader came for. "Quick actions" and the guide strip are
+    // deliberately not among them any more: both were second links to rows
+    // already in the navigation on the same screen.
     for (const section of [
-      'Upcoming Janazahs', 'Near you', 'Masjids you follow', 'Quick actions',
-      'How to perform Janazah',
+      'Upcoming Janazahs', 'Near you', 'Masjids you follow',
     ]) {
       assert.ok(home.includes(section), `the home page is missing: ${section}`);
     }
@@ -120,12 +122,11 @@ describe('location stays optional and stays on the device', () => {
     const enable = home.slice(home.indexOf('async function enableLocation'));
     assert.match(enable.slice(0, 600), /loc\.update\(\{ enabled: true \}\)/);
     // The only call sites are click handlers: the finder's "Use my
-    // location", the near-you prompt, the near-you section's "Update
-    // location" (shown once the stored position goes stale), and the
-    // zero-notices explore block's "Enable nearby alerts", plus the
+    // location", the near-you prompt, and the near-you section's "Update
+    // location" (shown once the stored position goes stale), plus the
     // function's own definition.
     const calls = home.match(/enableLocation\(/g) || [];
-    assert.equal(calls.length, 5, 'enableLocation should be defined once and called on click only');
+    assert.equal(calls.length, 4, 'enableLocation should be defined once and called on click only');
   });
 
   test('a refused permission turns the setting back off', () => {
@@ -145,10 +146,16 @@ describe('the follow section works without an account', () => {
 
 describe('navigation', () => {
   test('the sidebar carries sections and nothing personal', () => {
+    // Five places, not seven. "Following" and the guide's longer name moved
+    // out: the follow list is about the person, so it sits in the account
+    // menu and the footer, and a nav of seven equally weighted rows was the
+    // congestion this reduced.
     const links = nav.slice(nav.indexOf('const LINKS'), nav.indexOf('// Deeper pages'));
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Following', 'Janazah Guide']) {
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Guide']) {
       assert.ok(links.includes(`'${label}'`), `the sidebar is missing ${label}`);
     }
+    assert.ok(!/const LINKS[\s\S]*?\];/.exec(nav)[0].includes("'Following'"),
+      'the follow list belongs to the account menu, not the primary nav');
     for (const personal of ['Sign out', 'Account', 'Create account']) {
       assert.ok(!links.includes(`'${personal}'`),
         `${personal} belongs in the account menu, not among the sections`);
@@ -190,33 +197,23 @@ describe('navigation', () => {
 });
 
 describe('the page fits the screen it is read on', () => {
-  test('one column by default; the second is opted into at a width', () => {
-    // Written this way round on purpose. A grid that starts at two columns
-    // and is undone for phones is one forgotten override away from a
-    // squeezed home page on the device most of this site is read on.
-    const grid = css.slice(css.indexOf('.home-grid {'));
-    assert.match(grid.slice(0, 120), /grid-template-columns: 1fr/);
-    const wide = css.slice(css.indexOf('@media (min-width: 1180px)'));
-    assert.match(wide.slice(0, 400), /\.home-grid \{ grid-template-columns: [\d.]+fr [\d.]+fr/);
-  });
-
-  test('the wide treatment belongs to the home route and leaves with it', () => {
-    // The class lives on the shared #view element, so a page that added it
-    // and did not take it away would widen whatever was rendered next.
-    assert.match(home, /mount\.classList\.add\('view--home'\)/);
-    const teardown = home.slice(home.indexOf('export function teardownHome'));
-    assert.match(teardown.slice(0, 400), /classList\.remove\('view--home'\)/);
-  });
-
-  test('the phone keeps the reading order it had', () => {
-    // The columns are wrappers, not a reordering: at one column the sections
-    // still come out in the order somebody scrolls them.
+  test('one column, at every width', () => {
+    // The two-column treatment went with the sections that filled the second
+    // column. What is left is four sections a reader works down in order,
+    // and splitting four things across two columns on a wide screen only
+    // makes the eye choose where to start.
     const render = home.slice(home.indexOf('mount.replaceChildren('), home.indexOf('repaint();'));
-    const order = ['upcoming', 'near', 'explore', 'followed', 'quickActions'];
+    assert.ok(!/home-grid|home-col/.test(render),
+      'the home page is back to two columns');
+    assert.ok(!/view--home/.test(home), 'the wide width class outlived its layout');
+  });
+
+  test('the sections stay in the order somebody needs them', () => {
+    const render = home.slice(home.indexOf('mount.replaceChildren('), home.indexOf('repaint();'));
     let at = -1;
-    for (const section of order) {
+    for (const section of ['finder', 'results', 'upcoming', 'near', 'followed']) {
       const next = render.indexOf(section);
-      assert.ok(next > at, `${section} is out of reading order in the mobile column`);
+      assert.ok(next > at, `${section} is out of reading order`);
       at = next;
     }
   });

@@ -14,8 +14,8 @@ import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
 import { renderFooter } from './footer.js';
 import {
-  revealIn, autoReveal, pageEnter,
-  ownScrollRestoration, rememberScroll, restoreScroll, watchScroll,
+  revealIn, autoReveal, pageEnter, ownScrollRestoration, rememberScroll,
+  restoreScroll, watchScroll, watchScrollPosition,
 } from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
 import { renderWelcome, teardownWelcome } from './views/welcome.js';
@@ -66,6 +66,17 @@ function paintNav() {
   renderNav(nav(), { path: location.pathname, user, isAdmin, authReady });
 }
 
+// Returned by renderRoute when it has changed the URL instead of rendering,
+// so route() can run again against the new path rather than renderRoute
+// calling route() from inside itself.
+const REDIRECTED = Symbol('redirected');
+
+/** Swap the address without adding a history entry, and render that instead. */
+function redirect(to) {
+  history.replaceState(history.state, '', to);
+  return REDIRECTED;
+}
+
 function renderRoute() {
   teardownAll();
   paintNav();
@@ -87,9 +98,7 @@ function renderRoute() {
   // holding that link keeps working rather than landing on the home page
   // wondering where it went.
   if (/^\/masajid\/?$/.test(path)) {
-    history.replaceState(null, '', '/masjids');
-    route();
-    return;
+    return redirect('/masjids');
   }
 
   const orgPage = path.match(/^\/o\/([A-Za-z0-9_-]+)\/?$/);
@@ -124,7 +133,7 @@ function renderRoute() {
   }
   if (/^\/account\/?$/.test(path)) {
     if (!authReady) { mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' })); return; }
-    if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
+    if (!user) return redirect('/signin');
     renderAccount(mount(), { user });
     return;
   }
@@ -173,7 +182,7 @@ function renderRoute() {
     return;
   }
   if (/^\/signin\/?$/.test(path)) {
-    if (user) { history.replaceState(null, '', '/dashboard'); route(); return; }
+    if (user) return redirect('/dashboard');
     const initialMode = new URLSearchParams(location.search).get('mode') === 'signup'
       ? 'signup' : 'signin';
     renderAuth(mount(), { variant: 'community', initialMode });
@@ -186,7 +195,7 @@ function renderRoute() {
       mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' }));
       return;
     }
-    if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
+    if (!user) return redirect('/signin');
     renderDashboard(mount(), { user });
     return;
   }
@@ -202,7 +211,7 @@ function renderRoute() {
   // really occur — and checking would mean waiting for auth to resolve, which
   // shows the index first and then replaces it.
   if (path === '/' && firstVisit) {
-    history.replaceState(null, '', '/welcome');
+    history.replaceState(history.state, '', '/welcome');
     renderWelcome(mount());
     return;
   }
@@ -215,10 +224,29 @@ function renderRoute() {
 // autoReveal keeps watching the mount for whatever arrives later.
 let stopReveal = () => {};
 
-function route({ back = false } = {}) {
+/**
+ * Render whatever the current address says, and settle the page around it.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.back] This is a back or forward step, so the
+ *   offset recorded on the history entry is restored rather than the top.
+ * @param {boolean} [options.quiet] A repaint of the page already on screen,
+ *   not a navigation: something loaded late and the view has to be rebuilt
+ *   with it. Keeps the reader where they are and plays no entrance, because
+ *   a page that re-animates and jumps to the top half a second after it
+ *   settled reads as a bug, and used to be one.
+ */
+function route({ back = false, quiet = false } = {}) {
   stopReveal();
   renderedFor = user?.uid ?? null;
-  renderRoute();
+
+  // A route may decide the address should be different: an old link, or a
+  // page that turns out to need signing in. It says so and this runs again,
+  // with a bound because a pair of routes redirecting to each other would
+  // otherwise hang the tab rather than showing anything.
+  let guard = 0;
+  while (renderRoute() === REDIRECTED && guard++ < 5) { /* the new path */ }
+
   // Title, description, canonical and the sharing tags, from the one
   // manifest the static pages were generated from (js/site.js). The markup
   // already carried the right values for the page that was served; this
@@ -226,8 +254,10 @@ function route({ back = false } = {}) {
   // Views for a single notice or masjid set their own title from the record
   // they loaded, after this runs.
   applyPageMeta(location.pathname);
-  restoreScroll(location.pathname + location.search, { remembered: back });
-  pageEnter(mount());
+  if (!quiet) {
+    restoreScroll({ remembered: back });
+    pageEnter(mount());
+  }
   revealIn(mount());
   stopReveal = autoReveal(mount());
 }
@@ -235,16 +265,42 @@ function route({ back = false } = {}) {
 // Handle in-app links without reloading the document. Links to the console are
 // left alone so they load that page properly.
 document.addEventListener('click', (event) => {
+  // Anything the browser is meant to handle itself, it handles itself. Each
+  // of these was a way to break a link that people genuinely use: a
+  // shift-click opens a window, an alt-click saves the target, and a
+  // middle-click opens a tab, and intercepting any of them takes that away
+  // and navigates in place instead.
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
   const link = event.target.closest('a[href^="/"]');
-  if (!link || link.target === '_blank' || event.metaKey || event.ctrlKey) return;
+  if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
   const url = new URL(link.href);
+  // The console is a separate entry point with its own bundle, so it has to
+  // be a real page load rather than a route in this application.
   if (url.origin !== location.origin || url.pathname.startsWith('/console')) return;
+
   event.preventDefault();
-  // Where they were on the page they are leaving, so pressing back returns
-  // them to it rather than to the top of a long feed.
-  rememberScroll(location.pathname + location.search);
-  history.pushState(null, '', url.pathname + url.search);
   closeNav($('#nav-toggle'), nav());
+
+  // Going where you already are is not a navigation. Pushing an entry for it
+  // is what made the Back button look broken: every click on the nav item
+  // for the current page stacked another identical entry, so Back returned
+  // to the same address and appeared to do nothing. The nav items are on
+  // every screen, so this happened constantly.
+  const here = location.pathname + location.search;
+  const there = url.pathname + url.search;
+  if (there === here) {
+    // Treat it as "take me to the top of this", which is what somebody
+    // clicking the section they are already in usually means.
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    return;
+  }
+
+  // Record where they were before the entry stops being the current one, so
+  // Back and Forward both return them to it.
+  rememberScroll();
+  history.pushState({}, '', there);
   route();
 });
 
@@ -254,6 +310,9 @@ window.addEventListener('popstate', () => route({ back: true }));
 
 ownScrollRestoration();
 watchScroll();
+// Keeps the current history entry's offset roughly current, so returning to
+// this page later lands where it was left.
+watchScrollPosition();
 
 renderFooter($('#footer'));
 
@@ -277,7 +336,7 @@ paintSampleMode();
 initSampleMode((enabled) => {
   console.info(`Sample data ${enabled ? 'on' : 'off'} by platform setting.`);
   paintSampleMode();
-  route();
+  route({ quiet: true });
 }).catch((err) => console.error('initSampleMode', err));
 
 // Same reasoning: the public pages that show a support or privacy contact
@@ -285,7 +344,7 @@ initSampleMode((enabled) => {
 // which starts out at its built-in defaults (both addresses empty) until
 // this resolves. Reading it here, rather than only inside the admin portal,
 // is what lets those pages ever show a real address at all.
-initPlatformSettings(() => route())
+initPlatformSettings(() => route({ quiet: true }))
   .catch((err) => console.error('initPlatformSettings', err));
 
 if (usingEmulator) $('#env-banner')?.removeAttribute('hidden');

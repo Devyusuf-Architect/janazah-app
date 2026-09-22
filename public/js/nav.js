@@ -15,43 +15,37 @@
 import { el, icon, toast, friendlyError } from './ui.js';
 import { signOutUser } from './views/auth.js';
 
+// The five places this site is. Everything else is one tap further in,
+// behind Profile, rather than competing with these for the same attention.
+//
 // `core: true` marks a section that also has its own button in the mobile
-// bottom bar. Those are hidden from the slide-out drawer on a phone — showing
+// bottom bar. Those are hidden from the slide-out drawer on a phone: showing
 // "Janazahs" in two places on the same small screen is not a second way in,
-// it is clutter. Everything without `core` is a "less-used" item and stays
-// in the drawer only.
+// it is clutter.
 const LINKS = [
   { href: '/', label: 'Home', icon: 'grid', core: true },
   { href: '/janazahs', label: 'Janazahs', icon: 'clock', core: true },
   { href: '/near-me', label: 'Near Me', icon: 'pin', core: true },
-  { href: '/following', label: 'Following', icon: 'bookmark', core: true },
-  { href: '/masjids', label: 'Masjids', icon: 'building' },
-  { href: '/janazah-guide', label: 'Janazah Guide', icon: 'shield' },
+  { href: '/masjids', label: 'Masjids', icon: 'building', core: true },
+  { href: '/janazah-guide', label: 'Guide', icon: 'shield' },
 ];
 
-// The bottom tab bar on a phone. Not a duplicate nav system: it is rendered
-// from these same routes, and "Profile" opens the very drawer the desktop
-// sidebar collapses into, rather than a third menu of its own.
+// The phone tab bar: four destinations and the drawer. The Guide is behind
+// Profile rather than here, because it is needed on the day of a Janazah and
+// a fifth tab costs every other tab the room for a legible label.
 const BOTTOM_LINKS = [
   { href: '/', label: 'Home', icon: 'grid' },
   { href: '/janazahs', label: 'Janazahs', icon: 'clock' },
   { href: '/near-me', label: 'Near Me', icon: 'pin' },
-  { href: '/following', label: 'Following', icon: 'bookmark' },
+  { href: '/masjids', label: 'Masjids', icon: 'building' },
 ];
 
-// The sidebar's own footer, always last regardless of collapse state: the
-// things somebody wants when they are done browsing sections, not while they
-// are in the middle of one.
-//
-// "How Ta'ziyah Works" is the introduction a first-time visitor is shown, at
-// its own address so it stays reachable afterwards. It is a plain link: it
-// opens the page and changes nothing, so returning to it does not reset the
-// first-visit flag, sign anybody out, or restart anything.
+// The sidebar's own footer: the two a visitor reaches for that are not one
+// of the five places above. Everything else moved into the account menu and
+// the site footer, where it is listed once instead of three times.
 const UTILITY_LINKS = [
+  { href: '/for-masjids', label: 'For Masjids', icon: 'building' },
   { href: '/account', label: 'Settings', icon: 'eye' },
-  { href: '/how-it-works', label: "How Ta'ziyah Works", icon: 'info' },
-  { href: '/faq', label: 'Questions', icon: 'search' },
-  { href: '/about', label: 'Help & About', icon: 'flag' },
 ];
 
 // Deeper pages are not in the nav but still belong to one of its sections, so
@@ -61,6 +55,7 @@ const SECTION_OF = [
   [/^\/o\//, '/masjids'],
   [/^\/n\//, '/janazahs'],
   [/^\/register-masjid/, '/for-masjids'],
+  [/^\/(how-it-works|faq|about|contact)/, '/for-masjids'],
 ];
 
 const COLLAPSE_KEY = 'taziyah.nav.collapsed';
@@ -163,11 +158,13 @@ function renderAccount(mount, { user, path, authReady = true }) {
     ]),
     // Not a link back to the personal home screen: Home in the sidebar is
     // already that, once someone is signed in, so this menu holds only what
-    // is about the person, not a second way to a page one click away. Not
-    // "Account" and
-    // "Settings" as two items either, since /account is one page — the
-    // sidebar's own Settings row is the second, deliberately different, way
-    // in (see UTILITY_LINKS).
+    // is about the person, not a second way to a page one click away.
+    //
+    // Short on purpose. Everything else about this site is in the footer, on
+    // every page, which is a better place for it than a dropdown somebody
+    // has to open to find out what is in it.
+    el('a', { class: 'account__item', href: '/following', role: 'menuitem' },
+      'Masjids you follow'),
     el('a', { class: 'account__item', href: '/account', role: 'menuitem' },
       'Account and settings'),
     el('button', {
@@ -254,32 +251,25 @@ export function renderNav(nav, { path, user, isAdmin = false, authReady = true }
       return navItem({ ...link, href, path, active: isActive(href, path) });
     })));
 
-  const personal = [];
-  // A platform administrator reading the public feed had no way through to
-  // the portal except by knowing the /console URL. The item is marked out
-  // because it leads somewhere most people signed in here cannot go.
+  // One quiet group below the rule, not three. A platform administrator
+  // reading the public feed had no way through to the portal except by
+  // knowing the /console URL, so that row is here when it applies, and is
+  // marked out because it leads somewhere most people signed in here cannot
+  // go. "For Masjids" used to appear in this group and again in the one
+  // below it; now it appears once.
+  const secondary = [];
   if (isAdmin) {
-    personal.push(navItem({
+    secondary.push(navItem({
       href: '/console?tab=admin', label: 'Admin', icon: 'shield', path,
       modifier: ' nav-item--admin',
     }));
   }
-  personal.push(navItem({
-    href: '/for-masjids', label: 'For Masjids', icon: 'building', path,
-    modifier: ' nav-item--quiet',
-  }));
+  secondary.push(...UTILITY_LINKS.map((link) =>
+    navItem({ ...link, path, modifier: ' nav-item--quiet' })));
 
   nav.append(
     el('div', { class: 'sidenav__rule', 'aria-hidden': 'true' }),
-    el('div', { class: 'sidenav__group' }, personal),
-  );
-
-  // Always last: the two things somebody wants once they are done browsing
-  // sections, kept out of the way of the sections themselves.
-  nav.append(
-    el('div', { class: 'sidenav__rule', 'aria-hidden': 'true' }),
-    el('div', { class: 'sidenav__group' },
-      UTILITY_LINKS.map((link) => navItem({ ...link, path, modifier: ' nav-item--quiet' }))),
+    el('div', { class: 'sidenav__group' }, secondary),
   );
 
   // Desktop only: the sidebar shrinks to icons. Hidden from the mobile drawer

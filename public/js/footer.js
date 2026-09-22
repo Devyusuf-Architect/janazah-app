@@ -24,6 +24,7 @@ const GROUPS = [
       { href: '/janazahs', label: 'Janazahs' },
       { href: '/near-me', label: 'Near me' },
       { href: '/masjids', label: 'Masjids' },
+      { href: '/following', label: 'Masjids you follow' },
     ],
   },
   {

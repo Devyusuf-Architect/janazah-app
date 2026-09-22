@@ -114,12 +114,16 @@ describe('layout', () => {
 });
 
 describe('the upcoming empty state is compact', () => {
-  test('one fact, one primary action, one smaller secondary link -- not two buttons and two paragraphs', () => {
+  test('one fact, one line of what changes it, and one action', () => {
     const fn = home.slice(home.indexOf('export function paintUpcoming'));
     const body = fn.slice(0, fn.indexOf('\n// ---'));
     assert.match(body, /'No upcoming Janazahs yet'/);
     assert.match(body, /class: 'home-empty home-empty--compact'/);
     assert.match(body, /btn--primary.*href: '\/masjids'/);
-    assert.match(body, /class: 'link home-empty__secondary', href: '\/register-masjid'/);
+    // One action, not two. The second link asked a reader to choose between
+    // finding a masjid and registering one at the moment the page had
+    // nothing to show them; registration lives in the navigation instead.
+    assert.ok(!/home-empty__secondary/.test(body),
+      'the empty state is back to two competing actions');
   });
 });

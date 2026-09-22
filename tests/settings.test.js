@@ -277,12 +277,16 @@ describe('scrolling keeps the reader’s place', () => {
     // reading about halfway down a long list.
     assert.match(motion, /export function rememberScroll/);
     assert.match(motion, /export function restoreScroll/);
-    assert.match(feed, /rememberScroll\(location\.pathname \+ location\.search\)/);
+    // The offset is keyed to the history entry now, not to a path in a Map,
+    // so rememberScroll takes no key: Forward and a reload lost the position
+    // when it lived in memory. See tests/navigation.test.js.
+    assert.match(feed, /rememberScroll\(\);/);
     assert.match(feed, /route\(\{ back: true \}\)/);
   });
 
   test('a fresh navigation starts at the top', () => {
-    assert.match(motion, /const to = remembered \? positions\.get\(key\) \?\? 0 : 0;/);
+    assert.match(motion,
+      /const target = remembered \? Number\(history\.state\?\.scrollY\) \|\| 0 : 0;/);
   });
 
   test('the restore is instant, not animated', () => {

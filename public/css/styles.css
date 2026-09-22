@@ -2779,7 +2779,7 @@ body.is-scrolled .masthead {
 
 .finder__locate { flex: none; height: 2.7rem; }
 
-.home-section { margin-bottom: 2.2rem; }
+.home-section { margin-bottom: 2.6rem; }
 .home-results:not([hidden]) { margin-bottom: 2.2rem; }
 
 .section-head {
@@ -2965,16 +2965,19 @@ body.is-scrolled .masthead {
    They look different so that "nothing here yet" is not mistaken for
    "you have to do something". */
 
+/* No border and no fill. Four bordered boxes stacked down one column read
+   as four things of equal importance, which is what made this page feel
+   congested; a rule above and quieter type puts the notices themselves back
+   in front. The rule is the section's own divider, not a frame around the
+   prompt. */
 .prompt {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: .95rem 1.05rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
+  padding: .9rem 0 .1rem;
+  border-top: 1px solid var(--line);
 }
 .prompt__body { flex: 1 1 18rem; min-width: 0; }
 .prompt__lede { margin: 0 0 .2rem; font-size: .92rem; color: var(--ink); }
@@ -2997,9 +3000,10 @@ body.is-scrolled .masthead {
 }
 .home-empty__secondary { font-size: .84rem; }
 
-/* Upcoming Janazahs' own empty state: one short fact, one clear next step,
-   and a smaller second option -- never the two-paragraph, two-button version
-   this replaced, which read as an apology rather than as useful information. */
+/* Upcoming Janazahs' own empty state: one short fact, one line saying what
+   will change it, and one action. Never a second button beside the first:
+   choosing between two unrelated things is the last thing to ask of somebody
+   looking at a page that has nothing to show them. */
 .home-empty--compact { padding-top: .2rem; }
 .home-empty__title {
   margin: 0 0 .3rem;
@@ -3099,19 +3103,27 @@ body.is-scrolled .masthead {
 /* Same calm, boxed treatment as .guide-strip, so an early-launch state and an
    established one read as one visual family rather than two different apps. */
 
-.growing-note {
-  padding: 1.1rem 1.2rem;
-  border: 1px solid var(--line);
+/* Shown only while the site has nothing to show. One line, one action, and
+   a quiet fill rather than a bordered card, so it reads as a footnote to an
+   empty page instead of a fifth thing demanding attention. */
+.note-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.15rem;
   border-radius: 12px;
   background: var(--surface-2);
 }
-.growing-note__title {
+.note-strip__body { flex: 1 1 16rem; min-width: 0; }
+.note-strip__title {
   font-family: var(--serif);
-  font-size: 1.02rem;
-  margin: 0 0 .3rem;
+  font-size: 1rem;
+  margin: 0 0 .25rem;
   color: var(--ink);
 }
-.growing-note__sub { margin: 0; font-size: .86rem; color: var(--ink-2); }
+.note-strip__sub { margin: 0; font-size: .86rem; color: var(--ink-2); }
 
 /* ---------- the guide ---------- */
 
@@ -3145,6 +3157,9 @@ body.is-scrolled .masthead {
   /* The closing band on the public pages: full-width taps, less padding. */
   .cta-band { padding: 1.15rem; }
   .cta-band__actions .btn { flex: 1 1 auto; justify-content: center; }
+  /* The zero-notices strip: the action becomes a full-width tap. */
+  .note-strip { align-items: stretch; }
+  .note-strip .btn { width: 100%; justify-content: center; }
 }
 
 /* ---------------------------------------------------------------------------

@@ -28,9 +28,6 @@ let unwatch = null;
 export function teardownHome() {
   if (unwatch) unwatch();
   unwatch = null;
-  // The wide two-column treatment belongs to this route only; every other
-  // page keeps the reading column it was designed around.
-  document.getElementById('view')?.classList.remove('view--home');
 }
 
 export function renderHome(mount) {
@@ -52,28 +49,23 @@ export function renderHome(mount) {
     paintExplore(explore, state);
   };
 
-  // Two columns on a large monitor, one everywhere else. The wrappers are
-  // always present and the grid is a single column until 1180px, so on a
-  // phone, a tablet and a laptop this is exactly the page it was: the same
-  // sections in the same reading order. Above that width the page was a
-  // narrow ribbon down the middle of the screen with the lower half of it
-  // below the fold for no reason.
+  // One column, four sections, in the order somebody actually needs them:
+  // search, what is coming up, what is near, who you follow.
   //
-  // What goes where follows the dashboard's split: the left column is what is
-  // happening, the right column is what to do about it.
-  mount.classList.add('view--home');
+  // What used to be here as well: a six-tile Quick Actions grid, a guide
+  // strip, and a four-tile "get started" block. Every one of those was a
+  // second or third link to a place already in the nav, which is what made
+  // the page read as congested: nine sections of equal weight, none of them
+  // obviously the point. They are gone rather than restyled. The two-column
+  // layout went with them, because two columns of a shorter page is a lot of
+  // empty space beside a little content.
   mount.replaceChildren(
     finder(state, repaint),
     results,
-    el('div', { class: 'home-grid' }, [
-      el('div', { class: 'home-col' }, [upcoming, near, explore]),
-      el('div', { class: 'home-col' }, [
-        followed,
-        quickActions(),
-        growingNote(),
-        guideStrip(),
-      ]),
-    ]),
+    upcoming,
+    near,
+    followed,
+    explore,
   );
 
   repaint();
@@ -290,14 +282,16 @@ export function paintUpcoming(mount, state) {
   const visible = state.notices.slice(0, UPCOMING_LIMIT);
 
   if (!visible.length) {
+    // One line of fact, one line of what will change it, one action. The
+    // second link that used to sit beside this ("Register a Masjid") made a
+    // reader choose between two unrelated things at the moment the page had
+    // nothing to show them; it lives in the nav and the footer instead.
     mount.append(el('div', { class: 'home-empty home-empty--compact' }, [
       el('p', { class: 'home-empty__title', text: 'No upcoming Janazahs yet' }),
       el('p', { class: 'muted' },
         'Verified Masjids will appear here as they begin publishing.'),
       el('div', { class: 'home-empty__actions' }, [
         el('a', { class: 'btn btn--small btn--primary', href: '/masjids' }, 'Find a Masjid'),
-        el('a', { class: 'link home-empty__secondary', href: '/register-masjid',
-          text: 'Register a Masjid' }),
       ]),
     ]));
     return;
@@ -451,15 +445,15 @@ export function paintFollowed(mount, state, repaint) {
 // ------------------------------------------------------------------ explore
 
 /**
- * Shown only while there is nothing real yet to fill the page. Once the
- * first real notice is published this disappears on its own — it is a
- * softer landing for an empty site, not a permanent fixture, so it must not
- * linger and clutter the page once Janazahs are actually flowing.
+ * Shown only while there is nothing real yet to fill the page.
  *
- * A visitor here could be a community member or someone representing a
- * masjid, and before sign-in there is no reliable way to tell which. Rather
- * than guess, both audiences are served on the same screen: the ordinary
- * community actions, plus one more prominent card for registering a masjid.
+ * It replaces a section that held a bordered registration card and a grid of
+ * four tiles, all of which led to places already in the navigation. What is
+ * left is the one thing this page cannot say anywhere else: the site is new,
+ * that is why it is empty, and here is the single action that changes it.
+ *
+ * It disappears on its own once the first notice is published, so it must
+ * stay small enough that nobody minds having seen it.
  */
 function paintExplore(mount, state) {
   if (state.loading || state.notices.length) {
@@ -469,107 +463,49 @@ function paintExplore(mount, state) {
   }
   mount.hidden = false;
 
-  const enableNearby = el('button', { class: 'qa__item qa__item--button', type: 'button' },
-    [icon('pin', { size: 17 }), el('span', { text: 'Enable nearby alerts' })]);
-  enableNearby.addEventListener('click', () => enableLocation(enableNearby, () => paintExplore(mount, state)));
-
-  mount.replaceChildren(
-    sectionHead('Get started with Ta’ziyah'),
-    el('div', { class: 'guide-strip reveal' }, [
-      el('div', {}, [
-        el('h2', { class: 'guide-strip__title', text: 'Bring Your Masjid to Ta’ziyah' }),
-        el('p', { class: 'guide-strip__sub' },
-          'Register your Masjid to publish verified Janazah notices and keep '
-          + 'your community informed.'),
-      ]),
-      el('a', { class: 'btn btn--primary btn--small', href: '/register-masjid' },
-        'Register Organization'),
+  mount.replaceChildren(el('div', { class: 'note-strip reveal' }, [
+    el('div', { class: 'note-strip__body' }, [
+      el('h2', { class: 'note-strip__title', text: 'Ta’ziyah is growing' }),
+      el('p', { class: 'note-strip__sub' },
+        'We are onboarding Masjids across Ontario. As organizations join, '
+        + 'verified Janazah notices will appear here.'),
     ]),
-    el('ul', { class: 'qa' }, [
-      el('li', {}, [el('a', { class: 'qa__item', href: '/masjids' },
-        [icon('building', { size: 17 }), el('span', { text: 'Find or follow a Masjid' })])]),
-      el('li', {}, [el('a', { class: 'qa__item', href: '/janazah-guide' },
-        [icon('shield', { size: 17 }), el('span', { text: 'How to perform Janazah' })])]),
-      el('li', {}, [enableNearby]),
-      el('li', {}, [el('a', { class: 'qa__item', href: '/about' },
-        [icon('flag', { size: 17 }), el('span', { text: 'Learn how Ta’ziyah works' })])]),
-    ]),
-  );
-}
-
-/**
- * A small, calm note that Ta'ziyah is early rather than empty. Deliberately
- * not a banner, and deliberately not a number: there is no honest count yet
- * worth stating, and a bare "0" reads as failure rather than honesty.
- */
-function growingNote() {
-  return el('section', { class: 'home-section' }, [
-    el('div', { class: 'growing-note reveal' }, [
-      el('h2', { class: 'growing-note__title', text: 'Ta’ziyah is growing' }),
-      el('p', { class: 'growing-note__sub' },
-        'We are currently onboarding Masjids across Ontario. As organizations '
-        + 'join, verified Janazah notices will appear here.'),
-    ]),
-  ]);
+    el('a', { class: 'btn btn--small', href: '/for-masjids' }, 'Register a Masjid'),
+  ]));
 }
 
 // ------------------------------------------------------------ the last bits
 
-const ACTIONS = [
-  { href: '/janazahs', icon: 'clock', label: 'Find Janazahs' },
-  { href: '/near-me', icon: 'pin', label: 'Nearby' },
-  { href: '/masjids', icon: 'building', label: 'Find Masjids' },
-  { href: '/janazah-guide', icon: 'shield', label: 'Janazah Guide' },
-  { href: '/register-masjid', icon: 'users', label: 'Register a Masjid' },
-  // The introduction, at its own address. Somebody who arrived on a link to
-  // one notice has never seen it, and this is where they would look for it
-  // rather than in the sidebar's footer.
-  { href: '/how-it-works', icon: 'info', label: "How Ta'ziyah works" },
-];
-
-// Shown in place of "Register a Masjid" for a signed-in staff member of a
-// verified masjid: registration is already done, and the two things they
-// actually come back to do are publish and manage their own notices. Both
-// point at the console's Notices tab, which is the one real entry point for
-// composing (a button inside that tab opens the composer) and for managing
-// what is already published -- there is no separate composer route to link
-// to instead.
+// Shown only to a signed-in staff member of a verified masjid, because
+// these two are the only actions on this site that the navigation cannot
+// reach: both lead into the console, which is a separate application.
+//
+// There used to be six more beside them, for everybody: Find Janazahs,
+// Nearby, Find Masjids, Janazah Guide, Register a Masjid, How Ta'ziyah
+// works. Every one of those is a row in the navigation on the same screen,
+// so the block was a second copy of the nav rendered in the middle of the
+// page, and a reader had no way to tell which of the two was the real one.
 const STAFF_ACTIONS = [
   { href: '/console?tab=notices', icon: 'plus', label: 'Post Janazah' },
   { href: '/console?tab=notices', icon: 'grid', label: 'Manage Janazahs' },
 ];
 
 /**
- * @param {{ canPublish: boolean } | null} staff Pass a staff context (from
- *   the dashboard, which is the only caller that knows it) to add the two
- *   staff-only actions for a verified masjid's own staff. Omitted on the
- *   public feed, where nobody is signed in.
+ * The staff shortcuts, or nothing at all.
+ *
+ * @param {{ canPublish: boolean } | null} staff The staff context, which only
+ *   the dashboard knows. Returns null for everybody else, and the caller
+ *   leaves the section out rather than rendering an empty heading.
  */
 export function quickActions(staff = null) {
-  const items = staff?.canPublish ? [...ACTIONS.slice(0, 4), ...STAFF_ACTIONS] : ACTIONS;
+  if (!staff?.canPublish) return null;
   return el('section', { class: 'home-section' }, [
-    sectionHead('Quick actions'),
-    el('ul', { class: 'qa' }, items.map((a) => el('li', {}, [
+    sectionHead('For your masjid'),
+    el('ul', { class: 'qa' }, STAFF_ACTIONS.map((a) => el('li', {}, [
       el('a', { class: 'qa__item', href: a.href }, [
         icon(a.icon, { size: 17 }),
         el('span', { text: a.label }),
       ]),
     ]))),
-  ]);
-}
-
-/**
- * Not buried at the bottom of a marketing page: somebody who has just been
- * told a Janazah is in an hour, and has never prayed one, needs this before
- * they need an account.
- */
-function guideStrip() {
-  return el('section', { class: 'guide-strip reveal' }, [
-    el('div', {}, [
-      el('h2', { class: 'guide-strip__title', text: 'How to perform Janazah' }),
-      el('p', { class: 'guide-strip__sub' },
-        'Step-by-step guidance for the Janazah prayer and the burial process.'),
-    ]),
-    el('a', { class: 'btn btn--primary btn--small', href: '/janazah-guide' }, 'View guide'),
   ]);
 }

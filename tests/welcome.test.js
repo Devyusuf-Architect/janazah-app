@@ -29,7 +29,7 @@ describe('it is shown once', () => {
     assert.match(feed, /if \(path === '\/' && firstVisit\) \{/);
     // Read before marking, so the first route of a session still knows it was.
     assert.match(feed, /const firstVisit = isFirstVisit\(\);\s*\n\s*markVisited\(\);/);
-    assert.match(feed, /history\.replaceState\(null, '', '\/welcome'\)/);
+    assert.match(feed, /history\.replaceState\(history\.state, '', '\/welcome'\)/);
   });
 
   test('a link straight to a notice is never interrupted', () => {
@@ -156,24 +156,22 @@ describe('a returning visitor can always get back to it', () => {
   const nav = readFileSync('public/js/nav.js', 'utf8');
   const home = readFileSync('public/js/views/home.js', 'utf8');
 
-  test('it is a named item in the sidebar, which is also the phone drawer', () => {
-    // The mobile "Profile" tab opens this very drawer (renderBottomNav), so
-    // one item covers both, rather than a second menu built for the phone.
-    const utility = nav.slice(nav.indexOf('const UTILITY_LINKS'), nav.indexOf('// Deeper pages'));
-    assert.match(utility, /href: '\/how-it-works'/);
-    assert.match(utility, /How Ta.ziyah Works/);
-  });
-
-  test('the home page offers it too, for somebody who arrived on a link', () => {
-    const actions = home.slice(home.indexOf('const ACTIONS'), home.indexOf('const STAFF_ACTIONS'));
-    assert.match(actions, /href: '\/how-it-works'/);
+  test('it is a named link in the footer, which is on every page', () => {
+    // It was a sidebar row and a home-page tile as well. Both went in the
+    // navigation clean-up: the sidebar is the five places this site is, and
+    // the footer carries everything else, listed once.
+    const footer = readFileSync('public/js/footer.js', 'utf8');
+    assert.match(footer, /href: '\/how-it-works'/);
+    assert.match(footer, /'How it works'/);
   });
 
   test('reopening it changes nothing: no flag, no sign-out, no reset', () => {
     // A plain link, so the route simply renders. Anything that wrote to
     // visited.js or touched auth from here would make revisiting the
     // introduction an action with consequences.
-    for (const [name, source] of [['nav.js', nav], ['home.js', home]]) {
+    const footer = readFileSync('public/js/footer.js', 'utf8');
+    for (const [name, source] of [['footer.js', footer], ['about.js',
+      readFileSync('public/js/views/about.js', 'utf8')]]) {
       const near = source.slice(Math.max(0, source.indexOf("'/how-it-works'") - 300),
         source.indexOf("'/how-it-works'") + 300);
       assert.ok(!/markVisited|isFirstVisit|signOut|onclick/.test(near),

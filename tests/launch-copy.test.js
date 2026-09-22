@@ -36,9 +36,17 @@ describe('the homepage when there are zero real notices', () => {
     assert.match(home, /Verified Masjids will appear here as they begin publishing\./);
   });
 
-  test('it offers a way forward for both a visitor and a masjid', () => {
+  test('the empty state offers one action, not a choice between two', () => {
+    // It used to carry "Find a Masjid" and "Register a Masjid" side by side,
+    // which asked a reader to pick between two unrelated things at the
+    // moment the page had nothing to show them. Registration is still one
+    // click away, from the note below and from the navigation.
     assert.match(home, /'Find a Masjid'/);
-    assert.match(home, /text: 'Register a Masjid'/);
+    const empty = home.slice(home.indexOf('No upcoming Janazahs yet'));
+    const actions = empty.slice(empty.indexOf('home-empty__actions'),
+      empty.indexOf('return;'));
+    assert.equal((actions.match(/href:/g) || []).length, 1,
+      'the empty state must offer exactly one action');
   });
 
   test('a search with no matches says so in the required wording', () => {
@@ -51,10 +59,11 @@ describe('the homepage when there are zero real notices', () => {
       'the explore block must hide itself once real notices exist');
   });
 
-  test('the masjid-registration call to action is present and prominent', () => {
-    assert.match(home, /Bring Your Masjid to Ta.ziyah/);
-    assert.match(home, /Register your Masjid to publish verified Janazah notices/);
-    assert.match(home, /'Register Organization'/);
+  test('registering a masjid is still offered while the site is empty', () => {
+    // The bordered card and the four tiles beside it are gone; one line and
+    // one button say the same thing without competing with the page.
+    assert.match(home, /'Register a Masjid'/);
+    assert.match(home, /href: '\/for-masjids'/);
   });
 
   test('the growing note exists and never claims a fake number', () => {
