@@ -524,7 +524,7 @@ const ACTIONS = [
   // The introduction, at its own address. Somebody who arrived on a link to
   // one notice has never seen it, and this is where they would look for it
   // rather than in the sidebar's footer.
-  { href: '/welcome', icon: 'info', label: "How Ta'ziyah works" },
+  { href: '/how-it-works', icon: 'info', label: "How Ta'ziyah works" },
 ];
 
 // Shown in place of "Register a Masjid" for a signed-in staff member of a

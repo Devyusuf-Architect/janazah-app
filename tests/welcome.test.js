@@ -160,13 +160,13 @@ describe('a returning visitor can always get back to it', () => {
     // The mobile "Profile" tab opens this very drawer (renderBottomNav), so
     // one item covers both, rather than a second menu built for the phone.
     const utility = nav.slice(nav.indexOf('const UTILITY_LINKS'), nav.indexOf('// Deeper pages'));
-    assert.match(utility, /href: '\/welcome'/);
+    assert.match(utility, /href: '\/how-it-works'/);
     assert.match(utility, /How Ta.ziyah Works/);
   });
 
   test('the home page offers it too, for somebody who arrived on a link', () => {
     const actions = home.slice(home.indexOf('const ACTIONS'), home.indexOf('const STAFF_ACTIONS'));
-    assert.match(actions, /href: '\/welcome'/);
+    assert.match(actions, /href: '\/how-it-works'/);
   });
 
   test('reopening it changes nothing: no flag, no sign-out, no reset', () => {
@@ -174,8 +174,8 @@ describe('a returning visitor can always get back to it', () => {
     // visited.js or touched auth from here would make revisiting the
     // introduction an action with consequences.
     for (const [name, source] of [['nav.js', nav], ['home.js', home]]) {
-      const near = source.slice(Math.max(0, source.indexOf("'/welcome'") - 300),
-        source.indexOf("'/welcome'") + 300);
+      const near = source.slice(Math.max(0, source.indexOf("'/how-it-works'") - 300),
+        source.indexOf("'/how-it-works'") + 300);
       assert.ok(!/markVisited|isFirstVisit|signOut|onclick/.test(near),
         `${name} does something besides linking to the introduction`);
     }

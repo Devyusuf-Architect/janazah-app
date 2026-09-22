@@ -5,6 +5,7 @@
 // matching is Phase 3 and notifications are Phase 4; nothing here depends on
 // either, and no user location is read or stored.
 
+import { applyPageMeta } from '../seo.js';
 import { el, icon, skeleton, toast, friendlyError, showModal } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
 import { formatDistance } from '../geo.js';
@@ -343,9 +344,16 @@ export async function renderSingleNotice(mount, noticeId) {
     return;
   }
 
-  document.title = notice.showDeceasedName && notice.deceasedName
-    ? `Janazah for ${notice.deceasedName}`
-    : `Janazah notice - ${notice.orgName}`;
+  // Titled for the person reading it, and kept out of search results: a
+  // notice is public because the community needs it today, which is not the
+  // same as wanting a permanent search result for somebody's death. The
+  // noindex comes from NOINDEX_PREFIXES in seo.js.
+  applyPageMeta(location.pathname, {
+    title: notice.showDeceasedName && notice.deceasedName
+      ? `Janazah for ${notice.deceasedName}`
+      : `Janazah notice from ${notice.orgName}`,
+    description: `Janazah notice published by ${notice.orgName}.`,
+  });
 
   const following = follows.isFollowing(notice.orgId);
   mount.replaceChildren(

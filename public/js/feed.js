@@ -12,12 +12,19 @@ import { isSampleMode, initSampleMode } from './sample-mode.js';
 import { initPlatformSettings } from './platform-settings.js';
 import * as store from './store.js';
 import { renderNav, wireNavToggle, closeNav } from './nav.js';
+import { renderFooter } from './footer.js';
 import {
   revealIn, autoReveal, pageEnter,
   ownScrollRestoration, rememberScroll, restoreScroll, watchScroll,
 } from './motion.js';
 import { renderHome, teardownHome } from './views/home.js';
 import { renderWelcome, teardownWelcome } from './views/welcome.js';
+import { renderHowItWorks } from './views/how-it-works.js';
+import { renderForMasjids } from './views/for-masjids.js';
+import { renderFaq } from './views/faq.js';
+import { renderContact } from './views/contact.js';
+import { renderDeleteAccount } from './views/delete-account.js';
+import { applyPageMeta } from './seo.js';
 import { isFirstVisit, markVisited } from './visited.js';
 import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
 import { renderMasjids } from './views/masjids.js';
@@ -92,65 +99,81 @@ function renderRoute() {
   }
 
   if (/^\/janazahs\/?$/.test(path)) {
-    document.title = "Janazahs - Ta'ziyah";
     renderFeed(mount());
     return;
   }
   if (/^\/near-me\/?$/.test(path)) {
-    document.title = "Near me - Ta'ziyah";
     renderFeed(mount(), { initialFilter: 'nearby' });
     return;
   }
   if (/^\/masjids\/?$/.test(path)) {
-    document.title = "Masjids - Ta'ziyah";
     renderMasjids(mount());
     return;
   }
   if (/^\/register-masjid\/?$/.test(path)) {
-    document.title = "Register your masjid - Ta'ziyah";
     renderRegisterMasjid(mount());
     return;
   }
   if (/^\/janazah-guide\/?$/.test(path)) {
-    document.title = "How to pray Salat al-Janazah - Ta'ziyah";
     renderJanazahGuide(mount());
     return;
   }
   if (/^\/following\/?$/.test(path)) {
-    document.title = "Following - Ta'ziyah";
     renderFollowing(mount());
     return;
   }
   if (/^\/account\/?$/.test(path)) {
     if (!authReady) { mount().replaceChildren(el('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
-    document.title = "Account - Ta'ziyah";
     renderAccount(mount(), { user });
     return;
   }
+  // The first-run introduction keeps its own address. It is a different
+  // thing from /how-it-works: four points and a closing, read once by
+  // somebody who has just arrived, where /how-it-works is the full account
+  // for a reader who wants it. Neither is the other written twice.
+  //
+  // It is marked noindex with a canonical pointing at /how-it-works
+  // (js/site.js), so the two do not compete for the same search result while
+  // both stay reachable.
   if (/^\/welcome\/?$/.test(path)) {
-    document.title = "Ta'ziyah - Janazah notices you can trust";
     renderWelcome(mount());
     return;
   }
+  if (/^\/how-it-works\/?$/.test(path)) {
+    renderHowItWorks(mount());
+    return;
+  }
+  if (/^\/for-masjids\/?$/.test(path)) {
+    renderForMasjids(mount());
+    return;
+  }
+  if (/^\/faq\/?$/.test(path)) {
+    renderFaq(mount());
+    return;
+  }
+  if (/^\/contact\/?$/.test(path)) {
+    renderContact(mount());
+    return;
+  }
+  if (/^\/delete-account\/?$/.test(path)) {
+    renderDeleteAccount(mount());
+    return;
+  }
   if (/^\/about\/?$/.test(path)) {
-    document.title = "About - Ta'ziyah";
     renderAbout(mount());
     return;
   }
   if (/^\/privacy\/?$/.test(path)) {
-    document.title = "Privacy - Ta'ziyah";
     renderPrivacy(mount());
     return;
   }
   if (/^\/terms\/?$/.test(path)) {
-    document.title = "Terms of service - Ta'ziyah";
     renderTerms(mount());
     return;
   }
   if (/^\/signin\/?$/.test(path)) {
     if (user) { history.replaceState(null, '', '/dashboard'); route(); return; }
-    document.title = "Sign in - Ta'ziyah";
     const initialMode = new URLSearchParams(location.search).get('mode') === 'signup'
       ? 'signup' : 'signin';
     renderAuth(mount(), { variant: 'community', initialMode });
@@ -164,7 +187,6 @@ function renderRoute() {
       return;
     }
     if (!user) { history.replaceState(null, '', '/signin'); route(); return; }
-    document.title = "Dashboard - Ta'ziyah";
     renderDashboard(mount(), { user });
     return;
   }
@@ -181,11 +203,9 @@ function renderRoute() {
   // shows the index first and then replaces it.
   if (path === '/' && firstVisit) {
     history.replaceState(null, '', '/welcome');
-    document.title = "Ta'ziyah - Janazah notices you can trust";
     renderWelcome(mount());
     return;
   }
-  document.title = "Ta'ziyah";
   renderHome(mount());
 }
 
@@ -199,6 +219,13 @@ function route({ back = false } = {}) {
   stopReveal();
   renderedFor = user?.uid ?? null;
   renderRoute();
+  // Title, description, canonical and the sharing tags, from the one
+  // manifest the static pages were generated from (js/site.js). The markup
+  // already carried the right values for the page that was served; this
+  // keeps them right for every page reached without a reload afterwards.
+  // Views for a single notice or masjid set their own title from the record
+  // they loaded, after this runs.
+  applyPageMeta(location.pathname);
   restoreScroll(location.pathname + location.search, { remembered: back });
   pageEnter(mount());
   revealIn(mount());
@@ -227,6 +254,8 @@ window.addEventListener('popstate', () => route({ back: true }));
 
 ownScrollRestoration();
 watchScroll();
+
+renderFooter($('#footer'));
 
 const navToggle = $('#nav-toggle');
 if (navToggle) wireNavToggle(navToggle, nav());

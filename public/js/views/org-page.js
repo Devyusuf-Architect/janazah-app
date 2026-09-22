@@ -10,6 +10,7 @@
 // same public notice feed the front page already subscribes to, so it adds no
 // query, no index and no rule.
 
+import { applyPageMeta } from '../seo.js';
 import { el, icon, skeleton, toast, friendlyError } from '../ui.js';
 import { publicNoticeView } from '../notice-view.js';
 import * as store from '../store.js';
@@ -49,7 +50,17 @@ export async function renderOrgPage(mount, orgId) {
     return;
   }
 
-  document.title = `${org.name} - Ta'ziyah`;
+  // Indexable, unlike a single notice: a masjid publishing publicly is
+  // helped by being findable. The description is built from the record so it
+  // describes this masjid rather than the site in general.
+  applyPageMeta(location.pathname, {
+    title: org.name,
+    description: [
+      `Janazah notices published by ${org.name}`,
+      [org.city, org.province].filter(Boolean).join(', '),
+    ].filter(Boolean).join(' in ')
+      + '. Follow this masjid to see its notices first.',
+  });
 
   const list = el('div', { class: 'stack' }, [skeleton(2)]);
 

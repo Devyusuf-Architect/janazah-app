@@ -62,7 +62,7 @@ export function renderAbout(mount) {
     // a flag write, so a returning visitor who wants to see it again can,
     // without it starting to interrupt them on future visits.
     el('p', { class: 'muted' }, [
-      el('a', { class: 'link', href: '/welcome', text: 'How Ta’ziyah works' }),
+      el('a', { class: 'link', href: '/how-it-works', text: 'How Ta’ziyah works' }),
       ', from the start.',
     ]),
 

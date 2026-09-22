@@ -2,7 +2,7 @@
 // from the CDN, so the end-to-end test can run in a sandbox with no outbound
 // network access. Production keeps the CDN import map in public/index.html.
 
-import { mkdirSync, rmSync, cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, cpSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 
@@ -67,7 +67,12 @@ export async function buildTestApp() {
     }
   }
   </script>`;
-  for (const page of ['index.html', 'console.html']) {
+  // Every page in the output, not a list of two. scripts/build-seo.mjs
+  // generates one HTML file per public route, all of them carrying the same
+  // CDN import map, and a page whose map was missed loads no Firebase at all
+  // while looking like an ordinary blank screen.
+  const pages = readdirSync(OUT).filter((name) => name.endsWith('.html'));
+  for (const page of pages) {
     const path = join(OUT, page);
     const html = readFileSync(path, 'utf8')
       .replace(/<script type="importmap">[\s\S]*?<\/script>/, localMap);

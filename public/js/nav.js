@@ -49,7 +49,8 @@ const BOTTOM_LINKS = [
 // first-visit flag, sign anybody out, or restart anything.
 const UTILITY_LINKS = [
   { href: '/account', label: 'Settings', icon: 'eye' },
-  { href: '/welcome', label: "How Ta'ziyah Works", icon: 'info' },
+  { href: '/how-it-works', label: "How Ta'ziyah Works", icon: 'info' },
+  { href: '/faq', label: 'Questions', icon: 'search' },
   { href: '/about', label: 'Help & About', icon: 'flag' },
 ];
 
@@ -59,7 +60,7 @@ const UTILITY_LINKS = [
 const SECTION_OF = [
   [/^\/o\//, '/masjids'],
   [/^\/n\//, '/janazahs'],
-  [/^\/register-masjid/, '/register-masjid'],
+  [/^\/register-masjid/, '/for-masjids'],
 ];
 
 const COLLAPSE_KEY = 'taziyah.nav.collapsed';
@@ -264,7 +265,7 @@ export function renderNav(nav, { path, user, isAdmin = false, authReady = true }
     }));
   }
   personal.push(navItem({
-    href: '/register-masjid', label: 'Masjid access', icon: 'building', path,
+    href: '/for-masjids', label: 'For Masjids', icon: 'building', path,
     modifier: ' nav-item--quiet',
   }));
 

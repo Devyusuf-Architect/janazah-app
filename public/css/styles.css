@@ -771,14 +771,64 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
 }
 
 .footer {
-  max-width: var(--page);
+  max-width: var(--page-wide);
   margin: 0 auto;
-  padding: 2rem clamp(1rem, 4vw, 2rem) 5rem;
+  padding: 2.5rem clamp(1rem, 4vw, 2rem) 5rem;
   border-top: 1px solid var(--line);
   color: var(--ink-3);
   font-size: .84rem;
 }
 .footer a { color: var(--ink-2); }
+
+/* Four groups that wrap rather than a row that squeezes: on a phone they
+   become two columns of short lists, which is readable, instead of four
+   columns one word wide. */
+.footer-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 1.5rem 1.25rem;
+  margin-bottom: 2rem;
+}
+.footer-nav__heading {
+  margin: 0 0 .6rem;
+  font-family: var(--sans);
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.footer-nav__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.footer-nav__link {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: .88rem;
+  transition: color var(--dur-fast) var(--ease);
+}
+.footer-nav__link:hover { color: var(--accent); text-decoration: underline; }
+
+.footer-social { margin-bottom: 1.75rem; }
+.footer-social__link {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: .86rem;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.footer-social__link:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.footer-note { display: grid; gap: .6rem; max-width: 42rem; }
+.footer-note p { margin: 0; }
 
 /* ---------- page furniture ---------- */
 
@@ -1988,6 +2038,105 @@ select.field { cursor: pointer; }
 .policy li { margin-bottom: .45rem; }
 .policy__updated { font-size: .84rem; color: var(--ink-3); }
 
+/* The opening sentence of a policy-style page: one size up from the body,
+   never a hero. */
+.policy .lede {
+  font-size: 1.05rem;
+  color: var(--ink-2);
+  margin-bottom: 1.75rem;
+}
+
+/* A numbered sequence on /for-masjids, where the order is the point. */
+.steps-list { list-style: none; margin: 1.25rem 0 0; padding: 0; counter-reset: step; }
+.steps-list__item {
+  position: relative;
+  padding-left: 2.4rem;
+  margin-bottom: 1.35rem;
+  counter-increment: step;
+}
+.steps-list__item::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -.1rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.steps-list__title { margin: 0 0 .3rem; font-size: 1rem; }
+.steps-list__body { margin: 0; color: var(--ink-2); font-size: .93rem; }
+
+.fact-list { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: .85rem; }
+.fact-list__item { display: flex; gap: .7rem; align-items: flex-start; }
+.fact-list__item .icon { flex: none; margin-top: .2rem; color: var(--accent); }
+.fact-list__item strong { display: block; font-size: .95rem; color: var(--ink); }
+.fact-list__item span { font-size: .89rem; color: var(--ink-3); }
+
+/* A stage on /how-it-works: an icon in the heading, so the page can be
+   skimmed by its five marks without reading a word. */
+.stage__title { display: flex; align-items: center; gap: .65rem; }
+.stage__mark {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+}
+
+/* The questions page. <details> so a reader can scan the questions and open
+   only the one they came for, and so the answers are in the markup for a
+   crawler either way. */
+.faq { display: grid; gap: .1rem; }
+.faq__item { border-bottom: 1px solid var(--line); }
+.faq__q {
+  cursor: pointer;
+  padding: .9rem 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+.faq__q::-webkit-details-marker { display: none; }
+.faq__q::after {
+  content: "";
+  margin-left: auto;
+  width: .5rem;
+  height: .5rem;
+  border-right: 1.5px solid var(--ink-3);
+  border-bottom: 1.5px solid var(--ink-3);
+  transform: rotate(45deg);
+  transition: transform var(--dur) var(--ease);
+}
+.faq__item[open] .faq__q::after { transform: rotate(-135deg); }
+.faq__q-text { margin: 0; font-size: .97rem; font-weight: 600; color: var(--ink); }
+.faq__a { padding: 0 0 1rem; }
+.faq__a p { margin: 0; color: var(--ink-2); font-size: .93rem; }
+
+/* The closing band on a page that should end with somewhere to go. */
+.cta-band {
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.cta-band h2 { margin-top: 0; }
+.cta-band__actions { display: flex; gap: .7rem; flex-wrap: wrap; margin: 1rem 0 0; }
+.cta-band .muted { margin: 1rem 0 0; font-size: .88rem; }
+
+
 /* ---------- misc ---------- */
 
 .dup-warning { flex-direction: column; }
@@ -2993,6 +3142,9 @@ body.is-scrolled .masthead {
   .jrow > .directions-menu { align-self: flex-start; margin-left: .5rem; }
   .finder__locate { flex: 1 1 100%; justify-content: center; }
   .prompt, .guide-strip { align-items: stretch; }
+  /* The closing band on the public pages: full-width taps, less padding. */
+  .cta-band { padding: 1.15rem; }
+  .cta-band__actions .btn { flex: 1 1 auto; justify-content: center; }
 }
 
 /* ---------------------------------------------------------------------------

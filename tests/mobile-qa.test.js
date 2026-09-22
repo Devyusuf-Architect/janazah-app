@@ -48,9 +48,12 @@ describe('Near Me: a short privacy line up front, the full explanation one tap a
   });
 });
 
-describe('About: a permanent, discoverable way back to the welcome/introduction', () => {
-  test('links to /welcome without touching the first-visit flag', () => {
-    assert.match(about, /href:\s*'\/welcome'/);
+describe('About: a permanent, discoverable way back to how this works', () => {
+  test('links to the explanation without touching the first-visit flag', () => {
+    // /how-it-works rather than /welcome: the introduction is the first-run
+    // screen, and this is the page that covers the same ground in full. It
+    // is the one somebody reading About is looking for.
+    assert.match(about, /href:\s*'\/how-it-works'/);
     // A plain navigation, not a call that would clear or set the visited flag.
     assert.doesNotMatch(about, /markVisited|taziyah\.visited/);
   });

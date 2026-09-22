@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /welcome
+Disallow: /following
+Disallow: /dashboard
+Disallow: /account
+Disallow: /signin
+Disallow: /n/
+Disallow: /console
+Allow: /
+
+Sitemap: https://taziyah.com/sitemap.xml
