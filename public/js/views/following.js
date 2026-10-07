@@ -6,12 +6,15 @@
 // here, and this page says so rather than implying a sync that does not
 // happen.
 
-import { el, icon, skeleton, friendlyError } from '../ui.js';
+import { el, icon, skeleton, friendlyError, renderGuard } from '../ui.js';
 import { orgRow } from './masjids.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
 
 export function renderFollowing(mount) {
+  // A read that lands after the reader has moved on must not paint over
+  // the page they moved to (see renderGuard in ui.js).
+  const current = renderGuard(mount);
   mount.replaceChildren(
     el('div', { class: 'page-head' }, [el('h1', { text: 'Following' })]),
     el('div', { class: 'skeletons', 'aria-hidden': 'true' }, [skeleton(2)]),
@@ -25,7 +28,9 @@ export function renderFollowing(mount) {
   }
 
   store.verifiedOrganizations()
-    .then((orgs) => paint(mount, orgs.filter((o) => followedIds.includes(o.id))))
+    .then((orgs) => {
+      if (current()) paint(mount, orgs.filter((o) => followedIds.includes(o.id)));
+    })
     .catch((err) => {
       mount.replaceChildren(
         el('div', { class: 'page-head' }, [el('h1', { text: 'Following' })]),

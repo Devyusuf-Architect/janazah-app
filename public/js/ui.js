@@ -13,6 +13,34 @@ export function esc(value) {
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+// Which render of the shared view element is currently on screen.
+//
+// Every page paints into the same #view, and several of them finish
+// asynchronously: a masjid directory, a follow list, a dashboard all read
+// Firestore and then call mount.replaceChildren(). If the reader navigated
+// away before that read resolved, the abandoned page painted itself over
+// whatever they had moved to. It showed up as the Janazahs page losing its
+// filter box a moment after pressing Back from Masjids, intermittently,
+// depending on whether the organization cache was warm.
+//
+// The router stamps the element for each render; a view takes the stamp it
+// was rendered under and checks it before painting anything late.
+let renders = 0;
+
+/** Called by the router, once per route, before the view is built. */
+export function stampRender(mount) {
+  if (mount) mount.dataset.render = String((renders += 1));
+}
+
+/**
+ * Hand back a test for "is the render I belong to still the one on screen".
+ * Call it at the top of a view, then check it inside every .then().
+ */
+export function renderGuard(mount) {
+  const token = mount?.dataset?.render;
+  return () => mount?.dataset?.render === token;
+}
+
 export function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {

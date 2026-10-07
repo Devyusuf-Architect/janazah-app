@@ -11,14 +11,11 @@ import { formatJanazahTime } from '../model.js';
 import { formatDistance } from '../geo.js';
 import { publicNoticeView } from '../notice-view.js';
 import { FAMILY_TAKEDOWN_TARGET } from '../takedown-policy.js';
-import { renderNearby } from './nearby.js';
-import { orgRow } from './masjids.js';
 import * as follows from '../follows.js';
 import * as loc from '../location.js';
 import * as alerts from '../alerts.js';
 import * as push from '../push.js';
 import * as store from '../store.js';
-import { slideIndicator } from '../indicator.js';
 
 const REPORT_REASONS = [
   // Listed first: a family asking for their own relative's notice to come
@@ -35,17 +32,12 @@ const REPORT_REASONS = [
 ];
 
 let unwatch = null;
-let stopIndicator = null;
 let notices = [];
-let orgsById = new Map();
-// Decided lazily, once, the first time the feed paints with no filter forced
-// on it (see renderFeed below) — after that it is whatever tab the visitor
-// last chose, same as before.
-let filter = null;
+// What was typed into the filter, kept across a trip into a notice and back
+// so returning does not mean retyping it.
+let query = '';
 
 export function teardownFeed() {
-  stopIndicator?.();
-  stopIndicator = null;
   if (unwatch) { unwatch(); unwatch = null; }
 }
 
@@ -105,107 +97,71 @@ function groupByDate(list) {
 
 // ---------------------------------------------------------------------- render
 
-export function renderFeed(mount, { initialFilter } = {}) {
+/**
+ * Current and upcoming Janazah notices, and nothing else.
+ *
+ * This page used to carry its own bar of four tabs: All notices, Near me,
+ * Masjids I follow, and Manage follows. Three of those already had their own
+ * address and their own row in the sidebar, and "Near me" was the same
+ * component this one is, rendered through a filter instead of a route. So a
+ * reader had two navigation systems for the same ideas and no way to tell
+ * whether the sidebar's "Near Me" and the tab called "Near me" were different
+ * things. They were not.
+ *
+ * What is left is one job: browse what is coming up, and narrow it by typing.
+ * Nearby is /near-me, the masjids you follow are /following, and following
+ * one is a button on a masjid wherever a masjid appears.
+ */
+export function renderFeed(mount) {
   teardownFeed();
   mount.replaceChildren();
-  if (initialFilter) {
-    filter = initialFilter;
-  } else if (filter === null) {
-    // First landing with no filter forced (i.e. plain /janazahs): someone who
-    // already follows a masjid most likely came here for those, not the full
-    // list. Nobody following anything yet sees everything, since an empty
-    // "Masjids I follow" would be a worse first screen than a full one.
-    // On a phone, though, always land on "All notices" — the smart default
-    // above combines badly with a small screen's limited room to notice and
-    // switch tabs, so a mobile visitor should never open on a filtered view
-    // they did not choose.
-    const isMobile = window.matchMedia?.('(max-width: 900px)').matches
-      ?? window.innerWidth <= 900;
-    filter = isMobile ? 'all' : (follows.followedOrgIds().length ? 'following' : 'all');
-  }
 
   mount.append(el('div', { class: 'feed-intro' }, [
     el('h1', { text: 'Current and upcoming Janazahs' }),
     el('p', { class: 'muted' },
       'Published by verified masjids and funeral coordinators. No account ' +
-      'needed, and nothing about you is collected to show this page.'),
+      'needed.'),
   ]));
 
-  const tabs = el('div', { class: 'tabs tabs--plain' });
-  // The marker follows whatever paintTabs() rebuilds, so it does not need
-  // re-attaching each time the follow count changes the labels.
-  stopIndicator?.();
-  stopIndicator = slideIndicator(tabs);
+  // The filter that replaced four tabs. It survives a trip to a notice and
+  // back, because retyping what you were looking for after reading one notice
+  // is the sort of small loss that makes a site feel like it is resisting you.
+  const search = el('input', {
+    class: 'field feed-search__input',
+    type: 'search',
+    id: 'feed-search',
+    placeholder: 'Masjid, city or postal code',
+    autocomplete: 'off',
+    value: query,
+  });
+  search.setAttribute('aria-label', 'Filter Janazahs by masjid, city or postal code');
+  search.addEventListener('input', () => { query = search.value; paint(); });
+
   const list = el('div', { class: 'stack' });
-  mount.append(tabs, list);
-
-  /**
-   * One set of tab buttons, restyled by CSS into a segmented control on a
-   * desktop and a bottom bar on a phone. Deliberately not two sets: duplicate
-   * controls confuse assistive technology and would match twice by name.
-   */
-  const paintTabs = () => {
-    const followed = follows.followedOrgIds().length;
-    const tab = (key, iconName, label, onclick) => el('button', {
-      class: `tab${filter === key ? ' tab--active' : ''}`,
-      onclick,
-    }, [icon(iconName, { size: 18 }), el('span', { class: 'tab__label', text: label })]);
-
-    tabs.replaceChildren(
-      tab('all', 'grid', 'All notices', () => { filter = 'all'; paint(); }),
-      tab('nearby', 'pin', 'Near me', () => { filter = 'nearby'; paint(); }),
-      tab('following', 'bookmark',
-        `Masjids I follow${followed ? ` (${followed})` : ''}`,
-        () => { filter = 'following'; paint(); }),
-      tab('manage', 'users', 'Manage follows', () => openFollowManager()),
-    );
-  };
+  mount.append(
+    el('div', { class: 'feed-search' }, [icon('search', { size: 17 }), search]),
+    list,
+  );
 
   const paint = () => {
-    paintTabs();
     list.replaceChildren();
-
-    if (filter === 'nearby') {
-      renderNearby(list, {
-        getNotices: () => notices,
-        onChange: paint,
-        renderCard: (notice, distanceLabel) =>
-          feedCard(notice, onFollowChange, distanceLabel),
-      });
-      return;
-    }
-
-    const followedIds = follows.followedOrgIds();
-    const visible = filter === 'following'
-      ? notices.filter((n) => followedIds.includes(n.orgId))
-      : notices;
+    const visible = matching(notices, query);
 
     if (!visible.length) {
-      const noFollows = filter === 'following' && !followedIds.length;
-      list.append(el('div', { class: 'empty' }, [
-        icon(noFollows ? 'bookmark' : 'clock', { size: 30 }),
-        el('h2', {
-          text: noFollows
-            ? 'No masjids followed yet'
-            : filter === 'following'
-              ? 'Nothing from the masjids you follow'
-              : 'No current or upcoming Janazahs',
-        }),
-        el('p', {
-          text: noFollows
-            ? 'Follow a masjid and its notices will gather here.'
-            : 'This page updates on its own as notices are published.',
-        }),
-        filter === 'following'
-          ? el('button', { class: 'btn', onclick: () => openFollowManager() },
-              'Choose masjids to follow')
-          : null,
-      ]));
+      list.append(el('div', { class: 'empty' }, notices.length
+        ? [
+          el('h2', { text: 'Nothing matches that' }),
+          el('p', { text: 'Try a masjid name, a city, or a postal code.' }),
+        ]
+        : [
+          el('h2', { text: 'No current or upcoming Janazahs' }),
+          el('p', { text: 'New notices appear here when verified masjids publish them.' }),
+        ]));
       return;
     }
 
-    // When location is on, every tab shows how far away each notice is. The
-    // distance is computed here in the browser and never sent anywhere.
+    // When location is on, each notice shows how far away it is. The distance
+    // is computed here in the browser and never sent anywhere.
     const settings = loc.settings();
     const from = settings.enabled ? settings.last : null;
 
@@ -219,13 +175,10 @@ export function renderFeed(mount, { initialFilter } = {}) {
     }
   };
 
-  // Following changes the tab count, and while the "following" filter is
-  // active it changes which cards belong on screen, so both have to refresh.
+  // Following a masjid from a card changes which topics this device receives.
+  // It no longer changes what is on this page, so there is nothing to repaint.
   const onFollowChange = () => {
-    // Following also decides which masjid topics this device receives.
     push.syncTopics().catch((err) => console.error('syncTopics', err));
-    if (filter === 'following') paint();
-    else paintTabs();
   };
 
   unwatch = store.watchPublicNotices((incoming) => {
@@ -250,13 +203,22 @@ export function renderFeed(mount, { initialFilter } = {}) {
   });
 
   list.append(skeleton(3));
-  paintTabs();
+}
 
-  // The organization list is only needed for the follow manager, so a failure
-  // here must not take the feed down with it.
-  store.verifiedOrganizations()
-    .then((orgs) => { orgsById = new Map(orgs.map((o) => [o.id, o])); })
-    .catch((err) => console.error('verifiedOrganizations', err));
+/** Postal codes get typed with and without the space; compare without it. */
+const normalize = (value) => String(value || '').toLowerCase().replace(/\s+/g, '');
+
+/** The same fields the home page's finder searches, so both agree. */
+function matching(all, text) {
+  const needle = normalize(text);
+  if (needle.length < 2) return all;
+  return all.filter((notice) => normalize([
+    notice.orgName, notice.prayerLocation?.name, notice.prayerLocation?.address,
+    notice.burialLocation?.name, notice.burialLocation?.address,
+    // Same gate the display uses: a name search can only ever surface a name
+    // the family already agreed to show publicly.
+    notice.showDeceasedName ? notice.deceasedName : null,
+  ].filter(Boolean).join(' ')).includes(needle));
 }
 
 /**
@@ -291,7 +253,7 @@ function followButton(notice, onFollowChange) {
   return button;
 }
 
-function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
+export function feedCard(notice, onFollowChange = () => {}, distanceLabel = null) {
   const started = (() => {
     const at = notice.janazahAt?.toDate ? notice.janazahAt.toDate() : notice.janazahAt;
     return at && at.getTime() < Date.now();
@@ -493,42 +455,4 @@ function openReport(notice) {
   ]));
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
   document.body.append(backdrop);
-}
-
-// ------------------------------------------------------------ follow manager
-
-async function openFollowManager() {
-  const body = el('div', {}, [el('p', { class: 'muted', text: 'Loading masjids…' })]);
-  showModal('Masjids you follow', body, { wide: true });
-
-  let orgs = [...orgsById.values()];
-  if (!orgs.length) {
-    try {
-      orgs = await store.verifiedOrganizations();
-      orgsById = new Map(orgs.map((o) => [o.id, o]));
-    } catch (err) {
-      body.replaceChildren(el('p', { class: 'form-error', text: friendlyError(err, 'orgList') }));
-      return;
-    }
-  }
-
-  if (!follows.storageAvailable()) {
-    body.replaceChildren(el('p', { class: 'notice-strip notice-strip--warn' },
-      'Your browser is blocking local storage, so follows cannot be saved on ' +
-      'this device. The feed still works without them.'));
-    return;
-  }
-
-  const render = () => {
-    body.replaceChildren(
-      el('p', { class: 'muted' }, [
-        'Follows are kept on this device only. Nothing is sent to the masjid ' +
-        'or to us, and there is no account to create. Browse the full ',
-        el('a', { class: 'link', href: '/masjids', text: 'directory of masjids' }),
-        '.',
-      ]),
-      el('ul', { class: 'list' }, orgs.map((org) => orgRow(org, render))),
-    );
-  };
-  render();
 }

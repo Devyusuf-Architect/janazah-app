@@ -10,7 +10,7 @@
 // of the site uses, so a change to any of them changes this page too rather
 // than leaving it quietly stale.
 
-import { el, icon, toast, skeleton, directionsMenu } from '../ui.js';
+import { el, icon, toast, skeleton, directionsMenu, renderGuard } from '../ui.js';
 import { formatJanazahTime } from '../model.js';
 import { formatDistance } from '../geo.js';
 import * as store from '../store.js';
@@ -31,6 +31,9 @@ export function teardownHome() {
 }
 
 export function renderHome(mount) {
+  // A read that lands after the reader has moved on must not paint over
+  // the page they moved to (see renderGuard in ui.js).
+  const current = renderGuard(mount);
   teardownHome();
 
   const state = { notices: [], orgs: [], query: '', loading: true };
@@ -79,7 +82,7 @@ export function renderHome(mount) {
   // The masjid list is only needed for search and the follow section, so a
   // failure here must not take the Janazah list down with it.
   store.verifiedOrganizations()
-    .then((orgs) => { state.orgs = orgs; repaint(); })
+    .then((orgs) => { if (!current()) return; state.orgs = orgs; repaint(); })
     .catch((err) => console.error('verifiedOrganizations', err));
 }
 
@@ -475,37 +478,3 @@ function paintExplore(mount, state) {
 }
 
 // ------------------------------------------------------------ the last bits
-
-// Shown only to a signed-in staff member of a verified masjid, because
-// these two are the only actions on this site that the navigation cannot
-// reach: both lead into the console, which is a separate application.
-//
-// There used to be six more beside them, for everybody: Find Janazahs,
-// Nearby, Find Masjids, Janazah Guide, Register a Masjid, How Ta'ziyah
-// works. Every one of those is a row in the navigation on the same screen,
-// so the block was a second copy of the nav rendered in the middle of the
-// page, and a reader had no way to tell which of the two was the real one.
-const STAFF_ACTIONS = [
-  { href: '/console?tab=notices', icon: 'plus', label: 'Post Janazah' },
-  { href: '/console?tab=notices', icon: 'grid', label: 'Manage Janazahs' },
-];
-
-/**
- * The staff shortcuts, or nothing at all.
- *
- * @param {{ canPublish: boolean } | null} staff The staff context, which only
- *   the dashboard knows. Returns null for everybody else, and the caller
- *   leaves the section out rather than rendering an empty heading.
- */
-export function quickActions(staff = null) {
-  if (!staff?.canPublish) return null;
-  return el('section', { class: 'home-section' }, [
-    sectionHead('For your masjid'),
-    el('ul', { class: 'qa' }, STAFF_ACTIONS.map((a) => el('li', {}, [
-      el('a', { class: 'qa__item', href: a.href }, [
-        icon(a.icon, { size: 17 }),
-        el('span', { text: a.label }),
-      ]),
-    ]))),
-  ]);
-}

@@ -167,3 +167,122 @@ describe('a route that changes the address', () => {
       'the retry must be bounded, or two routes pointing at each other hang the tab');
   });
 });
+
+describe('one destination, one place to reach it', () => {
+  const nav = readFileSync('public/js/nav.js', 'utf8');
+  const janazahs = readFileSync('public/js/views/feed.js', 'utf8');
+  const dashboard = readFileSync('public/js/views/dashboard.js', 'utf8');
+
+  test('the Janazahs page carries no second navigation bar', () => {
+    // It used to hold four tabs: All notices, Near me, Masjids I follow, and
+    // Manage follows. Three had their own address and their own sidebar row
+    // already, and "Near me" rendered this very component through a filter,
+    // so the sidebar's Near Me and the tab called "Near me" were the same
+    // screen reached two ways. A reader had to work out that they were not
+    // different things.
+    const render = janazahs.slice(janazahs.indexOf('export function renderFeed'),
+      janazahs.indexOf('export function feedCard'));
+    // Code, not prose: the comment above renderFeed names the tabs in order
+    // to say why they are gone.
+    for (const gone of ["class: 'tabs", 'paintTabs(', 'slideIndicator(', 'openFollowManager(']) {
+      assert.ok(!render.includes(gone), `the Janazahs page still builds ${gone}`);
+    }
+    assert.ok(!/initialFilter/.test(janazahs),
+      'the page is still rendered through a filter from somewhere else');
+  });
+
+  test('Near Me is a route, not a filter on another page', () => {
+    const site = readFileSync('public/js/feed.js', 'utf8');
+    assert.match(site, /renderNearMePage\(mount\(\)/);
+    const nearby = readFileSync('public/js/views/nearby.js', 'utf8');
+    assert.match(nearby, /export function renderNearMePage/);
+    assert.match(nearby, /export function teardownNearMe/);
+    assert.match(site, /teardownNearMe\(\);/,
+      'its own notice subscription must be torn down with the route');
+  });
+
+  test('each of the five places appears once in the primary nav', () => {
+    const links = nav.slice(nav.indexOf('const LINKS'), nav.indexOf('const BOTTOM_LINKS'));
+    const hrefs = (links.match(/href: '([^']+)'/g) || []);
+    assert.equal(new Set(hrefs).size, hrefs.length, 'a destination is listed twice');
+    assert.equal(hrefs.length, 5);
+  });
+
+  test('Settings is in the account menu, not a sixth row competing with them', () => {
+    const sidebar = nav.slice(nav.indexOf('const LINKS'), nav.indexOf('const SECTION_OF'));
+    assert.ok(!/label: 'Settings'/.test(sidebar), 'Settings is back in the sidebar');
+    const menu = nav.slice(nav.indexOf("class: 'account__menu'"), nav.indexOf('const button'));
+    assert.match(menu, /Account and settings/);
+  });
+});
+
+describe('what is shown depends on what the reader can actually do', () => {
+  const nav = readFileSync('public/js/nav.js', 'utf8');
+
+  test('a coordinator of a verified masjid is offered Manage Masjid', () => {
+    assert.match(nav, /if \(isStaff\) \{[\s\S]{0,260}label: 'Manage Masjid'/);
+  });
+
+  test('and is not also offered the page explaining what publishing is', () => {
+    // Offering somebody the introduction to a thing they already do daily is
+    // exactly the irrelevant option this clean-up removes.
+    assert.match(nav, /if \(!isStaff\) \{[\s\S]{0,260}'\/for-masjids'/);
+  });
+
+  test('Admin appears only for administrators, and stays marked out', () => {
+    assert.match(nav, /if \(isAdmin\) \{[\s\S]{0,260}nav-item--admin/);
+  });
+
+  test('both are presentation only: the rules decide what anybody may do', () => {
+    // A hidden row is not a permission. Someone who types the console's
+    // address still meets firestore.rules on every read and write.
+    assert.match(nav, /Presentation only/);
+  });
+});
+
+describe('an empty page says so without taking the screen to do it', () => {
+  const css = readFileSync('public/css/styles.css', 'utf8');
+
+  test('the empty state is a line of text, not a dashed box', () => {
+    const rule = css.slice(css.indexOf('.empty {'), css.indexOf('.empty h2'));
+    assert.ok(!/dashed/.test(rule), 'the dashed box is back');
+    const padding = rule.match(/padding: ([\d.]+)rem/);
+    assert.ok(Number(padding[1]) <= 1.5,
+      `${padding[1]}rem of padding draws the emptiness larger than the content`);
+  });
+
+  test('the decorative icon inside it is not rendered', () => {
+    assert.match(css, /\.empty \.icon \{ display: none; \}/);
+  });
+});
+
+describe('a page you have left cannot paint over the one you are on', () => {
+  const ui = readFileSync('public/js/ui.js', 'utf8');
+  const site = readFileSync('public/js/feed.js', 'utf8');
+
+  test('the router stamps each render of the shared view element', () => {
+    assert.match(ui, /export function stampRender/);
+    const renderRoute = site.slice(site.indexOf('function renderRoute'),
+      site.indexOf('function route({'));
+    assert.match(renderRoute, /stampRender\(mount\(\)\)/);
+  });
+
+  test('every view that paints from a late read checks it first', () => {
+    // Found by pressing Back from Masjids to Janazahs: the directory's own
+    // read resolved after the route had changed and replaced the children of
+    // the shared #view, so the Janazahs page lost its filter box. It was
+    // intermittent because the organization cache is usually warm.
+    for (const file of ['masjids.js', 'following.js', 'home.js', 'dashboard.js']) {
+      const source = readFileSync(`public/js/views/${file}`, 'utf8');
+      assert.match(source, /const current = renderGuard\(mount\)/,
+        `${file} does not take a render guard`);
+      // A window rather than the rest of the line: some of these callbacks
+      // span several lines.
+      for (const match of source.matchAll(/\.then\(\((?:orgs|notice|org)\) =>/g)) {
+        const body = source.slice(match.index, match.index + 200);
+        assert.ok(/current\(\)/.test(body),
+          `${file} paints from a read without checking the render is still current`);
+      }
+    }
+  });
+});

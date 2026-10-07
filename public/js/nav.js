@@ -40,13 +40,17 @@ const BOTTOM_LINKS = [
   { href: '/masjids', label: 'Masjids', icon: 'building' },
 ];
 
-// The sidebar's own footer: the two a visitor reaches for that are not one
-// of the five places above. Everything else moved into the account menu and
-// the site footer, where it is listed once instead of three times.
-const UTILITY_LINKS = [
-  { href: '/for-masjids', label: 'For Masjids', icon: 'building' },
-  { href: '/account', label: 'Settings', icon: 'eye' },
-];
+// Below the rule, and only when it applies to the person reading it.
+//
+// Settings used to sit here as a sixth row competing with the five places
+// this site is. It is one click away in the account menu at the top right,
+// which is where somebody looks for their own settings, so it is only there
+// now.
+//
+// "For Masjids" is the page that explains publishing to a masjid that does
+// not yet do it. Somebody who already staffs a verified one is shown Manage
+// Masjid instead: offering them the explanation of a thing they already do
+// is one of the irrelevant options this clean-up is removing.
 
 // Deeper pages are not in the nav but still belong to one of its sections, so
 // the current place stays lit rather than the whole bar going dark the moment
@@ -219,12 +223,15 @@ function renderAccount(mount, { user, path, authReady = true }) {
  *   portal. Presentation only: what an administrator may actually do is
  *   decided by firestore.rules on every read and write, so hiding or showing
  *   this link changes nobody's permissions.
+ * @param {boolean} [state.isStaff] Whether this account staffs a verified
+ *   organization. Presentation only, exactly like isAdmin: what somebody may
+ *   actually publish is decided by firestore.rules on every write.
  * @param {boolean} [state.authReady] False only during the brief window
  *   before Firebase has reported auth state for the first time. The account
  *   control renders neither signed-in nor signed-out controls then, since
  *   neither is known to be true yet.
  */
-export function renderNav(nav, { path, user, isAdmin = false, authReady = true }) {
+export function renderNav(nav, { path, user, isAdmin = false, isStaff = false, authReady = true }) {
   nav.replaceChildren();
   document.body.classList.toggle('is-nav-collapsed', collapsed());
 
@@ -258,14 +265,31 @@ export function renderNav(nav, { path, user, isAdmin = false, authReady = true }
   // go. "For Masjids" used to appear in this group and again in the one
   // below it; now it appears once.
   const secondary = [];
+
+  // Somebody who publishes for a verified masjid gets the way into the
+  // console they actually use, named for what it does.
+  if (isStaff) {
+    secondary.push(navItem({
+      href: '/console?tab=notices', label: 'Manage Masjid', icon: 'building',
+      path, modifier: ' nav-item--staff',
+    }));
+  }
+  // A platform administrator reading the public feed had no way through to
+  // the portal except by knowing the /console URL. Marked out because it
+  // leads somewhere almost nobody signed in here can go.
   if (isAdmin) {
     secondary.push(navItem({
       href: '/console?tab=admin', label: 'Admin', icon: 'shield', path,
       modifier: ' nav-item--admin',
     }));
   }
-  secondary.push(...UTILITY_LINKS.map((link) =>
-    navItem({ ...link, path, modifier: ' nav-item--quiet' })));
+  // Only for people it is for: see the note on UTILITY_LINKS above.
+  if (!isStaff) {
+    secondary.push(navItem({
+      href: '/for-masjids', label: 'For Masjids', icon: 'building', path,
+      modifier: ' nav-item--quiet',
+    }));
+  }
 
   nav.append(
     el('div', { class: 'sidenav__rule', 'aria-hidden': 'true' }),

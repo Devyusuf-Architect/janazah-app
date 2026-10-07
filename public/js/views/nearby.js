@@ -4,7 +4,7 @@
 // asked for their location by an app about funerals, and they are owed a plain
 // statement of what happens to it before the browser prompt appears.
 
-import { el, toast } from '../ui.js';
+import { el, toast, skeleton } from '../ui.js';
 import { formatDistance } from '../geo.js';
 import { alertsPanel } from './alerts-panel.js';
 import * as loc from '../location.js';
@@ -198,4 +198,49 @@ async function refresh(button, onChange) {
     button.disabled = false;
     button.textContent = original;
   }
+}
+
+// ------------------------------------------------------------ the Near Me page
+//
+// /near-me used to be renderFeed with a filter forced on, which is why the
+// sidebar's "Near Me" and the "Near me" tab inside Janazahs rendered the same
+// thing. The tab is gone and this is a page in its own right: it owns its
+// notice subscription, so it no longer depends on the Janazahs view having
+// been rendered first.
+
+let unwatch = null;
+let notices = [];
+
+export function teardownNearMe() {
+  if (unwatch) { unwatch(); unwatch = null; }
+}
+
+export function renderNearMePage(mount, { watchNotices, renderCard }) {
+  teardownNearMe();
+  mount.replaceChildren();
+
+  mount.append(el('div', { class: 'feed-intro' }, [
+    el('h1', { text: 'Janazahs near you' }),
+    el('p', { class: 'muted' },
+      'Worked out in your own browser. Your position is never sent to us or ' +
+      'to any masjid.'),
+  ]));
+
+  const panel = el('div', { class: 'stack' });
+  mount.append(panel);
+
+  const paint = () => {
+    panel.replaceChildren();
+    renderNearby(panel, {
+      getNotices: () => notices,
+      onChange: paint,
+      renderCard,
+    });
+  };
+
+  panel.append(skeleton(2));
+  unwatch = watchNotices((incoming) => {
+    notices = incoming;
+    paint();
+  });
 }

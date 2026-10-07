@@ -7,7 +7,7 @@
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, usingEmulator } from './firebase.js';
-import { $, el, toast } from './ui.js';
+import { $, el, toast, stampRender } from './ui.js';
 import { isSampleMode, initSampleMode } from './sample-mode.js';
 import { initPlatformSettings } from './platform-settings.js';
 import * as store from './store.js';
@@ -26,7 +26,8 @@ import { renderContact } from './views/contact.js';
 import { renderDeleteAccount } from './views/delete-account.js';
 import { applyPageMeta } from './seo.js';
 import { isFirstVisit, markVisited } from './visited.js';
-import { renderFeed, renderSingleNotice, teardownFeed } from './views/feed.js';
+import { renderFeed, renderSingleNotice, teardownFeed, feedCard } from './views/feed.js';
+import { renderNearMePage, teardownNearMe } from './views/nearby.js';
 import { renderMasjids } from './views/masjids.js';
 import { renderOrgPage, teardownOrgPage } from './views/org-page.js';
 import { renderFollowing } from './views/following.js';
@@ -50,20 +51,24 @@ let authReady = false;
 // later is then recognised as no change.
 let renderedFor = null;
 // Resolved asynchronously after sign-in. False until then, so the nav simply
-// has no Admin link for a moment rather than flickering one in and out.
+// has no Admin link for a moment rather than flickering one in and out. The
+// same applies to staffing a verified masjid, which decides whether the
+// sidebar offers "Manage Masjid" or the page explaining publishing.
 let isAdmin = false;
+let isStaff = false;
 
 function teardownAll() {
   teardownHome();
   teardownWelcome();
   teardownFeed();
+  teardownNearMe();
   teardownDashboard();
   teardownOrgPage();
 }
 
 /** Redraws the nav for the current path and sign-in state. */
 function paintNav() {
-  renderNav(nav(), { path: location.pathname, user, isAdmin, authReady });
+  renderNav(nav(), { path: location.pathname, user, isAdmin, isStaff, authReady });
 }
 
 // Returned by renderRoute when it has changed the URL instead of rendering,
@@ -80,6 +85,9 @@ function redirect(to) {
 function renderRoute() {
   teardownAll();
   paintNav();
+  // Anything the page being replaced had in flight is now stale, and must
+  // not paint itself over what comes next. See stampRender in ui.js.
+  stampRender(mount());
 
   const path = location.pathname;
   // Read before marking, so the first route of a session still knows it was
@@ -112,7 +120,10 @@ function renderRoute() {
     return;
   }
   if (/^\/near-me\/?$/.test(path)) {
-    renderFeed(mount(), { initialFilter: 'nearby' });
+    renderNearMePage(mount(), {
+      watchNotices: store.watchPublicNotices,
+      renderCard: (notice, distanceLabel) => feedCard(notice, () => {}, distanceLabel),
+    });
     return;
   }
   if (/^\/masjids\/?$/.test(path)) {
@@ -366,6 +377,7 @@ onAuthStateChanged(auth, (nextUser) => {
   user = nextUser;
   authReady = true;
   isAdmin = false;
+  isStaff = false;
 
   // Two different reasons to re-render, and conflating them breaks one of
   // them each way:
@@ -399,4 +411,17 @@ onAuthStateChanged(auth, (nextUser) => {
       paintNav();
     })
     .catch((err) => console.error('isPlatformAdmin', err));
+
+  // Whether to offer "Manage Masjid" rather than the page explaining what
+  // publishing is. Cached by store.myOrganizations, so this is not a fresh
+  // read on every route. A failure here means the sidebar shows the ordinary
+  // community version, which is the safe way to be wrong.
+  store.myOrganizations(nextUser.uid)
+    .then((orgs) => {
+      const staff = orgs.some((org) => org.verificationStatus === 'verified');
+      if (user !== nextUser || staff === isStaff) return;
+      isStaff = staff;
+      paintNav();
+    })
+    .catch((err) => console.error('myOrganizations', err));
 });

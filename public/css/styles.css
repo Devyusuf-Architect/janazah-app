@@ -365,6 +365,9 @@ body.is-nav-collapsed .app-body { --sidenav: 3.75rem; }
 
 /* Leads somewhere most signed-in people cannot go, so it is marked out
    without shouting: a tint rather than another filled button. */
+.nav-item--staff { font-weight: 600; }
+.nav-item--staff .icon { color: var(--accent); }
+
 .nav-item--admin { color: var(--gold); }
 .nav-item--admin:hover { background: var(--gold-soft); color: var(--gold); }
 
@@ -1366,20 +1369,59 @@ body.is-nav-collapsed .sidenav__collapse .icon { transform: rotate(180deg); }
   font-size: .84rem;
 }
 
+/* "Nothing here yet" is one short fact and, at most, one way forward. It used
+   to be a dashed box three rem deep with a thirty-pixel icon centred in it,
+   which on a page with no data took up half the screen to say that there was
+   none: the emptiness was drawn larger than the content would have been. A
+   rule and two lines of ordinary text say the same thing and stop the page
+   looking broken. */
 .empty {
-  display: grid;
-  justify-items: center;
-  gap: .3rem;
-  text-align: center;
-  padding: 3rem 1.5rem;
-  background: var(--surface);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius);
+  padding: 1rem 0 .25rem;
+  border-top: 1px solid var(--line);
   color: var(--ink-3);
+  font-size: .9rem;
 }
-.empty .icon { color: var(--line-strong); margin-bottom: .5rem; }
-.empty h2 { color: var(--ink); }
-.empty .btn { margin-top: .75rem; }
+.empty h2 {
+  margin: 0 0 .25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.empty p { margin: 0; }
+.empty .icon { display: none; }
+.empty .btn { margin-top: .8rem; }
+
+/* The Janazahs filter, in the space the four-tab bar used to occupy. One
+   control doing one job, styled as the same field as the home page's finder
+   so the two read as the same idea in two places rather than two features. */
+.feed-search {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: 0 .85rem;
+  margin-bottom: 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.feed-search:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.feed-search .icon { flex: none; color: var(--ink-3); }
+/* Scoped to the wrapper so these beat .field, which is defined later in this
+   sheet and would otherwise draw its own border and radius inside this one. */
+.feed-search .feed-search__input {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: .7rem 0;
+  flex: 1;
+  min-width: 0;
+}
+.feed-search .feed-search__input:focus { outline: none; box-shadow: none; }
 
 /* ---------- tabs, and the phone tab bar ---------- */
 

@@ -5,7 +5,7 @@
 // own follow manager uses (views/feed.js), and shares this file's row markup
 // with it, so there is one place that draws "a masjid, with a follow button".
 
-import { el, toast } from '../ui.js';
+import { el, toast, renderGuard } from '../ui.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
 import * as push from '../push.js';
@@ -51,10 +51,13 @@ export function orgRow(org, onChange = () => {}) {
 }
 
 export function renderMasjids(mount) {
+  // A read that lands after the reader has moved on must not paint over
+  // the page they moved to (see renderGuard in ui.js).
+  const current = renderGuard(mount);
   mount.replaceChildren(el('div', { class: 'skeletons', 'aria-hidden': 'true' }));
 
   store.verifiedOrganizations()
-    .then((orgs) => paint(mount, orgs))
+    .then((orgs) => { if (current()) paint(mount, orgs); })
     .catch((err) => {
       // Same call home.js and dashboard.js already make: a failed read here
       // is not something a visitor can act on, and showing an alarming error

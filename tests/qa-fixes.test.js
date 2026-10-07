@@ -25,39 +25,11 @@ const privacy = readFileSync('public/js/views/privacy.js', 'utf8');
 const terms = readFileSync('public/js/views/terms.js', 'utf8');
 const about = readFileSync('public/js/views/about.js', 'utf8');
 
-describe('item 1: the mobile feed tabs no longer share the bottom nav\'s rectangle', () => {
-  test('the feed\'s own tab row opts out of the bottom-dock treatment', () => {
-    assert.match(feed, /const tabs = el\('div', \{ class: 'tabs tabs--plain' \}\);/,
-      'the feed tabs should carry tabs--plain, the same escape hatch the admin ' +
-      'portal already uses for its own section switcher');
-  });
-
-  test('.tabs--plain exists and stays out of the fixed bottom-dock position below 640px', () => {
-    const block = css.slice(css.indexOf('.tabs.tabs--plain {'), css.indexOf('.tabs.tabs--plain {') + 400);
-    assert.match(block, /position:\s*static/);
-  });
-});
-
-describe('item 1: mobile visitors default to All notices', () => {
-  test('the default-filter decision checks a mobile viewport before the follow count', () => {
-    const decision = feed.slice(
-      feed.indexOf("} else if (filter === null) {"),
-      feed.indexOf("}", feed.indexOf("filter = isMobile")) + 1);
-    assert.match(decision, /window\.matchMedia/);
-    assert.match(decision, /max-width:\s*900px/,
-      'should match the same 900px breakpoint .bottom-nav uses');
-    assert.match(decision, /isMobile \? 'all'/,
-      'a mobile visitor should always land on all notices');
-    assert.match(decision, /followedOrgIds\(\)\.length \? 'following' : 'all'/,
-      'desktop keeps the existing follows-based default');
-  });
-});
-
-describe('item 6: the follow-management tab is labelled for what it does', () => {
-  test('the tab that opens the follow manager no longer says the generic "Manage"', () => {
-    assert.match(feed, /tab\('manage', 'users', 'Manage follows', \(\) => openFollowManager\(\)\)/);
-  });
-});
+// Three blocks stood here, all pinning the Janazahs page's own bar of four
+// tabs: how it behaved on a phone, which tab it opened on, and what the
+// follow-management one was called. The bar is gone. Three of its tabs led
+// to places that already had their own address and their own sidebar row,
+// and "Near me" rendered the very component the page it sat on was.
 
 describe('item 5: admin loading states have visual weight', () => {
   test('the shared admin "loading" helper reuses the skeleton pattern, not bare text', () => {
@@ -86,12 +58,12 @@ describe('item 5: no sign-in flash before auth state resolves', () => {
   });
 
   test('renderNav threads authReady down to the account control', () => {
-    assert.match(nav, /export function renderNav\(nav, \{ path, user, isAdmin = false, authReady = true \}\)/);
+    assert.match(nav, /export function renderNav\(nav, \{[^}]*authReady = true[^}]*\}\)/);
     assert.match(nav, /renderAccount\(account, \{ user, path, authReady \}\)/);
   });
 
   test('the public site bootstrap passes its own authReady flag to the nav paint', () => {
-    assert.match(siteBootstrap, /renderNav\(nav\(\), \{ path: location\.pathname, user, isAdmin, authReady \}\)/);
+    assert.match(siteBootstrap, /renderNav\(nav\(\), \{[^}]*authReady[^}]*\}\)/);
   });
 
   test('the placeholder reserves the same footprint as the real control, so nothing jumps', () => {

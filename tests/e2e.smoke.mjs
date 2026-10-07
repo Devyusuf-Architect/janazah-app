@@ -576,12 +576,31 @@ const run = async () => {
     assert.ok(followState && JSON.parse(followState).length === 1,
       'follow was not stored on the device');
 
-    await visitor.getByRole('button', { name: 'Masjids I follow (1)' }).click();
-    await visitor.locator('.notice-card').first().waitFor({ timeout: 5000 });
-    log('follow persisted on the device and filters the feed');
+    // The masjids this device follows have their own page. There used to be
+    // a "Masjids I follow" tab on this one as well, which is the duplication
+    // the navigation clean-up removed.
+    await visitor.goto(`${BASE}/following`);
+    await visitor.locator('.mrow, .list li').first().waitFor({ timeout: 10000 });
+    assert.ok((await visitor.locator('#view').innerText()).includes('Test Masjid'),
+      'the followed masjid is missing from /following');
+    log('follow persisted on the device and shows on its own page');
+
+    // The filter that replaced the tab bar narrows the list in place.
+    await visitor.goto(`${BASE}/janazahs`);
+    await visitor.locator('.notice-card').first().waitFor({ timeout: 10000 });
+    await visitor.locator('.feed-search__input').fill('Test Masjid');
+    await visitor.waitForTimeout(250);
+    assert.ok(await visitor.locator('.notice-card').count() > 0,
+      'filtering by the masjid name hid its own notices');
+    await visitor.locator('.feed-search__input').fill('zzzzzz');
+    await visitor.waitForTimeout(250);
+    assert.equal(await visitor.locator('.notice-card').count(), 0,
+      'a filter matching nothing still showed notices');
+    await visitor.locator('.feed-search__input').fill('');
+    await visitor.waitForTimeout(250);
+    log('the Janazahs filter narrows the list and clears again');
 
     // The shareable per-notice link.
-    await visitor.getByRole('button', { name: 'All notices' }).click();
     await visitor.getByRole('link', { name: 'Open' }).first().click();
     await visitor.locator('.public-notice').first().waitFor({ timeout: 10000 });
     assert.match(visitor.url(), /\/n\/[A-Za-z0-9_-]+$/, 'expected a /n/{id} share URL');
@@ -897,11 +916,11 @@ const run = async () => {
       geolocation: { latitude: 43.6591234, longitude: -79.3901234 },
       locale: 'en-CA',
     });
-    await local.goto(`${BASE}/janazahs`);
-    await local.locator('.notice-card').first().waitFor({ timeout: 15000 });
-
-    await local.getByRole('button', { name: 'Near me' }).click();
-    await local.getByRole('button', { name: 'Use my location' }).waitFor({ timeout: 10000 });
+    // Near Me is its own address, not a tab on the Janazahs page. It used to
+    // be renderFeed with a filter forced on, which is why the sidebar's "Near
+    // Me" and the tab called "Near me" rendered the same screen.
+    await local.goto(`${BASE}/near-me`);
+    await local.getByRole('button', { name: 'Use my location' }).waitFor({ timeout: 15000 });
 
     // The short promise is up front (mobile QA pass: progressive disclosure),
     // and the full explanation of where location goes and how long it is
@@ -1082,8 +1101,12 @@ const run = async () => {
     assert.match(homeText, /Upcoming Janazahs/i);
     assert.match(homeText, /Near you/i);
     assert.match(homeText, /Masjids you follow/i);
-    assert.match(homeText, /How to perform Janazah/i);
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Following', 'Janazah Guide']) {
+    // Not the guide: it is a row in the sidebar on this same screen, and the
+    // strip repeating it here was one of the duplicate links the navigation
+    // clean-up removed.
+    // The five places this site is. "Following" moved to the account menu and
+    // the footer, and the guide's row is now simply "Guide".
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids', 'Guide']) {
       await guest.locator('#nav').getByRole('link', { name: label, exact: true })
         .first().waitFor({ timeout: 5000 });
     }
@@ -1145,17 +1168,17 @@ const run = async () => {
     assert.ok(!(await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
       .first().isVisible()), 'the sidebar must be closed on a phone until opened');
     // The header hamburger is gone on a phone; the bottom bar's own Home,
-    // Janazahs, Near Me and Following tabs, plus a Profile tab, replace it.
+    // Janazahs, Near Me and Masjids tabs, plus a Profile tab, replace it.
     assert.ok(!(await phone.locator('#nav-toggle').isVisible()),
       'the header hamburger must give way to the bottom bar on a phone');
-    for (const label of ['Home', 'Janazahs', 'Near Me', 'Following']) {
+    for (const label of ['Home', 'Janazahs', 'Near Me', 'Masjids']) {
       await phone.locator('#bottom-nav').getByRole('link', { name: label, exact: true })
         .waitFor({ state: 'visible', timeout: 5000 });
     }
     await phone.locator('#bottom-nav').getByRole('button', { name: 'Profile' }).click();
-    // Masjids and Janazah Guide are the "less-used" items the bottom bar has
-    // no room for; they live in the menu the Profile tab opens.
-    await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
+    // The Guide is the one core place the bottom bar has no room for, so it
+    // lives in the menu the Profile tab opens.
+    await phone.locator('#nav').getByRole('link', { name: 'Guide', exact: true })
       .first().waitFor({ state: 'visible', timeout: 5000 });
     // Already on the bottom bar, so no longer duplicated in this menu too.
     assert.equal(
@@ -1164,7 +1187,7 @@ const run = async () => {
     // To the right of the drawer, which is where somebody dismissing it taps.
     // The scrim spans the viewport, so its centre is under the drawer itself.
     await phone.locator('#nav-scrim').click({ position: { x: 360, y: 400 } });
-    await phone.locator('#nav').getByRole('link', { name: 'Masjids', exact: true })
+    await phone.locator('#nav').getByRole('link', { name: 'Guide', exact: true })
       .first().waitFor({ state: 'hidden', timeout: 5000 });
     // The page under it is still the useful one, at a readable width.
     const phoneRow = await phone.locator('.jrow').first().boundingBox();
@@ -1230,9 +1253,11 @@ const run = async () => {
     assert.match(member.url(), /\/dashboard$/, 'expected /dashboard after community sign-up');
 
     const dashboardText = await member.locator('#view').innerText();
+    // Three sections and the greeting. Quick Actions is gone: for a community
+    // member every tile in it was a row in the sidebar on the same screen.
     for (const claim of [
       /Assalamu Alaikum/, /Upcoming Janazahs/, /Near you/i,
-      /Masjids you follow/i, /Quick actions/i,
+      /Masjids you follow/i,
     ]) {
       assert.match(dashboardText, claim, `dashboard is missing: ${claim}`);
     }

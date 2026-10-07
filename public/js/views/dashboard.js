@@ -15,10 +15,10 @@
 // staffs a verified masjid (so Quick Actions can offer Post/Manage), and
 // Recent Updates, a short list built from notices already on this page.
 
-import { el, icon } from '../ui.js';
+import { el, icon, renderGuard } from '../ui.js';
 import * as store from '../store.js';
 import * as follows from '../follows.js';
-import { paintUpcoming, paintNear, paintFollowed, quickActions, sectionHead } from './home.js';
+import { paintUpcoming, paintNear, paintFollowed, sectionHead } from './home.js';
 
 /** How many recent-activity lines to show before the rest waits for /janazahs. */
 const RECENT_UPDATES_LIMIT = 5;
@@ -38,11 +38,13 @@ export function teardownDashboard() {
  * @param {{ user: import('firebase/auth').User }} ctx
  */
 export function renderDashboard(mount, ctx) {
+  // A read that lands after the reader has moved on must not paint over
+  // the page they moved to (see renderGuard in ui.js).
+  const current = renderGuard(mount);
   teardownDashboard();
   // Same pattern as the admin portal (views/admin.js): a wider reading
   // column for a two-column layout, restored to the normal width by
   // teardownDashboard() the moment this route is left.
-  mount.classList.add('view--wide');
 
   const state = {
     notices: [], orgs: [], query: '', loading: true,
@@ -57,34 +59,34 @@ export function renderDashboard(mount, ctx) {
   const near = el('section', { class: 'home-section' });
   const followed = el('section', { class: 'home-section' });
   const updates = el('section', { class: 'home-section', hidden: true });
-  // Null unless this account can publish for a verified masjid. A comment
-  // node holds the place so the column keeps its order when the staff
-  // context resolves a moment later and the section appears.
-  let qa = quickActions() || document.createComment('quick-actions');
 
   const repaint = () => {
     paintUpcoming(upcoming, state);
     paintNear(near, state, repaint);
     paintFollowed(followed, state, repaint);
     paintRecentUpdates(updates, state);
-    const freshQa = quickActions(staffContext(state))
-      || document.createComment('quick-actions');
-    qa.replaceWith(freshQa);
-    qa = freshQa;
   };
 
   const firstName = (ctx.user.displayName || '').trim().split(/\s+/)[0];
 
+  // One column, three sections, in the order the questions get asked: what is
+  // happening, what is near me, what have the masjids I follow got coming up.
+  //
+  // The two-column grid is gone, and so is the Quick Actions block that
+  // filled the second column: for a community member every one of its tiles
+  // was a row in the sidebar on the same screen, and for a coordinator the
+  // two console shortcuts are now the sidebar's own "Manage Masjid". Recent
+  // Updates stays, because a cancellation on a masjid you follow is not
+  // reachable any other way, and it hides itself when there is none.
   mount.replaceChildren(
     el('header', { class: 'dash-head' }, [
       el('h1', { class: 'dash-head__title', text: firstName ? `Assalamu Alaikum, ${firstName}` : 'Assalamu Alaikum' }),
       el('p', { class: 'dash-head__sub muted' }, 'Here is what is happening around you.'),
     ]),
     upcoming,
-    el('div', { class: 'dash-grid' }, [
-      el('div', { class: 'dash-col' }, [near, followed]),
-      el('div', { class: 'dash-col' }, [qa, updates]),
-    ]),
+    near,
+    followed,
+    updates,
   );
 
   repaint();
@@ -98,11 +100,11 @@ export function renderDashboard(mount, ctx) {
   // As on the public feed, a masjid-list failure must not take the Janazah
   // list down with it.
   store.verifiedOrganizations()
-    .then((orgs) => { state.orgs = orgs; repaint(); })
+    .then((orgs) => { if (!current()) return; state.orgs = orgs; repaint(); })
     .catch((err) => console.error('verifiedOrganizations', err));
 
   store.myOrganizations(ctx.user.uid)
-    .then((orgs) => { state.staffOrgs = orgs; repaint(); })
+    .then((orgs) => { if (!current()) return; state.staffOrgs = orgs; repaint(); })
     .catch((err) => {
       console.error('myOrganizations', err);
       // Staff status could not be confirmed; treat as "not staff" rather
@@ -110,12 +112,6 @@ export function renderDashboard(mount, ctx) {
       state.staffOrgs = [];
       repaint();
     });
-}
-
-/** Whether this account staffs a verified masjid, for Quick Actions. */
-function staffContext(state) {
-  if (!state.staffOrgs) return null;
-  return { canPublish: state.staffOrgs.some((o) => o.verificationStatus === 'verified') };
 }
 
 // -------------------------------------------------------------- recent updates
